@@ -38,7 +38,24 @@ body {
 }
 
 .hero-gradient {
-  background: radial-gradient(circle at top right, #f97316, #ea580c, #c2410c);
+  background: radial-gradient(circle at top right, #fb923c, #ea580c, #9a3412);
+  /* Fallback / dark mode feel */
+  background-size: 200% 200%;
+  animation: gradientBG 15s ease infinite;
+}
+
+@keyframes gradientBG {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
 }
 
 .btn-primary {

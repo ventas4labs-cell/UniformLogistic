@@ -225,69 +225,94 @@ function App() {
     // --- Views ---
 
     const renderLanding = () => (
-        <div className="flex flex-col h-screen hero-gradient text-white relative overflow-hidden">
-            {/* Background Decor */}
-            <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-white/10 rounded-full blur-3xl"></div>
-            <div className="absolute bottom-[-10%] left-[-10%] w-64 h-64 bg-orange-400/20 rounded-full blur-2xl"></div>
+        <div className="flex flex-col min-h-screen hero-gradient text-white relative overflow-hidden font-sans selection:bg-orange-500 selection:text-white">
+            {/* Background Decor - Animated Orbs */}
+            <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] bg-white/10 rounded-full blur-[100px] animate-pulse"></div>
+            <div className="absolute bottom-[-10%] left-[-20%] w-[600px] h-[600px] bg-orange-600/30 rounded-full blur-[120px]"></div>
 
-            <button
-                onClick={handleLogout}
-                className="absolute top-6 right-6 z-50 bg-white/10 backdrop-blur-xl p-3 rounded-2xl hover:bg-white/20 transition-all text-white border border-white/10 cursor-pointer shadow-lg"
-                title="Cerrar Sesión"
-            >
-                <LogOut size={20} />
-            </button>
+            {/* Header / Logout */}
+            <div className="absolute top-6 right-6 z-50">
+                <button
+                    onClick={handleLogout}
+                    className="group bg-white/10 backdrop-blur-md p-3 pr-4 rounded-full hover:bg-white/20 transition-all text-white border border-white/10 shadow-lg flex items-center gap-2"
+                    title="Cerrar Sesión"
+                >
+                    <div className="bg-white/20 p-1.5 rounded-full group-hover:bg-white/30 transition-colors">
+                        <LogOut size={16} />
+                    </div>
+                    <span className="text-sm font-medium opacity-90">Salir</span>
+                </button>
+            </div>
 
-            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center z-10 animate-fade-in">
-                <div className="bg-white p-6 rounded-[2rem] mb-8 shadow-2xl w-48 lg:w-56 mx-auto transform hover:scale-105 transition-transform">
-                    <img src="/logo.png" alt="Uniform Logistic Logo" className="w-full h-auto" />
+            {/* Main Content */}
+            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center z-10 animate-fade-in w-full max-w-5xl mx-auto">
+
+                {/* Logo Section - Glass Card effect for logo */}
+                <div className="relative mb-8 group">
+                    <div className="absolute inset-0 bg-white/20 blur-xl rounded-full transform group-hover:scale-110 transition-transform duration-700"></div>
+                    <div className="relative bg-white/90 backdrop-blur-sm p-8 rounded-[2.5rem] shadow-2xl w-52 h-52 flex items-center justify-center transform hover:scale-105 transition-all duration-300 border border-white/50">
+                        <img src="/logo.png" alt="Uniform Logistic Logo" className="w-full h-auto object-contain drop-shadow-md" />
+                    </div>
                 </div>
-                <h1 className="text-5xl lg:text-7xl font-bold mb-6 tracking-tight leading-tight">
-                    Uniform <span className="text-orange-200">Logistic</span>
-                </h1>
-                <p className="text-orange-50 text-lg lg:text-2xl mb-12 max-w-lg mx-auto opacity-90 font-light">
-                    Gestión inteligente de uniformes para profesionales de seguridad.
-                </p>
 
-                <div className="w-full max-w-sm space-y-4">
+                {/* Typography */}
+                <div className="space-y-4 mb-12">
+                    <h1 className="text-5xl md:text-7xl font-bold tracking-tight leading-none drop-shadow-sm">
+                        Uniform <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-100 to-orange-50">Logistic</span>
+                    </h1>
+                    <p className="text-orange-100 text-lg md:text-2xl font-light max-w-2xl mx-auto leading-relaxed border-t border-white/10 pt-6 mt-6">
+                        Gestión inteligente de uniformes para profesionales de seguridad.
+                    </p>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="w-full max-w-md space-y-4 flex flex-col items-center">
                     <button
                         onClick={() => setView(AppView.CATALOG)}
-                        className="w-full py-5 px-8 bg-white text-orange-600 rounded-2xl font-bold text-xl shadow-2xl hover:bg-gray-50 hover:shadow-white/10 transition-all hover:-translate-y-1 active:scale-95"
+                        className="group relative w-full py-5 px-8 bg-white text-orange-600 rounded-2xl font-bold text-xl shadow-2xl hover:shadow-orange-900/20 transition-all hover:-translate-y-1 active:scale-95 overflow-hidden"
                     >
-                        Iniciar Nuevo Pedido
+                        <div className="absolute inset-0 bg-gradient-to-r from-orange-50 to-white opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <span className="relative flex items-center justify-center gap-3">
+                            Start New Order
+                            <ArrowLeft className="rotate-180 group-hover:translate-x-1 transition-transform" size={24} />
+                        </span>
                     </button>
 
                     <button
                         onClick={() => setView(AppView.ORDER_HISTORY)}
-                        className="w-full py-4 px-8 bg-orange-900/40 backdrop-blur-md text-white rounded-2xl font-semibold border border-white/10 hover:bg-orange-900/60 transition-all flex items-center justify-center gap-3 active:scale-95"
+                        className="w-full py-4 px-8 bg-black/20 backdrop-blur-md text-white rounded-2xl font-semibold border border-white/10 hover:bg-black/30 hover:border-white/20 transition-all flex items-center justify-center gap-3 active:scale-95"
                     >
-                        <History size={20} />
-                        Historial de Pedidos
+                        <History size={20} className="text-orange-200" />
+                        <span>Order History</span>
                     </button>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        {isAdmin && (
+                    {/* Admin Actions Area */}
+                    {(isAdmin) && (
+                        <div className="grid grid-cols-2 gap-3 w-full pt-4 border-t border-white/10 mt-2">
                             <button
                                 onClick={() => setView(AppView.AI_COUNT)}
-                                className="bg-white/10 backdrop-blur-md text-white py-4 px-4 rounded-2xl font-semibold border border-white/5 hover:bg-white/20 flex items-center justify-center gap-2 transition-all"
+                                className="bg-white/5 backdrop-blur-sm text-white py-3 px-4 rounded-xl text-sm font-medium border border-white/5 hover:bg-white/10 hover:shadow-lg transition-all flex flex-col items-center justify-center gap-2"
                             >
-                                <Camera size={20} />
-                                <span className="text-sm">Contador</span>
+                                <Camera size={20} className="text-orange-300" />
+                                <span>AI Counter</span>
                             </button>
-                        )}
-                        {isAdmin && (
                             <button
                                 onClick={() => setView(AppView.ADMIN_DASHBOARD)}
-                                className="bg-gray-900/40 backdrop-blur-md text-white py-4 px-4 rounded-2xl font-semibold border border-white/5 hover:bg-gray-900/60 flex items-center justify-center gap-2 transition-all"
+                                className="bg-white/5 backdrop-blur-sm text-white py-3 px-4 rounded-xl text-sm font-medium border border-white/5 hover:bg-white/10 hover:shadow-lg transition-all flex flex-col items-center justify-center gap-2"
                             >
-                                Dashboard
+                                <Plus size={20} className="text-orange-300" />
+                                <span>Dashboard</span>
                             </button>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </div>
             </div>
-            <div className="p-6 text-center text-orange-200/60 text-sm font-medium">
-                v1.2.0 • Premium Access Only
+
+            {/* Footer */}
+            <div className="p-6 text-center">
+                <p className="text-orange-200/60 text-xs font-medium tracking-widest uppercase">
+                    v1.2.0 • Premium Enterprise Solution
+                </p>
             </div>
         </div>
     );
