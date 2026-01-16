@@ -225,64 +225,64 @@ function App() {
     // --- Views ---
 
     const renderLanding = () => (
-        <div className="flex flex-col min-h-screen hero-gradient text-white relative overflow-hidden font-sans selection:bg-orange-500 selection:text-white">
+        <div className="flex flex-col min-h-screen hero-gradient text-white relative overflow-x-hidden font-sans selection:bg-orange-500 selection:text-white">
             {/* Background Decor - Animated Orbs */}
-            <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] bg-white/10 rounded-full blur-[100px] animate-pulse"></div>
-            <div className="absolute bottom-[-10%] left-[-20%] w-[600px] h-[600px] bg-orange-600/30 rounded-full blur-[120px]"></div>
+            <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] bg-white/10 rounded-full blur-[100px] animate-pulse pointer-events-none"></div>
+            <div className="absolute bottom-[-10%] left-[-20%] w-[600px] h-[600px] bg-orange-600/30 rounded-full blur-[120px] pointer-events-none"></div>
 
             {/* Header / Logout */}
             <div className="absolute top-6 right-6 z-50">
                 <button
                     onClick={handleLogout}
-                    className="group bg-white/10 backdrop-blur-md p-3 pr-4 rounded-full hover:bg-white/20 transition-all text-white border border-white/10 shadow-lg flex items-center gap-2"
+                    className="group bg-white/10 backdrop-blur-md p-2.5 pr-4 rounded-full hover:bg-white/20 transition-all text-white border border-white/10 shadow-lg flex items-center gap-2"
                     title="Cerrar Sesión"
                 >
                     <div className="bg-white/20 p-1.5 rounded-full group-hover:bg-white/30 transition-colors">
-                        <LogOut size={16} />
+                        <LogOut size={14} />
                     </div>
-                    <span className="text-sm font-medium opacity-90">Salir</span>
+                    <span className="text-xs font-medium opacity-90">Salir</span>
                 </button>
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center z-10 animate-fade-in w-full max-w-5xl mx-auto">
+            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center z-10 animate-fade-in w-full max-w-4xl mx-auto mt-10 mb-10">
 
-                {/* Logo Section - Glass Card effect for logo */}
+                {/* Logo Section */}
                 <div className="relative mb-8 group">
                     <div className="absolute inset-0 bg-white/20 blur-xl rounded-full transform group-hover:scale-110 transition-transform duration-700"></div>
-                    <div className="relative bg-white/90 backdrop-blur-sm p-8 rounded-[2.5rem] shadow-2xl w-52 h-52 flex items-center justify-center transform hover:scale-105 transition-all duration-300 border border-white/50">
+                    <div className="relative bg-white/90 backdrop-blur-sm p-6 rounded-[2rem] shadow-2xl w-40 h-40 md:w-52 md:h-52 flex items-center justify-center transform hover:scale-105 transition-all duration-300 border border-white/50">
                         <img src="/logo.png" alt="Uniform Logistic Logo" className="w-full h-auto object-contain drop-shadow-md" />
                     </div>
                 </div>
 
                 {/* Typography */}
-                <div className="space-y-4 mb-12">
-                    <h1 className="text-5xl md:text-7xl font-bold tracking-tight leading-none drop-shadow-sm">
+                <div className="space-y-4 mb-10">
+                    <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight leading-none drop-shadow-sm">
                         Uniform <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-100 to-orange-50">Logistic</span>
                     </h1>
-                    <p className="text-orange-100 text-lg md:text-2xl font-light max-w-2xl mx-auto leading-relaxed border-t border-white/10 pt-6 mt-6">
+                    <p className="text-orange-100 text-base md:text-xl font-light max-w-xl mx-auto leading-relaxed border-t border-white/10 pt-6 mt-6">
                         Gestión inteligente de uniformes para profesionales de seguridad.
                     </p>
                 </div>
 
                 {/* Action Buttons */}
-                <div className="w-full max-w-md space-y-4 flex flex-col items-center">
+                <div className="w-full max-w-sm space-y-4 flex flex-col items-center">
                     <button
                         onClick={() => setView(AppView.CATALOG)}
-                        className="group relative w-full py-5 px-8 bg-white text-orange-600 rounded-2xl font-bold text-xl shadow-2xl hover:shadow-orange-900/20 transition-all hover:-translate-y-1 active:scale-95 overflow-hidden"
+                        className="group relative w-full py-4 px-6 bg-white text-orange-600 rounded-xl font-bold text-lg shadow-xl hover:shadow-orange-900/20 transition-all hover:-translate-y-1 active:scale-95 overflow-hidden"
                     >
                         <div className="absolute inset-0 bg-gradient-to-r from-orange-50 to-white opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                        <span className="relative flex items-center justify-center gap-3">
+                        <span className="relative flex items-center justify-center gap-2">
                             Start New Order
-                            <ArrowLeft className="rotate-180 group-hover:translate-x-1 transition-transform" size={24} />
+                            <ArrowLeft className="rotate-180 group-hover:translate-x-1 transition-transform" size={20} />
                         </span>
                     </button>
 
                     <button
                         onClick={() => setView(AppView.ORDER_HISTORY)}
-                        className="w-full py-4 px-8 bg-black/20 backdrop-blur-md text-white rounded-2xl font-semibold border border-white/10 hover:bg-black/30 hover:border-white/20 transition-all flex items-center justify-center gap-3 active:scale-95"
+                        className="w-full py-3.5 px-6 bg-black/20 backdrop-blur-md text-white rounded-xl font-semibold border border-white/10 hover:bg-black/30 hover:border-white/20 transition-all flex items-center justify-center gap-2 active:scale-95 text-base"
                     >
-                        <History size={20} className="text-orange-200" />
+                        <History size={18} className="text-orange-200" />
                         <span>Order History</span>
                     </button>
 
@@ -291,16 +291,16 @@ function App() {
                         <div className="grid grid-cols-2 gap-3 w-full pt-4 border-t border-white/10 mt-2">
                             <button
                                 onClick={() => setView(AppView.AI_COUNT)}
-                                className="bg-white/5 backdrop-blur-sm text-white py-3 px-4 rounded-xl text-sm font-medium border border-white/5 hover:bg-white/10 hover:shadow-lg transition-all flex flex-col items-center justify-center gap-2"
+                                className="bg-white/5 backdrop-blur-sm text-white py-3 px-3 rounded-lg text-sm font-medium border border-white/5 hover:bg-white/10 hover:shadow-lg transition-all flex flex-col items-center justify-center gap-2"
                             >
-                                <Camera size={20} className="text-orange-300" />
+                                <Camera size={18} className="text-orange-300" />
                                 <span>AI Counter</span>
                             </button>
                             <button
                                 onClick={() => setView(AppView.ADMIN_DASHBOARD)}
-                                className="bg-white/5 backdrop-blur-sm text-white py-3 px-4 rounded-xl text-sm font-medium border border-white/5 hover:bg-white/10 hover:shadow-lg transition-all flex flex-col items-center justify-center gap-2"
+                                className="bg-white/5 backdrop-blur-sm text-white py-3 px-3 rounded-lg text-sm font-medium border border-white/5 hover:bg-white/10 hover:shadow-lg transition-all flex flex-col items-center justify-center gap-2"
                             >
-                                <Plus size={20} className="text-orange-300" />
+                                <Plus size={18} className="text-orange-300" />
                                 <span>Dashboard</span>
                             </button>
                         </div>
@@ -309,8 +309,8 @@ function App() {
             </div>
 
             {/* Footer */}
-            <div className="p-6 text-center">
-                <p className="text-orange-200/60 text-xs font-medium tracking-widest uppercase">
+            <div className="p-4 text-center">
+                <p className="text-orange-200/60 text-[10px] font-medium tracking-widest uppercase">
                     v1.2.0 • Premium Enterprise Solution
                 </p>
             </div>

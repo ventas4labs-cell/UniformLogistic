@@ -18,6 +18,17 @@ export default defineConfig(({ mode }) => {
       alias: {
         '@': path.resolve(__dirname, '.'),
       }
+    },
+    build: {
+      chunkSizeWarningLimit: 1000,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            vendor: ['react', 'react-dom'],
+            utils: ['@google/genai', '@supabase/supabase-js', 'jspdf', 'jspdf-autotable', 'lucide-react']
+          }
+        }
+      }
     }
   };
 });
