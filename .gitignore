@@ -31,3 +31,4 @@ token.json
 .env
 .venv/
 venv/
+.vercel
