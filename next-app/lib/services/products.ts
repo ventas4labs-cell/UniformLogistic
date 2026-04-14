@@ -18,6 +18,7 @@ export interface ProductRow {
     fabric_type: string | null;
     is_active: boolean | null;
     bom_json: BomItem[] | null;
+    codigo_cabys: string | null;
 }
 
 export interface AdminProduct extends Product {
@@ -25,6 +26,7 @@ export interface AdminProduct extends Product {
     fabricType: string;
     isActive: boolean;
     bom: BomItem[];
+    codigoCabys: string;
 }
 
 const genderToCategory = (gender: ProductRow['gender']): Product['category'] => {
@@ -44,7 +46,8 @@ export const mapProductRow = (row: ProductRow): AdminProduct => ({
     sizes: row.sizes_json || {},
     fabricType: row.fabric_type || '',
     isActive: row.is_active !== false,
-    bom: (row.bom_json as BomItem[]) || []
+    bom: (row.bom_json as BomItem[]) || [],
+    codigoCabys: row.codigo_cabys || ''
 });
 
 export const fetchCatalogForUser = async (
@@ -64,7 +67,7 @@ export const fetchCatalogForUser = async (
         .select(`
             product:products (
                 id, product_code, name, description, image_url,
-                product_type, gender, sizes_json, fabric_type, is_active, bom_json
+                product_type, gender, sizes_json, fabric_type, is_active, bom_json, codigo_cabys
             )
         `)
         .eq('company_id', link.company_id)
@@ -104,10 +107,11 @@ export interface ProductInput {
     fabricType?: string;
     isActive?: boolean;
     bom?: BomItem[];
+    codigoCabys?: string;
 }
 
 const PRODUCT_SELECT =
-    'id, product_code, name, description, image_url, product_type, gender, sizes_json, fabric_type, is_active, bom_json';
+    'id, product_code, name, description, image_url, product_type, gender, sizes_json, fabric_type, is_active, bom_json, codigo_cabys';
 
 export const fetchProducts = async (
     supabase: SupabaseClient
@@ -137,7 +141,8 @@ export const createProduct = async (
             sizes_json: input.sizes,
             fabric_type: input.fabricType || null,
             is_active: input.isActive ?? true,
-            bom_json: input.bom || []
+            bom_json: input.bom || [],
+            codigo_cabys: input.codigoCabys || null
         })
         .select(PRODUCT_SELECT)
         .single();
@@ -162,7 +167,8 @@ export const updateProduct = async (
             sizes_json: input.sizes,
             fabric_type: input.fabricType || null,
             is_active: input.isActive ?? true,
-            bom_json: input.bom || []
+            bom_json: input.bom || [],
+            codigo_cabys: input.codigoCabys || null
         })
         .eq('id', uuid)
         .select(PRODUCT_SELECT)

@@ -143,6 +143,7 @@ interface ItemProduct {
     product_type: 'shirt' | 'pant' | null;
     fabric_type: string | null;
     bom_json: { name: string; qty: number }[] | null;
+    codigo_cabys: string | null;
 }
 
 interface ItemJoin {
@@ -183,7 +184,7 @@ const NESTED_SELECT = `
         size,
         quantity,
         description,
-        product:products ( product_type, fabric_type, bom_json )
+        product:products ( product_type, fabric_type, bom_json, codigo_cabys )
     )
 `;
 
@@ -210,7 +211,8 @@ const mapRowToOrder = (row: RawOrderRow): Order => {
                 quantity: it.quantity,
                 productType: product?.product_type || undefined,
                 fabricType: product?.fabric_type || undefined,
-                bom: product?.bom_json || undefined
+                bom: product?.bom_json || undefined,
+                codigoCabys: product?.codigo_cabys || undefined
             };
         }),
         dateCreated: row.created_at,

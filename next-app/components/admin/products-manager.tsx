@@ -9,6 +9,7 @@ import {
     updateProductAction,
     deleteProductAction
 } from '@/app/(admin)/admin/products/actions';
+import { validateCABYS } from '@/lib/facturacion/validation/cabys-validator';
 
 const emptyForm: ProductInput = {
     productCode: '',
@@ -20,7 +21,8 @@ const emptyForm: ProductInput = {
     sizes: { men: [], women: [], waist: [], inseam: [] },
     fabricType: '',
     isActive: true,
-    bom: []
+    bom: [],
+    codigoCabys: ''
 };
 
 const parseList = (input: string): string[] =>
@@ -57,7 +59,8 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
             sizes: p.sizes,
             fabricType: p.fabricType,
             isActive: p.isActive,
-            bom: p.bom || []
+            bom: p.bom || [],
+            codigoCabys: p.codigoCabys || ''
         });
         setShowForm(true);
         setError(null);
@@ -68,6 +71,14 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
         setSaving(true);
         setError(null);
         try {
+            if (form.codigoCabys && form.codigoCabys.trim()) {
+                const result = validateCABYS(form.codigoCabys.trim());
+                if (!result.valid) {
+                    setError(result.error || 'Código CABYS inválido');
+                    setSaving(false);
+                    return;
+                }
+            }
             if (editing) {
                 await updateProductAction(editing.uuid, form);
             } else {
@@ -120,6 +131,7 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
                             <th className="p-4 font-semibold text-gray-600">Tipo</th>
                             <th className="p-4 font-semibold text-gray-600">Género</th>
                             <th className="p-4 font-semibold text-gray-600">Tela</th>
+                            <th className="p-4 font-semibold text-gray-600">CABYS</th>
                             <th className="p-4 font-semibold text-gray-600">Estado</th>
                             <th className="p-4 font-semibold text-gray-600 text-right">Acciones</th>
                         </tr>
@@ -127,7 +139,7 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
                     <tbody className="divide-y divide-gray-100">
                         {initialProducts.length === 0 ? (
                             <tr>
-                                <td colSpan={7} className="p-8 text-center text-gray-500">
+                                <td colSpan={8} className="p-8 text-center text-gray-500">
                                     <Package size={32} className="mx-auto mb-2 opacity-30" />
                                     Sin productos registrados.
                                 </td>
@@ -146,6 +158,17 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
                                     </td>
                                     <td className="p-4 text-gray-600 text-sm">{p.category}</td>
                                     <td className="p-4 text-gray-600 text-sm">{p.fabricType || '—'}</td>
+                                    <td className="p-4">
+                                        {p.codigoCabys ? (
+                                            <span className="text-xs font-mono text-gray-700 bg-gray-100 px-2 py-1 rounded">
+                                                {p.codigoCabys}
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded font-semibold">
+                                                Sin CABYS
+                                            </span>
+                                        )}
+                                    </td>
                                     <td className="p-4">
                                         <span
                                             className={`text-xs font-bold px-2 py-1 rounded-full ${p.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}
@@ -263,6 +286,35 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
                                     className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none font-mono text-xs"
                                     placeholder="/products/shirt-blue.png"
                                 />
+                            </Field>
+
+                            <Field label="Código CABYS (Hacienda) — 13 dígitos">
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    maxLength={13}
+                                    value={form.codigoCabys || ''}
+                                    onChange={(e) =>
+                                        setForm({
+                                            ...form,
+                                            codigoCabys: e.target.value.replace(/\D/g, '').slice(0, 13)
+                                        })
+                                    }
+                                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none font-mono text-sm"
+                                    placeholder="ej. 6201001000000"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Se autocompleta en cada línea de factura. Catálogo oficial:{' '}
+                                    <a
+                                        href="https://www.hacienda.go.cr/contenido/14570-clasificador-de-bienes-y-servicios-cabys"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-orange-600 hover:underline"
+                                    >
+                                        BCCR
+                                    </a>
+                                    .
+                                </p>
                             </Field>
 
                             {form.productType === 'shirt' ? (

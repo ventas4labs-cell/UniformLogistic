@@ -11,12 +11,11 @@ import {
 } from '@/app/(admin)/admin/orders/factura-actions';
 import type { TipoDocumento, TipoCedula, CodigoTarifa } from '@/lib/facturacion/types';
 
-const DEFAULT_CABYS = '';
 const DEFAULT_PRECIO = 0;
 
 function buildInitialLines(order: Order): FacturaLineInput[] {
     return order.items.map((it) => ({
-        codigo_cabys: DEFAULT_CABYS,
+        codigo_cabys: it.codigoCabys || '',
         detalle: `${it.productName} — ${it.selection.size || ''}`.trim(),
         cantidad: it.quantity,
         precio_unitario: DEFAULT_PRECIO,
@@ -244,7 +243,22 @@ export function FacturaModal({ order, onClose }: { order: Order; onClose: () => 
                                         <div className="flex items-start gap-2">
                                             <div className="flex-1 space-y-2">
                                                 <div className="grid grid-cols-3 gap-2">
-                                                    <Field label="Código CABYS *">
+                                                    <Field
+                                                        label={
+                                                            <span className="flex items-center gap-1">
+                                                                Código CABYS *
+                                                                {line.codigo_cabys.length === 13 ? (
+                                                                    <span className="text-[10px] font-bold text-green-700 bg-green-50 px-1.5 py-0.5 rounded">
+                                                                        Auto
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
+                                                                        Falta
+                                                                    </span>
+                                                                )}
+                                                            </span>
+                                                        }
+                                                    >
                                                         <input
                                                             required
                                                             type="text"
@@ -254,7 +268,11 @@ export function FacturaModal({ order, onClose }: { order: Order; onClose: () => 
                                                                     codigo_cabys: e.target.value.replace(/\D/g, '')
                                                                 })
                                                             }
-                                                            className="w-full p-2 border rounded text-sm font-mono outline-none focus:ring-2 focus:ring-orange-500"
+                                                            className={`w-full p-2 border rounded text-sm font-mono outline-none focus:ring-2 focus:ring-orange-500 ${
+                                                                line.codigo_cabys.length === 13
+                                                                    ? 'bg-green-50/40 border-green-200'
+                                                                    : 'bg-white'
+                                                            }`}
                                                             placeholder="13 dígitos"
                                                             maxLength={13}
                                                         />
@@ -459,7 +477,7 @@ function TipoButton({
     );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
     return (
         <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">{label}</label>
