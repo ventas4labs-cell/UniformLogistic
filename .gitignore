@@ -32,3 +32,14 @@ token.json
 .venv/
 venv/
 .vercel
+
+# Local PSD/video mockup experiments
+*.psd
+analyze_*.py
+convert_to_*.py
+create_video_*.py
+debug_*.py
+debug_*.png
+export_*.py
+inspect_psd*.py
+modify_psd*.py
