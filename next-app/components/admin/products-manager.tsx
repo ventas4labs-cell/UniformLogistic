@@ -95,6 +95,18 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
         setError(null);
     };
 
+    // Same merge logic but on top of the CURRENT form (used by the
+    // mic button inside the open modal — typical use case is "edit
+    // existing product and dictate a couple of corrections").
+    const mergeVoiceIntoForm = (patch: Partial<ProductInput>) => {
+        setForm((prev) => ({
+            ...prev,
+            ...patch,
+            sizes: { ...prev.sizes, ...(patch.sizes || {}) }
+        }));
+        setError(null);
+    };
+
     const startEdit = (p: AdminProduct) => {
         setEditing(p);
         setForm({
@@ -256,9 +268,19 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
                     <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                         <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-zinc-800">
                             <h3 className="text-xl font-bold">{editing ? 'Editar Producto' : 'Nuevo Producto'}</h3>
-                            <button onClick={() => setShowForm(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg">
-                                <X size={20} />
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <VoiceProductDictate
+                                    mode={editing ? 'edit' : 'create'}
+                                    onPrefill={mergeVoiceIntoForm}
+                                />
+                                <button
+                                    onClick={() => setShowForm(false)}
+                                    className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"
+                                    aria-label="Cerrar"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
                         </div>
                         <form onSubmit={handleSave} className="p-6 space-y-4">
                             <div className="grid grid-cols-2 gap-3">

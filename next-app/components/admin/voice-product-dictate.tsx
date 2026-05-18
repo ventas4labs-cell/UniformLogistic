@@ -36,6 +36,8 @@ interface Props {
      *  into its form state and opens the existing product modal. */
     onPrefill: (patch: Partial<ProductInput>) => void;
     className?: string;
+    /** Pick labels for create vs edit contexts. Defaults to 'create'. */
+    mode?: 'create' | 'edit';
 }
 
 type Phase = 'idle' | 'recording' | 'parsing' | 'done';
@@ -101,7 +103,23 @@ function toPrefill(p: ParsedProduct): Partial<ProductInput> {
     return out;
 }
 
-export function VoiceProductDictate({ onPrefill, className = '' }: Props) {
+export function VoiceProductDictate({ onPrefill, className = '', mode = 'create' }: Props) {
+    const labels =
+        mode === 'edit'
+            ? {
+                  trigger: 'Editar por voz',
+                  triggerTitle: 'Actualizar producto por voz',
+                  heading: 'Editar producto por voz',
+                  subheading: 'Dictá los cambios y se mezclarán con los campos actuales.',
+                  accept: 'Aplicar cambios al formulario'
+              }
+            : {
+                  trigger: 'Crear por voz',
+                  triggerTitle: 'Crear producto por voz',
+                  heading: 'Crear producto por voz',
+                  subheading: 'Dictá los datos del producto y revisalos en el formulario.',
+                  accept: 'Abrir formulario con estos datos'
+              };
     const [open, setOpen] = useState(false);
     const [phase, setPhase] = useState<Phase>('idle');
     const [interim, setInterim] = useState('');
@@ -248,11 +266,11 @@ export function VoiceProductDictate({ onPrefill, className = '' }: Props) {
                     reset();
                     setOpen(true);
                 }}
-                title="Crear producto por voz"
+                title={labels.triggerTitle}
                 className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-orange-300 dark:border-orange-700/60 bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900/50 font-semibold text-sm shadow-sm ${className}`}
             >
                 <Mic size={16} />
-                Crear por voz
+                {labels.trigger}
             </button>
 
             {open && (
@@ -262,10 +280,10 @@ export function VoiceProductDictate({ onPrefill, className = '' }: Props) {
                             <div>
                                 <h3 className="text-lg font-bold flex items-center gap-2">
                                     <Sparkles size={18} className="text-orange-500" />
-                                    Crear producto por voz
+                                    {labels.heading}
                                 </h3>
                                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                                    Dictá los datos del producto y revisalos en el formulario.
+                                    {labels.subheading}
                                 </p>
                             </div>
                             <button
@@ -345,7 +363,12 @@ export function VoiceProductDictate({ onPrefill, className = '' }: Props) {
                             )}
 
                             {phase === 'done' && parsed && (
-                                <Preview parsed={parsed} onAccept={accept} onCancel={close} />
+                                <Preview
+                                    parsed={parsed}
+                                    onAccept={accept}
+                                    onCancel={close}
+                                    acceptLabel={labels.accept}
+                                />
                             )}
                         </div>
                     </div>
@@ -358,11 +381,13 @@ export function VoiceProductDictate({ onPrefill, className = '' }: Props) {
 function Preview({
     parsed,
     onAccept,
-    onCancel
+    onCancel,
+    acceptLabel
 }: {
     parsed: ParsedProduct;
     onAccept: () => void;
     onCancel: () => void;
+    acceptLabel: string;
 }) {
     const low = parsed.confidence < 0.7;
     const rows: { label: string; value: string }[] = [
@@ -469,7 +494,7 @@ function Preview({
                     onClick={onAccept}
                     className="px-5 py-2 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold shadow-md"
                 >
-                    Abrir formulario con estos datos
+                    {acceptLabel}
                 </button>
             </div>
         </div>
