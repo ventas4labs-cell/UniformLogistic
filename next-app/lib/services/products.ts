@@ -184,3 +184,29 @@ export const deleteProduct = async (
     const { error } = await supabase.from('products').delete().eq('id', uuid);
     if (error) throw error;
 };
+
+const slugifyName = (name: string): string =>
+    name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 40) || 'image';
+
+export const uploadProductImage = async (
+    supabase: SupabaseClient,
+    file: File
+): Promise<string> => {
+    const ext = (file.name.split('.').pop() || 'png').toLowerCase();
+    const base = slugifyName(file.name.replace(/\.[^.]+$/, ''));
+    const path = `${base}-${Date.now()}.${ext}`;
+    const buffer = await file.arrayBuffer();
+    const { error } = await supabase.storage
+        .from('product-images')
+        .upload(path, new Uint8Array(buffer), {
+            upsert: false,
+            contentType: file.type || 'image/png'
+        });
+    if (error) throw error;
+    const { data } = supabase.storage.from('product-images').getPublicUrl(path);
+    return data.publicUrl;
+};

@@ -2,11 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LogOut, ClipboardList, Building2, Package, Layers, Users, ArrowLeft, Receipt } from 'lucide-react';
+import { LogOut, ClipboardList, Building2, Package, Layers, Users, ArrowLeft, Receipt, Boxes, Wallet } from 'lucide-react';
 import { signOutAction } from '@/app/login/actions';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 const TABS: { href: string; label: string; icon: React.ReactNode }[] = [
     { href: '/admin/orders',      label: 'Pedidos',      icon: <ClipboardList size={20} /> },
+    { href: '/admin/stock',       label: 'Stock',        icon: <Boxes size={20} /> },
+    { href: '/admin/cuentas',     label: 'Cuentas',      icon: <Wallet size={20} /> },
     { href: '/admin/companies',   label: 'Empresas',     icon: <Building2 size={20} /> },
     { href: '/admin/products',    label: 'Productos',    icon: <Package size={20} /> },
     { href: '/admin/catalog',     label: 'Catálogo',     icon: <Layers size={20} /> },
@@ -45,6 +48,12 @@ export function AdminSidebar() {
             </nav>
 
             <div className="p-4 border-t border-white/10 space-y-2">
+                <div className="flex items-center justify-between gap-2 px-1">
+                    <span className="text-xs text-gray-400 font-semibold uppercase tracking-wide">
+                        Tema
+                    </span>
+                    <ThemeToggle />
+                </div>
                 <Link
                     href="/home"
                     className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:bg-white/10 hover:text-white transition-colors"

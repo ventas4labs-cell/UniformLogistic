@@ -2,12 +2,13 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Edit2, Trash2, Loader2, X, Package } from 'lucide-react';
+import { Plus, Edit2, Trash2, Loader2, X, Package, Upload, CheckCircle2 } from 'lucide-react';
 import type { AdminProduct, ProductInput, BomItem } from '@/lib/services/products';
 import {
     createProductAction,
     updateProductAction,
-    deleteProductAction
+    deleteProductAction,
+    uploadProductImageAction
 } from '@/app/(admin)/admin/products/actions';
 import { validateCABYS } from '@/lib/facturacion/validation/cabys-validator';
 
@@ -39,6 +40,36 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
     const [form, setForm] = useState<ProductInput>(emptyForm);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [uploadingImage, setUploadingImage] = useState(false);
+    const [dragging, setDragging] = useState(false);
+
+    const handleImageFile = async (file: File) => {
+        setUploadingImage(true);
+        setError(null);
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            const url = await uploadProductImageAction(fd);
+            setForm((f) => ({ ...f, imageUrl: url }));
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Error al subir la imagen');
+        } finally {
+            setUploadingImage(false);
+        }
+    };
+
+    const handleImageInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) handleImageFile(file);
+        e.target.value = '';
+    };
+
+    const handleImageDrop = (e: React.DragEvent<HTMLLabelElement>) => {
+        e.preventDefault();
+        setDragging(false);
+        const file = e.dataTransfer.files?.[0];
+        if (file) handleImageFile(file);
+    };
 
     const startCreate = () => {
         setEditing(null);
@@ -109,8 +140,8 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
         <div>
             <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Productos</h2>
-                    <p className="text-gray-500 text-sm">
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-zinc-100">Productos</h2>
+                    <p className="text-gray-500 dark:text-zinc-400 text-sm">
                         Catálogo maestro. Asígnalos a empresas en la pestaña &ldquo;Catálogo&rdquo;.
                     </p>
                 </div>
@@ -122,56 +153,56 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
                 </button>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm overflow-hidden">
                 <table className="w-full text-left">
-                    <thead className="bg-gray-50 border-b border-gray-200">
+                    <thead className="bg-gray-50 dark:bg-zinc-900/60 border-b border-gray-200 dark:border-zinc-800">
                         <tr>
-                            <th className="p-4 font-semibold text-gray-600">Código</th>
-                            <th className="p-4 font-semibold text-gray-600">Nombre</th>
-                            <th className="p-4 font-semibold text-gray-600">Tipo</th>
-                            <th className="p-4 font-semibold text-gray-600">Género</th>
-                            <th className="p-4 font-semibold text-gray-600">Tela</th>
-                            <th className="p-4 font-semibold text-gray-600">CABYS</th>
-                            <th className="p-4 font-semibold text-gray-600">Estado</th>
-                            <th className="p-4 font-semibold text-gray-600 text-right">Acciones</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Código</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Nombre</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Tipo</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Género</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Tela</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">CABYS</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Estado</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400 text-right">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-gray-100 dark:divide-zinc-800">
                         {initialProducts.length === 0 ? (
                             <tr>
-                                <td colSpan={8} className="p-8 text-center text-gray-500">
+                                <td colSpan={8} className="p-8 text-center text-gray-500 dark:text-zinc-400">
                                     <Package size={32} className="mx-auto mb-2 opacity-30" />
                                     Sin productos registrados.
                                 </td>
                             </tr>
                         ) : (
                             initialProducts.map((p) => (
-                                <tr key={p.uuid} className="hover:bg-gray-50">
-                                    <td className="p-4 font-mono text-xs text-gray-500">{p.id}</td>
-                                    <td className="p-4 font-bold text-gray-900">{p.name}</td>
+                                <tr key={p.uuid} className="hover:bg-gray-50 dark:hover:bg-zinc-800">
+                                    <td className="p-4 font-mono text-xs text-gray-500 dark:text-zinc-400">{p.id}</td>
+                                    <td className="p-4 font-bold text-gray-900 dark:text-zinc-100">{p.name}</td>
                                     <td className="p-4">
                                         <span
-                                            className={`text-xs font-bold px-2 py-1 rounded-full ${p.type === 'shirt' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}
+                                            className={`text-xs font-bold px-2 py-1 rounded-full ${p.type === 'shirt' ? 'bg-blue-100 dark:bg-blue-950/50 text-blue-800 dark:text-blue-300' : 'bg-purple-100 dark:bg-purple-950/50 text-purple-800 dark:text-purple-300'}`}
                                         >
                                             {p.type === 'shirt' ? 'Camisa' : 'Pantalón'}
                                         </span>
                                     </td>
-                                    <td className="p-4 text-gray-600 text-sm">{p.category}</td>
-                                    <td className="p-4 text-gray-600 text-sm">{p.fabricType || '—'}</td>
+                                    <td className="p-4 text-gray-600 dark:text-zinc-400 text-sm">{p.category}</td>
+                                    <td className="p-4 text-gray-600 dark:text-zinc-400 text-sm">{p.fabricType || '—'}</td>
                                     <td className="p-4">
                                         {p.codigoCabys ? (
-                                            <span className="text-xs font-mono text-gray-700 bg-gray-100 px-2 py-1 rounded">
+                                            <span className="text-xs font-mono text-gray-700 dark:text-zinc-300 bg-gray-100 dark:bg-zinc-800 px-2 py-1 rounded">
                                                 {p.codigoCabys}
                                             </span>
                                         ) : (
-                                            <span className="text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded font-semibold">
+                                            <span className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30 px-2 py-1 rounded font-semibold">
                                                 Sin CABYS
                                             </span>
                                         )}
                                     </td>
                                     <td className="p-4">
                                         <span
-                                            className={`text-xs font-bold px-2 py-1 rounded-full ${p.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}
+                                            className={`text-xs font-bold px-2 py-1 rounded-full ${p.isActive ? 'bg-green-100 dark:bg-green-950/50 text-green-800 dark:text-green-300' : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400'}`}
                                         >
                                             {p.isActive ? 'Activo' : 'Inactivo'}
                                         </span>
@@ -180,14 +211,14 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
                                         <div className="flex justify-end gap-2">
                                             <button
                                                 onClick={() => startEdit(p)}
-                                                className="p-2 text-gray-600 hover:bg-orange-50 hover:text-orange-600 rounded-lg"
+                                                className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-orange-50 hover:text-orange-600 rounded-lg"
                                             >
                                                 <Edit2 size={16} />
                                             </button>
                                             <button
                                                 onClick={() => handleDelete(p)}
                                                 disabled={pending}
-                                                className="p-2 text-gray-600 hover:bg-red-50 hover:text-red-600 rounded-lg disabled:opacity-50"
+                                                className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-red-50 hover:text-red-600 rounded-lg disabled:opacity-50"
                                             >
                                                 <Trash2 size={16} />
                                             </button>
@@ -202,10 +233,10 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
 
             {showForm && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+                    <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                        <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-zinc-800">
                             <h3 className="text-xl font-bold">{editing ? 'Editar Producto' : 'Nuevo Producto'}</h3>
-                            <button onClick={() => setShowForm(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+                            <button onClick={() => setShowForm(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg">
                                 <X size={20} />
                             </button>
                         </div>
@@ -278,14 +309,76 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
                                     />
                                 </Field>
                             </div>
-                            <Field label="URL de imagen">
-                                <input
-                                    type="text"
-                                    value={form.imageUrl}
-                                    onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
-                                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none font-mono text-xs"
-                                    placeholder="/products/shirt-blue.png"
-                                />
+                            <Field label="Imagen del producto">
+                                <label
+                                    onDragOver={(e) => {
+                                        e.preventDefault();
+                                        setDragging(true);
+                                    }}
+                                    onDragLeave={() => setDragging(false)}
+                                    onDrop={handleImageDrop}
+                                    className={`flex items-center gap-3 border-2 border-dashed rounded-lg p-4 cursor-pointer transition-colors ${
+                                        dragging
+                                            ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/30'
+                                            : form.imageUrl
+                                              ? 'border-green-300 bg-green-50/40 dark:bg-green-950/30 hover:border-orange-400'
+                                              : 'border-gray-300 dark:border-zinc-700 hover:border-orange-400 hover:bg-orange-50/50'
+                                    }`}
+                                >
+                                    {uploadingImage ? (
+                                        <Loader2 className="animate-spin text-gray-400 dark:text-zinc-500 shrink-0" size={20} />
+                                    ) : form.imageUrl ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img
+                                            src={form.imageUrl}
+                                            alt="Vista previa"
+                                            className="w-14 h-14 object-cover rounded-md border border-gray-200 dark:border-zinc-800 shrink-0 bg-white dark:bg-zinc-900"
+                                        />
+                                    ) : (
+                                        <Upload className="text-gray-400 dark:text-zinc-500 shrink-0" size={20} />
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 flex items-center gap-1.5">
+                                            {form.imageUrl ? (
+                                                <>
+                                                    <CheckCircle2 className="text-green-600 dark:text-green-400" size={14} />
+                                                    Imagen cargada
+                                                </>
+                                            ) : (
+                                                <>Arrastra una imagen o haz clic para seleccionar</>
+                                            )}
+                                        </div>
+                                        <div className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
+                                            {form.imageUrl ? (
+                                                <span className="font-mono truncate block">
+                                                    {form.imageUrl.split('/').pop()}
+                                                </span>
+                                            ) : (
+                                                'PNG, JPG, WEBP, GIF o SVG · máx. 5 MB'
+                                            )}
+                                        </div>
+                                    </div>
+                                    {form.imageUrl && !uploadingImage && (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                setForm({ ...form, imageUrl: '' });
+                                            }}
+                                            className="p-1.5 text-gray-400 dark:text-zinc-500 hover:text-red-600 hover:bg-red-50 rounded-md shrink-0"
+                                            aria-label="Quitar imagen"
+                                        >
+                                            <X size={16} />
+                                        </button>
+                                    )}
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleImageInput}
+                                        disabled={uploadingImage}
+                                        className="hidden"
+                                    />
+                                </label>
                             </Field>
 
                             <Field label="Código CABYS (Hacienda) — 13 dígitos">
@@ -303,13 +396,13 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
                                     className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none font-mono text-sm"
                                     placeholder="ej. 6201001000000"
                                 />
-                                <p className="text-xs text-gray-500 mt-1">
+                                <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
                                     Se autocompleta en cada línea de factura. Catálogo oficial:{' '}
                                     <a
                                         href="https://www.hacienda.go.cr/contenido/14570-clasificador-de-bienes-y-servicios-cabys"
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="text-orange-600 hover:underline"
+                                        className="text-orange-600 dark:text-orange-400 hover:underline"
                                     >
                                         BCCR
                                     </a>
@@ -381,21 +474,21 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
                                 </div>
                             )}
 
-                            <div className="border border-gray-200 rounded-lg p-4 space-y-3">
+                            <div className="border border-gray-200 dark:border-zinc-800 rounded-lg p-4 space-y-3">
                                 <div className="flex items-center justify-between">
-                                    <label className="text-sm font-bold text-gray-700">Insumos Requeridos (BOM)</label>
+                                    <label className="text-sm font-bold text-gray-700 dark:text-zinc-300">Insumos Requeridos (BOM)</label>
                                     <button
                                         type="button"
                                         onClick={() =>
                                             setForm({ ...form, bom: [...(form.bom || []), { name: '', qty: 0 }] })
                                         }
-                                        className="text-xs bg-orange-50 text-orange-600 px-3 py-1 rounded-lg font-bold hover:bg-orange-100 flex items-center gap-1"
+                                        className="text-xs bg-orange-50 dark:bg-orange-950/30 text-orange-600 dark:text-orange-400 px-3 py-1 rounded-lg font-bold hover:bg-orange-100 flex items-center gap-1"
                                     >
                                         <Plus size={14} /> Agregar insumo
                                     </button>
                                 </div>
                                 {(form.bom || []).length === 0 && (
-                                    <p className="text-xs text-gray-400 italic">Sin insumos configurados.</p>
+                                    <p className="text-xs text-gray-400 dark:text-zinc-500 italic">Sin insumos configurados.</p>
                                 )}
                                 {(form.bom || []).map((item: BomItem, idx: number) => (
                                     <div key={idx} className="flex items-center gap-2">
@@ -432,7 +525,7 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
                                                 const bom = (form.bom || []).filter((_, i) => i !== idx);
                                                 setForm({ ...form, bom });
                                             }}
-                                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
+                                            className="p-2 text-gray-400 dark:text-zinc-500 hover:text-red-500 hover:bg-red-50 rounded-lg"
                                         >
                                             <Trash2 size={14} />
                                         </button>
@@ -440,17 +533,17 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
                                 ))}
                             </div>
 
-                            <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-zinc-300">
                                 <input
                                     type="checkbox"
                                     checked={form.isActive ?? true}
                                     onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
-                                    className="w-4 h-4 text-orange-600 rounded"
+                                    className="w-4 h-4 text-orange-600 dark:text-orange-400 rounded"
                                 />
                                 Producto activo
                             </label>
                             {error && (
-                                <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm border border-red-100">
+                                <div className="bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 p-3 rounded-lg text-sm border border-red-100 dark:border-red-900/50">
                                     {error}
                                 </div>
                             )}
@@ -458,7 +551,7 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
                                 <button
                                     type="button"
                                     onClick={() => setShowForm(false)}
-                                    className="flex-1 py-3 border border-gray-300 rounded-lg font-bold text-gray-700 hover:bg-gray-50"
+                                    className="flex-1 py-3 border border-gray-300 dark:border-zinc-700 rounded-lg font-bold text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800"
                                 >
                                     Cancelar
                                 </button>
@@ -482,7 +575,7 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
     return (
         <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-1">{label}</label>
             {children}
         </div>
     );

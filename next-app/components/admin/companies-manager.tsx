@@ -95,8 +95,8 @@ export function CompaniesManager({ initialCompanies }: { initialCompanies: Compa
         <div>
             <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Empresas</h2>
-                    <p className="text-gray-500 text-sm">Administra los clientes corporativos del sistema.</p>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-zinc-100">Empresas</h2>
+                    <p className="text-gray-500 dark:text-zinc-400 text-sm">Administra los clientes corporativos del sistema.</p>
                 </div>
                 <button
                     onClick={startCreate}
@@ -106,36 +106,36 @@ export function CompaniesManager({ initialCompanies }: { initialCompanies: Compa
                 </button>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm overflow-hidden">
                 <table className="w-full text-left">
-                    <thead className="bg-gray-50 border-b border-gray-200">
+                    <thead className="bg-gray-50 dark:bg-zinc-900/60 border-b border-gray-200 dark:border-zinc-800">
                         <tr>
-                            <th className="p-4 font-semibold text-gray-600">Nombre</th>
-                            <th className="p-4 font-semibold text-gray-600">Cédula Jurídica</th>
-                            <th className="p-4 font-semibold text-gray-600">Contacto</th>
-                            <th className="p-4 font-semibold text-gray-600">Teléfono</th>
-                            <th className="p-4 font-semibold text-gray-600">Estado</th>
-                            <th className="p-4 font-semibold text-gray-600 text-right">Acciones</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Nombre</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Cédula Jurídica</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Contacto</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Teléfono</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Estado</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400 text-right">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-gray-100 dark:divide-zinc-800">
                         {initialCompanies.length === 0 ? (
                             <tr>
-                                <td colSpan={6} className="p-8 text-center text-gray-500">
+                                <td colSpan={6} className="p-8 text-center text-gray-500 dark:text-zinc-400">
                                     <Building2 size={32} className="mx-auto mb-2 opacity-30" />
                                     Aún no hay empresas registradas.
                                 </td>
                             </tr>
                         ) : (
                             initialCompanies.map((c) => (
-                                <tr key={c.id} className="hover:bg-gray-50">
-                                    <td className="p-4 font-bold text-gray-900">{c.name}</td>
-                                    <td className="p-4 font-mono text-sm text-gray-600">{c.documentNumber}</td>
-                                    <td className="p-4 text-gray-600">{c.contactName || '—'}</td>
-                                    <td className="p-4 text-gray-600">{c.phone || '—'}</td>
+                                <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-zinc-800">
+                                    <td className="p-4 font-bold text-gray-900 dark:text-zinc-100">{c.name}</td>
+                                    <td className="p-4 font-mono text-sm text-gray-600 dark:text-zinc-400">{c.documentNumber}</td>
+                                    <td className="p-4 text-gray-600 dark:text-zinc-400">{c.contactName || '—'}</td>
+                                    <td className="p-4 text-gray-600 dark:text-zinc-400">{c.phone || '—'}</td>
                                     <td className="p-4">
                                         <span
-                                            className={`text-xs font-bold px-2 py-1 rounded-full ${c.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}
+                                            className={`text-xs font-bold px-2 py-1 rounded-full ${c.isActive ? 'bg-green-100 dark:bg-green-950/50 text-green-800 dark:text-green-300' : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400'}`}
                                         >
                                             {c.isActive ? 'Activa' : 'Inactiva'}
                                         </span>
@@ -144,14 +144,14 @@ export function CompaniesManager({ initialCompanies }: { initialCompanies: Compa
                                         <div className="flex justify-end gap-2">
                                             <button
                                                 onClick={() => copyOrderLink(c)}
-                                                className={`p-2 rounded-lg transition-colors ${copiedId === c.id ? 'bg-green-50 text-green-600' : 'text-gray-600 hover:bg-blue-50 hover:text-blue-600'}`}
+                                                className={`p-2 rounded-lg transition-colors ${copiedId === c.id ? 'bg-green-50 dark:bg-green-950/30 text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-zinc-400 hover:bg-blue-50 hover:text-blue-600'}`}
                                                 title="Copiar link de pedidos"
                                             >
                                                 {copiedId === c.id ? <Check size={16} /> : <Link2 size={16} />}
                                             </button>
                                             <button
                                                 onClick={() => startEdit(c)}
-                                                className="p-2 text-gray-600 hover:bg-orange-50 hover:text-orange-600 rounded-lg"
+                                                className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-orange-50 hover:text-orange-600 rounded-lg"
                                                 title="Editar"
                                             >
                                                 <Edit2 size={16} />
@@ -159,7 +159,7 @@ export function CompaniesManager({ initialCompanies }: { initialCompanies: Compa
                                             <button
                                                 onClick={() => handleDelete(c)}
                                                 disabled={pending}
-                                                className="p-2 text-gray-600 hover:bg-red-50 hover:text-red-600 rounded-lg disabled:opacity-50"
+                                                className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-red-50 hover:text-red-600 rounded-lg disabled:opacity-50"
                                                 title="Eliminar"
                                             >
                                                 <Trash2 size={16} />
@@ -175,10 +175,10 @@ export function CompaniesManager({ initialCompanies }: { initialCompanies: Compa
 
             {showForm && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-                        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+                    <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                        <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-zinc-800">
                             <h3 className="text-xl font-bold">{editing ? 'Editar Empresa' : 'Nueva Empresa'}</h3>
-                            <button onClick={() => setShowForm(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+                            <button onClick={() => setShowForm(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg">
                                 <X size={20} />
                             </button>
                         </div>
@@ -235,17 +235,17 @@ export function CompaniesManager({ initialCompanies }: { initialCompanies: Compa
                                     className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none"
                                 />
                             </Field>
-                            <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-zinc-300">
                                 <input
                                     type="checkbox"
                                     checked={form.isActive ?? true}
                                     onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
-                                    className="w-4 h-4 text-orange-600 rounded"
+                                    className="w-4 h-4 text-orange-600 dark:text-orange-400 rounded"
                                 />
                                 Empresa activa
                             </label>
                             {error && (
-                                <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm border border-red-100">
+                                <div className="bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 p-3 rounded-lg text-sm border border-red-100 dark:border-red-900/50">
                                     {error}
                                 </div>
                             )}
@@ -253,7 +253,7 @@ export function CompaniesManager({ initialCompanies }: { initialCompanies: Compa
                                 <button
                                     type="button"
                                     onClick={() => setShowForm(false)}
-                                    className="flex-1 py-3 border border-gray-300 rounded-lg font-bold text-gray-700 hover:bg-gray-50"
+                                    className="flex-1 py-3 border border-gray-300 dark:border-zinc-700 rounded-lg font-bold text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800"
                                 >
                                     Cancelar
                                 </button>
@@ -277,7 +277,7 @@ export function CompaniesManager({ initialCompanies }: { initialCompanies: Compa
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
     return (
         <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-1">{label}</label>
             {children}
         </div>
     );

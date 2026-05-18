@@ -295,9 +295,15 @@ export const generateAdminPDF = (order: Order) => {
         y = drawSection(doc, y, 'PANTALONES', pants, formatPantSize);
     }
 
-    const bomTotals = new Map<
+    // Per-insumo, per-product breakdown so every row's math is self-evident:
+    //   per-unit (admin BOM config) × pieces ordered of that product = subtotal
+    // Total per insumo = sum of subtotals across contributing products.
+    const bomBreakdown = new Map<
         string,
-        { perUnit: Map<string, number>; total: number }
+        {
+            contributors: Map<string, { perUnit: number; pieces: number }>;
+            total: number;
+        }
     >();
 
     order.items.forEach((item) => {
@@ -305,18 +311,29 @@ export const generateAdminPDF = (order: Order) => {
         if (!bom || bom.length === 0) return;
         bom.forEach((b) => {
             if (!b.name || b.qty <= 0) return;
-            const entry = bomTotals.get(b.name) || {
-                perUnit: new Map<string, number>(),
+            const entry = bomBreakdown.get(b.name) || {
+                contributors: new Map<string, { perUnit: number; pieces: number }>(),
                 total: 0
             };
-            const prodKey = item.productName;
-            entry.perUnit.set(prodKey, (entry.perUnit.get(prodKey) || 0) + b.qty);
+            const productKey = item.productName;
+            const existing = entry.contributors.get(productKey) || {
+                perUnit: b.qty,
+                pieces: 0
+            };
+            // perUnit comes from the product's BOM — identical across every line
+            // item of that product, so we store it once (last write wins, same value).
+            existing.perUnit = b.qty;
+            existing.pieces += item.quantity;
+            entry.contributors.set(productKey, existing);
             entry.total += b.qty * item.quantity;
-            bomTotals.set(b.name, entry);
+            bomBreakdown.set(b.name, entry);
         });
     });
 
-    if (bomTotals.size > 0) {
+    const fmtNum = (n: number): number =>
+        Number.isInteger(n) ? n : parseFloat(n.toFixed(2));
+
+    if (bomBreakdown.size > 0) {
         if (y > pageHeight - 60) {
             doc.addPage();
             y = 20;
@@ -329,18 +346,20 @@ export const generateAdminPDF = (order: Order) => {
         doc.setFontSize(11);
         doc.text('INSUMOS REQUERIDOS', 16, y + 4.3);
 
-        const totalPieces = order.items.reduce((s, i) => s + i.quantity, 0);
-
-        const bomHead = ['Insumo', 'Cant. x Unidad', `Total (×${totalPieces} pzas)`];
+        const bomHead = ['Insumo', 'Cant. x Unidad', 'Total'];
         const bomBody: (string | number)[][] = [];
-        bomTotals.forEach((entry, name) => {
-            const perUnitVals = Array.from(entry.perUnit.values());
-            const avgPerUnit =
-                perUnitVals.reduce((a, b) => a + b, 0) / perUnitVals.length;
-            const perUnitDisplay = Number.isInteger(avgPerUnit)
-                ? avgPerUnit
-                : parseFloat(avgPerUnit.toFixed(2));
-            bomBody.push([name, perUnitDisplay, parseFloat(entry.total.toFixed(2))]);
+
+        bomBreakdown.forEach((entry, insumo) => {
+            // Pieces ordered of products that use this insumo (the meaningful
+            // denominator — products without this insumo don't dilute the avg).
+            const piecesUsingInsumo = Array.from(entry.contributors.values()).reduce(
+                (s, c) => s + c.pieces,
+                0
+            );
+            // Weighted per-unit so per-unit × pieces = total holds for THIS insumo.
+            // For single-product insumos this equals the admin-configured BOM qty.
+            const perUnit = piecesUsingInsumo > 0 ? entry.total / piecesUsingInsumo : 0;
+            bomBody.push([insumo, fmtNum(perUnit), fmtNum(entry.total)]);
         });
 
         autoTable(doc, {
@@ -364,7 +383,9 @@ export const generateAdminPDF = (order: Order) => {
                 fontSize: 7.5
             },
             columnStyles: {
-                0: { halign: 'left', fontStyle: 'bold', cellWidth: 50 }
+                0: { halign: 'left', fontStyle: 'bold', cellWidth: 50 },
+                1: { halign: 'right' },
+                2: { halign: 'right', fontStyle: 'bold' }
             },
             margin: { left: 14, right: 14 }
         });

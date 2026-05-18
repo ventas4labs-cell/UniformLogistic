@@ -109,20 +109,20 @@ export function FacturaModal({ order, onClose }: { order: Order; onClose: () => 
 
     return (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-                <div className="flex items-center justify-between p-6 border-b border-gray-100">
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+                <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-zinc-800">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-orange-100 rounded-lg">
-                            <Receipt className="text-orange-600" size={24} />
+                        <div className="p-2 bg-orange-100 dark:bg-orange-950/50 rounded-lg">
+                            <Receipt className="text-orange-600 dark:text-orange-400" size={24} />
                         </div>
                         <div>
-                            <h3 className="text-xl font-bold text-gray-900">Generar Factura Electrónica</h3>
-                            <p className="text-sm text-gray-500">
+                            <h3 className="text-xl font-bold text-gray-900 dark:text-zinc-100">Generar Factura Electrónica</h3>
+                            <p className="text-sm text-gray-500 dark:text-zinc-400">
                                 Pedido {order.id} · {order.companyName || 'Sin empresa'}
                             </p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
+                    <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg">
                         <X size={20} />
                     </button>
                 </div>
@@ -131,7 +131,7 @@ export function FacturaModal({ order, onClose }: { order: Order; onClose: () => 
                     <div className="p-6 space-y-6">
                         {/* Tipo de Documento */}
                         <div>
-                            <label className="block text-sm font-bold text-gray-700 uppercase tracking-wide mb-2">
+                            <label className="block text-sm font-bold text-gray-700 dark:text-zinc-300 uppercase tracking-wide mb-2">
                                 Tipo de Documento
                             </label>
                             <div className="flex gap-2">
@@ -153,7 +153,7 @@ export function FacturaModal({ order, onClose }: { order: Order; onClose: () => 
                         {/* Receptor (solo para Factura) */}
                         {isFactura && (
                             <div>
-                                <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wide mb-3">
+                                <h4 className="text-sm font-bold text-gray-700 dark:text-zinc-300 uppercase tracking-wide mb-3">
                                     Receptor
                                 </h4>
                                 <div className="space-y-3">
@@ -226,20 +226,20 @@ export function FacturaModal({ order, onClose }: { order: Order; onClose: () => 
                         {/* Líneas */}
                         <div>
                             <div className="flex items-center justify-between mb-3">
-                                <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wide">
+                                <h4 className="text-sm font-bold text-gray-700 dark:text-zinc-300 uppercase tracking-wide">
                                     Detalle ({lineas.length} líneas)
                                 </h4>
                                 <button
                                     type="button"
                                     onClick={addLine}
-                                    className="text-sm text-orange-600 hover:text-orange-700 font-semibold flex items-center gap-1"
+                                    className="text-sm text-orange-600 dark:text-orange-400 hover:text-orange-700 font-semibold flex items-center gap-1"
                                 >
                                     <Plus size={16} /> Agregar línea
                                 </button>
                             </div>
                             <div className="space-y-3">
                                 {lineas.map((line, idx) => (
-                                    <div key={idx} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                    <div key={idx} className="p-3 bg-gray-50 dark:bg-zinc-900/60 rounded-lg border border-gray-200 dark:border-zinc-800">
                                         <div className="flex items-start gap-2">
                                             <div className="flex-1 space-y-2">
                                                 <div className="grid grid-cols-3 gap-2">
@@ -248,11 +248,11 @@ export function FacturaModal({ order, onClose }: { order: Order; onClose: () => 
                                                             <span className="flex items-center gap-1">
                                                                 Código CABYS *
                                                                 {line.codigo_cabys.length === 13 ? (
-                                                                    <span className="text-[10px] font-bold text-green-700 bg-green-50 px-1.5 py-0.5 rounded">
+                                                                    <span className="text-[10px] font-bold text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/30 px-1.5 py-0.5 rounded">
                                                                         Auto
                                                                     </span>
                                                                 ) : (
-                                                                    <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
+                                                                    <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30 px-1.5 py-0.5 rounded">
                                                                         Falta
                                                                     </span>
                                                                 )}
@@ -270,8 +270,8 @@ export function FacturaModal({ order, onClose }: { order: Order; onClose: () => 
                                                             }
                                                             className={`w-full p-2 border rounded text-sm font-mono outline-none focus:ring-2 focus:ring-orange-500 ${
                                                                 line.codigo_cabys.length === 13
-                                                                    ? 'bg-green-50/40 border-green-200'
-                                                                    : 'bg-white'
+                                                                    ? 'bg-green-50/40 dark:bg-green-950/30 border-green-200 dark:border-green-900/60'
+                                                                    : 'bg-white dark:bg-zinc-900'
                                                             }`}
                                                             placeholder="13 dígitos"
                                                             maxLength={13}
@@ -359,7 +359,7 @@ export function FacturaModal({ order, onClose }: { order: Order; onClose: () => 
                                                         </select>
                                                     </Field>
                                                     <div className="flex items-end">
-                                                        <div className="w-full text-right text-sm font-mono font-semibold text-gray-800 p-2">
+                                                        <div className="w-full text-right text-sm font-mono font-semibold text-gray-800 dark:text-zinc-200 p-2">
                                                             ₡
                                                             {(
                                                                 line.cantidad *
@@ -377,7 +377,7 @@ export function FacturaModal({ order, onClose }: { order: Order; onClose: () => 
                                                 type="button"
                                                 onClick={() => removeLine(idx)}
                                                 disabled={lineas.length === 1}
-                                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded disabled:opacity-30 disabled:cursor-not-allowed"
+                                                className="p-2 text-gray-400 dark:text-zinc-500 hover:text-red-600 hover:bg-red-50 rounded disabled:opacity-30 disabled:cursor-not-allowed"
                                                 title="Eliminar línea"
                                             >
                                                 <Trash2 size={16} />
@@ -389,8 +389,8 @@ export function FacturaModal({ order, onClose }: { order: Order; onClose: () => 
 
                             <div className="mt-4 flex justify-end">
                                 <div className="text-right">
-                                    <div className="text-xs text-gray-500">Total estimado</div>
-                                    <div className="text-2xl font-bold text-gray-900 font-mono">
+                                    <div className="text-xs text-gray-500 dark:text-zinc-400">Total estimado</div>
+                                    <div className="text-2xl font-bold text-gray-900 dark:text-zinc-100 font-mono">
                                         ₡
                                         {total.toLocaleString('es-CR', {
                                             minimumFractionDigits: 2,
@@ -406,8 +406,8 @@ export function FacturaModal({ order, onClose }: { order: Order; onClose: () => 
                             <div
                                 className={`p-4 rounded-lg border ${
                                     result.type === 'success'
-                                        ? 'bg-green-50 border-green-200 text-green-800'
-                                        : 'bg-red-50 border-red-200 text-red-800'
+                                        ? 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-900/60 text-green-800 dark:text-green-300'
+                                        : 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-900/60 text-red-800 dark:text-red-300'
                                 }`}
                             >
                                 <div className="flex items-start gap-2">
@@ -427,11 +427,11 @@ export function FacturaModal({ order, onClose }: { order: Order; onClose: () => 
                         )}
                     </div>
 
-                    <div className="flex gap-3 p-6 border-t border-gray-100 bg-gray-50">
+                    <div className="flex gap-3 p-6 border-t border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-900/60">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="flex-1 py-3 border border-gray-300 rounded-lg font-bold text-gray-700 hover:bg-white"
+                            className="flex-1 py-3 border border-gray-300 dark:border-zinc-700 rounded-lg font-bold text-gray-700 dark:text-zinc-300 hover:bg-white"
                         >
                             {result?.type === 'success' ? 'Cerrar' : 'Cancelar'}
                         </button>
@@ -468,11 +468,11 @@ function TipoButton({
             className={`flex-1 p-3 rounded-lg border text-left transition-colors ${
                 active
                     ? 'bg-orange-600 text-white border-orange-600'
-                    : 'bg-white text-gray-700 border-gray-300 hover:border-orange-400'
+                    : 'bg-white dark:bg-zinc-900 text-gray-700 dark:text-zinc-300 border-gray-300 dark:border-zinc-700 hover:border-orange-400'
             }`}
         >
             <div className="font-bold">{label}</div>
-            <div className={`text-xs ${active ? 'text-orange-100' : 'text-gray-500'}`}>{sub}</div>
+            <div className={`text-xs ${active ? 'text-orange-100' : 'text-gray-500 dark:text-zinc-400'}`}>{sub}</div>
         </button>
     );
 }
@@ -480,7 +480,7 @@ function TipoButton({
 function Field({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
     return (
         <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">{label}</label>
+            <label className="block text-xs font-semibold text-gray-600 dark:text-zinc-400 mb-1">{label}</label>
             {children}
         </div>
     );

@@ -10,7 +10,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
     return (
         <CartProvider>
-            <div className="min-h-screen bg-zinc-50 font-sans text-zinc-900">
+            <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 font-sans text-zinc-900 dark:text-zinc-100 transition-colors">
                 <TopNav />
                 <main className="mx-auto w-full max-w-7xl px-4 lg:px-8 py-6">
                     {children}

@@ -43,3 +43,6 @@ debug_*.png
 export_*.py
 inspect_psd*.py
 modify_psd*.py
+
+# Local Claude Code settings — per-developer
+.claude/

@@ -61,8 +61,8 @@ export function OrdersTable({ initialOrders }: { initialOrders: Order[] }) {
         <div>
             <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Pedidos</h2>
-                    <p className="text-gray-500 text-sm">Logística y control de producción.</p>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-zinc-100">Pedidos</h2>
+                    <p className="text-gray-500 dark:text-zinc-400 text-sm">Logística y control de producción.</p>
                 </div>
                 <Link
                     href="/catalog"
@@ -72,9 +72,9 @@ export function OrdersTable({ initialOrders }: { initialOrders: Order[] }) {
                 </Link>
             </div>
 
-            <div className="bg-white p-4 rounded-xl shadow-sm mb-6 flex justify-between items-center">
+            <div className="bg-white dark:bg-zinc-900 p-4 rounded-xl shadow-sm mb-6 flex justify-between items-center">
                 <div className="relative w-full max-w-md">
-                    <Search className="absolute left-3 top-3 text-gray-400" size={20} />
+                    <Search className="absolute left-3 top-3 text-gray-400 dark:text-zinc-500" size={20} />
                     <input
                         type="text"
                         placeholder="Buscar pedidos..."
@@ -85,29 +85,29 @@ export function OrdersTable({ initialOrders }: { initialOrders: Order[] }) {
                 </div>
                 <button
                     onClick={() => router.refresh()}
-                    className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                    className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"
                 >
                     <RefreshCw size={20} className={pending ? 'animate-spin' : ''} />
                 </button>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm overflow-hidden">
                 <table className="w-full text-left">
-                    <thead className="bg-gray-50 border-b border-gray-200">
+                    <thead className="bg-gray-50 dark:bg-zinc-900/60 border-b border-gray-200 dark:border-zinc-800">
                         <tr>
-                            <th className="p-4 font-semibold text-gray-600">Ref</th>
-                            <th className="p-4 font-semibold text-gray-600">Cliente</th>
-                            <th className="p-4 font-semibold text-gray-600">Empresa</th>
-                            <th className="p-4 font-semibold text-gray-600">Fecha</th>
-                            <th className="p-4 font-semibold text-gray-600">Estado</th>
-                            <th className="p-4 font-semibold text-gray-600">Artículos</th>
-                            <th className="p-4 font-semibold text-gray-600 text-right">Acciones</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Ref</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Cliente</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Empresa</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Fecha</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Estado</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Artículos</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400 text-right">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-gray-100 dark:divide-zinc-800">
                         {filtered.length === 0 ? (
                             <tr>
-                                <td colSpan={7} className="p-8 text-center text-gray-500">
+                                <td colSpan={7} className="p-8 text-center text-gray-500 dark:text-zinc-400">
                                     No se encontraron pedidos.
                                 </td>
                             </tr>
@@ -116,15 +116,15 @@ export function OrdersTable({ initialOrders }: { initialOrders: Order[] }) {
                                 const status = (order.status as OrderStatus) || 'pending';
                                 const statusOption = ORDER_STATUS_OPTIONS.find((s) => s.value === status);
                                 return (
-                                    <tr key={order.uuid || order.id} className="hover:bg-gray-50">
-                                        <td className="p-4 font-mono text-sm font-bold text-orange-600">
+                                    <tr key={order.uuid || order.id} className="hover:bg-gray-50 dark:hover:bg-zinc-800">
+                                        <td className="p-4 font-mono text-sm font-bold text-orange-600 dark:text-orange-400">
                                             {order.id}
                                         </td>
-                                        <td className="p-4 font-medium text-gray-900">
+                                        <td className="p-4 font-medium text-gray-900 dark:text-zinc-100">
                                             {order.customerName || '—'}
                                         </td>
-                                        <td className="p-4 text-gray-600">{order.companyName || '—'}</td>
-                                        <td className="p-4 text-gray-500 text-sm">
+                                        <td className="p-4 text-gray-600 dark:text-zinc-400">{order.companyName || '—'}</td>
+                                        <td className="p-4 text-gray-500 dark:text-zinc-400 text-sm">
                                             {new Date(order.dateCreated).toLocaleDateString()}
                                         </td>
                                         <td className="p-4">
@@ -134,13 +134,13 @@ export function OrdersTable({ initialOrders }: { initialOrders: Order[] }) {
                                                     handleUpdateStatus(order.uuid, e.target.value as OrderStatus)
                                                 }
                                                 disabled={!order.uuid || pending}
-                                                className={`py-1 px-3 rounded-full text-xs font-bold border-none outline-none cursor-pointer ${statusOption?.color || 'bg-gray-100 text-gray-800'}`}
+                                                className={`py-1 px-3 rounded-full text-xs font-bold border-none outline-none cursor-pointer ${statusOption?.color || 'bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-zinc-200'}`}
                                             >
                                                 {ORDER_STATUS_OPTIONS.map((option) => (
                                                     <option
                                                         key={option.value}
                                                         value={option.value}
-                                                        className="bg-white text-gray-900"
+                                                        className="bg-white dark:bg-zinc-900 text-gray-900 dark:text-zinc-100"
                                                     >
                                                         {option.label}
                                                     </option>
@@ -148,7 +148,7 @@ export function OrdersTable({ initialOrders }: { initialOrders: Order[] }) {
                                             </select>
                                         </td>
                                         <td className="p-4">
-                                            <span className="bg-orange-100 text-orange-800 text-xs font-bold px-2 py-1 rounded-full">
+                                            <span className="bg-orange-100 dark:bg-orange-950/50 text-orange-800 dark:text-orange-300 text-xs font-bold px-2 py-1 rounded-full">
                                                 {totalPieces(order)} pzas
                                             </span>
                                         </td>
@@ -156,19 +156,19 @@ export function OrdersTable({ initialOrders }: { initialOrders: Order[] }) {
                                             <div className="flex justify-end gap-2">
                                                 <button
                                                     onClick={() => handlePreviewPdf(order)}
-                                                    className="text-gray-600 hover:text-orange-600 font-bold text-sm flex items-center gap-1 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-orange-200 hover:bg-orange-50 transition-colors"
+                                                    className="text-gray-600 dark:text-zinc-400 hover:text-orange-600 font-bold text-sm flex items-center gap-1 bg-gray-50 dark:bg-zinc-900/60 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-zinc-800 hover:border-orange-200 hover:bg-orange-50 transition-colors"
                                                 >
                                                     <Eye size={16} /> Ver
                                                 </button>
                                                 <button
                                                     onClick={() => handleDownloadPdf(order)}
-                                                    className="text-orange-600 hover:text-orange-800 font-bold text-sm flex items-center gap-1 bg-orange-50 px-3 py-1.5 rounded-lg border border-orange-100 transition-colors"
+                                                    className="text-orange-600 dark:text-orange-400 hover:text-orange-800 font-bold text-sm flex items-center gap-1 bg-orange-50 dark:bg-orange-950/30 px-3 py-1.5 rounded-lg border border-orange-100 dark:border-orange-900/50 transition-colors"
                                                 >
                                                     <Download size={16} /> PDF
                                                 </button>
                                                 <button
                                                     onClick={() => setFacturaOrder(order)}
-                                                    className="text-green-700 hover:text-green-900 font-bold text-sm flex items-center gap-1 bg-green-50 px-3 py-1.5 rounded-lg border border-green-100 transition-colors"
+                                                    className="text-green-700 dark:text-green-300 hover:text-green-900 font-bold text-sm flex items-center gap-1 bg-green-50 dark:bg-green-950/30 px-3 py-1.5 rounded-lg border border-green-100 dark:border-green-900/50 transition-colors"
                                                     title="Generar factura electrónica"
                                                 >
                                                     <Receipt size={16} /> Factura
@@ -181,7 +181,7 @@ export function OrdersTable({ initialOrders }: { initialOrders: Order[] }) {
                         )}
                         {pending && (
                             <tr>
-                                <td colSpan={7} className="p-2 text-center text-gray-400 text-xs">
+                                <td colSpan={7} className="p-2 text-center text-gray-400 dark:text-zinc-500 text-xs">
                                     <Loader2 className="animate-spin inline mr-2" size={12} />
                                     Actualizando...
                                 </td>

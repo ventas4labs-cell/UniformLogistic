@@ -104,14 +104,14 @@ export function FeConfigForm({ initialConfig }: { initialConfig: FeConfigRow | n
     };
 
     return (
-        <form onSubmit={handleSave} className="bg-white rounded-xl shadow-sm p-6 space-y-6">
+        <form onSubmit={handleSave} className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm p-6 space-y-6">
             <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-gray-900">Configuración del Emisor</h3>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-zinc-100">Configuración del Emisor</h3>
                 <span
                     className={`text-xs font-bold px-3 py-1 rounded-full ${
                         hasConfig
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-yellow-100 text-yellow-800'
+                            ? 'bg-green-100 dark:bg-green-950/50 text-green-800 dark:text-green-300'
+                            : 'bg-yellow-100 dark:bg-yellow-950/50 text-yellow-800 dark:text-yellow-300'
                     }`}
                 >
                     {hasConfig ? 'Configurado' : 'Sin configurar'}
@@ -129,7 +129,7 @@ export function FeConfigForm({ initialConfig }: { initialConfig: FeConfigRow | n
                             className={`flex-1 px-4 py-2 rounded-lg font-semibold text-sm border transition-colors ${
                                 form.environment === env
                                     ? 'bg-orange-600 text-white border-orange-600'
-                                    : 'bg-white text-gray-700 border-gray-300 hover:border-orange-400'
+                                    : 'bg-white dark:bg-zinc-900 text-gray-700 dark:text-zinc-300 border-gray-300 dark:border-zinc-700 hover:border-orange-400'
                             }`}
                         >
                             {env === 'staging' ? 'Pruebas (staging)' : 'Producción'}
@@ -316,20 +316,20 @@ export function FeConfigForm({ initialConfig }: { initialConfig: FeConfigRow | n
             <Section title="Llave Criptográfica (.p12)">
                 <div className="flex items-start gap-4">
                     <label className="flex-1">
-                        <div className="flex items-center gap-2 border-2 border-dashed border-gray-300 rounded-lg p-4 cursor-pointer hover:border-orange-400 hover:bg-orange-50 transition-colors">
+                        <div className="flex items-center gap-2 border-2 border-dashed border-gray-300 dark:border-zinc-700 rounded-lg p-4 cursor-pointer hover:border-orange-400 hover:bg-orange-50 transition-colors">
                             {uploading ? (
-                                <Loader2 className="animate-spin text-gray-400" size={20} />
+                                <Loader2 className="animate-spin text-gray-400 dark:text-zinc-500" size={20} />
                             ) : hasCert ? (
-                                <CheckCircle2 className="text-green-600" size={20} />
+                                <CheckCircle2 className="text-green-600 dark:text-green-400" size={20} />
                             ) : (
-                                <Upload className="text-gray-400" size={20} />
+                                <Upload className="text-gray-400 dark:text-zinc-500" size={20} />
                             )}
                             <div className="flex-1 min-w-0">
-                                <div className="text-sm font-semibold text-gray-700">
+                                <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300">
                                     {hasCert ? 'Certificado cargado' : 'Subir archivo .p12'}
                                 </div>
                                 {hasCert && (
-                                    <div className="text-xs text-gray-500 font-mono truncate">
+                                    <div className="text-xs text-gray-500 dark:text-zinc-400 font-mono truncate">
                                         {form.p12CertificatePath}
                                     </div>
                                 )}
@@ -367,8 +367,8 @@ export function FeConfigForm({ initialConfig }: { initialConfig: FeConfigRow | n
                 <div
                     className={`flex items-center gap-2 p-3 rounded-lg text-sm border ${
                         status.type === 'success'
-                            ? 'bg-green-50 text-green-800 border-green-200'
-                            : 'bg-red-50 text-red-800 border-red-200'
+                            ? 'bg-green-50 dark:bg-green-950/30 text-green-800 dark:text-green-300 border-green-200 dark:border-green-900/60'
+                            : 'bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-300 border-red-200 dark:border-red-900/60'
                     }`}
                 >
                     {status.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
@@ -377,7 +377,7 @@ export function FeConfigForm({ initialConfig }: { initialConfig: FeConfigRow | n
             )}
 
             {/* Actions */}
-            <div className="flex justify-end pt-2 border-t border-gray-100">
+            <div className="flex justify-end pt-2 border-t border-gray-100 dark:border-zinc-800">
                 <button
                     type="submit"
                     disabled={saving}
@@ -394,7 +394,7 @@ export function FeConfigForm({ initialConfig }: { initialConfig: FeConfigRow | n
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
     return (
         <div className="space-y-3">
-            <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wide">{title}</h4>
+            <h4 className="text-sm font-bold text-gray-700 dark:text-zinc-300 uppercase tracking-wide">{title}</h4>
             <div className="space-y-3">{children}</div>
         </div>
     );
@@ -403,7 +403,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
     return (
         <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-1">{label}</label>
             {children}
         </div>
     );

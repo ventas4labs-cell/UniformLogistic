@@ -13,7 +13,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     if (email !== ADMIN_EMAIL) redirect('/home');
 
     return (
-        <div className="flex min-h-screen bg-gray-100">
+        <div className="flex min-h-screen bg-gray-100 dark:bg-zinc-950 transition-colors">
             <AdminSidebar />
             <main className="flex-1 ml-64 p-8">
                 <div className="max-w-6xl mx-auto">{children}</div>

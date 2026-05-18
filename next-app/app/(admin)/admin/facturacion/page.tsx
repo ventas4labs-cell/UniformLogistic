@@ -11,8 +11,8 @@ export default async function AdminFacturacionPage() {
     return (
         <div className="space-y-8">
             <div>
-                <h2 className="text-2xl font-bold text-gray-900">Facturación Electrónica</h2>
-                <p className="text-gray-500 text-sm">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-zinc-100">Facturación Electrónica</h2>
+                <p className="text-gray-500 dark:text-zinc-400 text-sm">
                     Configuración del emisor y monitoreo de documentos enviados a Hacienda (v4.4).
                 </p>
             </div>

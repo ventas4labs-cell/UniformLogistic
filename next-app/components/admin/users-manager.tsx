@@ -117,8 +117,8 @@ export function UsersManager({ initialUsers, companies }: Props) {
         <div>
             <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Usuarios</h2>
-                    <p className="text-gray-500 text-sm">
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-zinc-100">Usuarios</h2>
+                    <p className="text-gray-500 dark:text-zinc-400 text-sm">
                         Crea usuarios, asigna empresas y gestiona contraseñas.
                     </p>
                 </div>
@@ -134,28 +134,28 @@ export function UsersManager({ initialUsers, companies }: Props) {
             </div>
 
             {orphanCount > 0 && (
-                <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-lg flex items-center gap-2 text-sm">
+                <div className="mb-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 text-amber-800 dark:text-amber-300 p-3 rounded-lg flex items-center gap-2 text-sm">
                     <AlertCircle size={18} />
                     Hay <strong>{orphanCount}</strong> usuario{orphanCount === 1 ? '' : 's'} sin empresa asignada. No pueden hacer pedidos hasta que los actives.
                 </div>
             )}
 
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm overflow-hidden">
                 <table className="w-full text-left">
-                    <thead className="bg-gray-50 border-b border-gray-200">
+                    <thead className="bg-gray-50 dark:bg-zinc-900/60 border-b border-gray-200 dark:border-zinc-800">
                         <tr>
-                            <th className="p-4 font-semibold text-gray-600">Usuario</th>
-                            <th className="p-4 font-semibold text-gray-600">Email</th>
-                            <th className="p-4 font-semibold text-gray-600">Teléfono</th>
-                            <th className="p-4 font-semibold text-gray-600">Registrado</th>
-                            <th className="p-4 font-semibold text-gray-600">Empresa asignada</th>
-                            <th className="p-4 font-semibold text-gray-600 text-right">Acciones</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Usuario</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Email</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Teléfono</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Registrado</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Empresa asignada</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400 text-right">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-gray-100 dark:divide-zinc-800">
                         {users.length === 0 ? (
                             <tr>
-                                <td colSpan={6} className="p-8 text-center text-gray-500">
+                                <td colSpan={6} className="p-8 text-center text-gray-500 dark:text-zinc-400">
                                     <Users size={32} className="mx-auto mb-2 opacity-30" />
                                     Sin usuarios registrados.
                                 </td>
@@ -164,12 +164,12 @@ export function UsersManager({ initialUsers, companies }: Props) {
                             users.map((u) => (
                                 <tr
                                     key={u.userId}
-                                    className={`hover:bg-gray-50 ${!u.companyId ? 'bg-amber-50/40' : ''}`}
+                                    className={`hover:bg-gray-50 dark:hover:bg-zinc-800 ${!u.companyId ? 'bg-amber-50/40 dark:bg-amber-950/30' : ''}`}
                                 >
-                                    <td className="p-4 font-bold text-gray-900">{u.fullName || '—'}</td>
-                                    <td className="p-4 text-gray-600 text-sm">{u.email}</td>
-                                    <td className="p-4 text-gray-600 text-sm">{u.phone || '—'}</td>
-                                    <td className="p-4 text-gray-500 text-xs">
+                                    <td className="p-4 font-bold text-gray-900 dark:text-zinc-100">{u.fullName || '—'}</td>
+                                    <td className="p-4 text-gray-600 dark:text-zinc-400 text-sm">{u.email}</td>
+                                    <td className="p-4 text-gray-600 dark:text-zinc-400 text-sm">{u.phone || '—'}</td>
+                                    <td className="p-4 text-gray-500 dark:text-zinc-400 text-xs">
                                         {new Date(u.signedUpAt).toLocaleDateString()}
                                     </td>
                                     <td className="p-4">
@@ -187,14 +187,14 @@ export function UsersManager({ initialUsers, companies }: Props) {
                                             ))}
                                         </select>
                                         {savingUserId === u.userId && (
-                                            <Loader2 className="animate-spin inline ml-2 text-gray-400" size={14} />
+                                            <Loader2 className="animate-spin inline ml-2 text-gray-400 dark:text-zinc-500" size={14} />
                                         )}
                                     </td>
                                     <td className="p-4 text-right">
                                         <div className="flex justify-end gap-1">
                                             <button
                                                 onClick={() => startEdit(u)}
-                                                className="p-2 text-gray-600 hover:bg-orange-50 hover:text-orange-600 rounded-lg"
+                                                className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-orange-50 hover:text-orange-600 rounded-lg"
                                                 title="Editar usuario"
                                             >
                                                 <Edit2 size={16} />
@@ -205,7 +205,7 @@ export function UsersManager({ initialUsers, companies }: Props) {
                                                     setNewPassword('');
                                                     setResetError(null);
                                                 }}
-                                                className="p-2 text-gray-600 hover:bg-orange-50 hover:text-orange-600 rounded-lg"
+                                                className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-orange-50 hover:text-orange-600 rounded-lg"
                                                 title="Cambiar contraseña"
                                             >
                                                 <KeyRound size={16} />
@@ -253,7 +253,7 @@ export function UsersManager({ initialUsers, companies }: Props) {
                             />
                         </Field>
                         {createError && (
-                            <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm border border-red-100">
+                            <div className="bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 p-3 rounded-lg text-sm border border-red-100 dark:border-red-900/50">
                                 {createError}
                             </div>
                         )}
@@ -269,11 +269,11 @@ export function UsersManager({ initialUsers, companies }: Props) {
             {resetTarget && (
                 <Modal title="Cambiar Contraseña" onClose={() => setResetTarget(null)}>
                     <form onSubmit={handleResetPassword} className="p-6 space-y-4">
-                        <div className="bg-gray-50 p-3 rounded-lg text-sm">
-                            <p className="text-gray-500">Usuario</p>
-                            <p className="font-bold text-gray-900">{resetTarget.email}</p>
+                        <div className="bg-gray-50 dark:bg-zinc-900/60 p-3 rounded-lg text-sm">
+                            <p className="text-gray-500 dark:text-zinc-400">Usuario</p>
+                            <p className="font-bold text-gray-900 dark:text-zinc-100">{resetTarget.email}</p>
                             {resetTarget.fullName && (
-                                <p className="text-gray-600">{resetTarget.fullName}</p>
+                                <p className="text-gray-600 dark:text-zinc-400">{resetTarget.fullName}</p>
                             )}
                         </div>
                         <Field label="Nueva contraseña *">
@@ -288,7 +288,7 @@ export function UsersManager({ initialUsers, companies }: Props) {
                             />
                         </Field>
                         {resetError && (
-                            <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm border border-red-100">
+                            <div className="bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 p-3 rounded-lg text-sm border border-red-100 dark:border-red-900/50">
                                 {resetError}
                             </div>
                         )}
@@ -330,7 +330,7 @@ export function UsersManager({ initialUsers, companies }: Props) {
                             />
                         </Field>
                         {editError && (
-                            <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm border border-red-100">
+                            <div className="bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 p-3 rounded-lg text-sm border border-red-100 dark:border-red-900/50">
                                 {editError}
                             </div>
                         )}
@@ -349,7 +349,7 @@ export function UsersManager({ initialUsers, companies }: Props) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
     return (
         <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-1">{label}</label>
             {children}
         </div>
     );
@@ -366,10 +366,10 @@ function Modal({
 }) {
     return (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-                <div className="flex items-center justify-between p-6 border-b border-gray-100">
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-md">
+                <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-zinc-800">
                     <h3 className="text-xl font-bold">{title}</h3>
-                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
+                    <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg">
                         <X size={20} />
                     </button>
                 </div>
@@ -393,7 +393,7 @@ function ModalActions({
             <button
                 type="button"
                 onClick={onCancel}
-                className="flex-1 py-3 border border-gray-300 rounded-lg font-bold text-gray-700 hover:bg-gray-50"
+                className="flex-1 py-3 border border-gray-300 dark:border-zinc-700 rounded-lg font-bold text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800"
             >
                 Cancelar
             </button>
