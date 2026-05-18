@@ -11,6 +11,7 @@ import {
     Warehouse
 } from 'lucide-react';
 import type { CompanyStockGroup, StockRow } from '@/lib/services/stock';
+import { VoiceStockDictate } from '@/components/admin/voice-stock-dictate';
 
 // Canonical shirt size order (anything not in this list sorts to the end).
 const SHIRT_SIZE_ORDER = [
@@ -99,7 +100,13 @@ const fmtCRC = (n: number) =>
 
 const fmtInt = (n: number) => new Intl.NumberFormat('es-CR').format(n);
 
-export function AdminStockBoard({ groups }: { groups: CompanyStockGroup[] }) {
+export function AdminStockBoard({
+    groups,
+    companies
+}: {
+    groups: CompanyStockGroup[];
+    companies: { id: string; name: string }[];
+}) {
     const [query, setQuery] = useState('');
     const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -183,7 +190,8 @@ export function AdminStockBoard({ groups }: { groups: CompanyStockGroup[] }) {
                         Inventario guardado a nombre de cada empresa cliente.
                     </p>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
+                <div className="flex items-center gap-2 text-sm flex-wrap">
+                    <VoiceStockDictate companies={companies} />
                     <button
                         onClick={expandAll}
                         className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-zinc-800 text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 font-semibold"
