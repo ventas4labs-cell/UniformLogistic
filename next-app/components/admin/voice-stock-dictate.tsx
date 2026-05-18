@@ -25,13 +25,52 @@ interface CompanyOption {
     name: string;
 }
 
+type MovementType = 'entry' | 'exit' | 'reserve' | 'release' | 'adjustment';
+
+const MOVEMENT_TYPES: { value: MovementType; label: string; verbHint: string; cls: string }[] = [
+    {
+        value: 'entry',
+        label: 'Entrada',
+        verbHint: 'recibí',
+        cls: 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300'
+    },
+    {
+        value: 'exit',
+        label: 'Salida',
+        verbHint: 'despaché',
+        cls: 'bg-red-100 dark:bg-red-950/50 text-red-800 dark:text-red-300'
+    },
+    {
+        value: 'reserve',
+        label: 'Reserva',
+        verbHint: 'aparté',
+        cls: 'bg-blue-100 dark:bg-blue-950/50 text-blue-800 dark:text-blue-300'
+    },
+    {
+        value: 'release',
+        label: 'Liberar',
+        verbHint: 'liberé',
+        cls: 'bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300'
+    },
+    {
+        value: 'adjustment',
+        label: 'Ajuste',
+        verbHint: 'el conteo es',
+        cls: 'bg-purple-100 dark:bg-purple-950/50 text-purple-800 dark:text-purple-300'
+    }
+];
+
+function typeMeta(type: MovementType) {
+    return MOVEMENT_TYPES.find((t) => t.value === type) ?? MOVEMENT_TYPES[0];
+}
+
 interface ParsedCommand {
     product_id: string;
     product_name: string;
     product_code: string;
     size: string;
     company_stock_id: string | null;
-    type: 'entry';
+    type: MovementType;
     quantity: number;
     reason: string;
     confidence: number;
@@ -54,6 +93,8 @@ interface ApplyResultRow extends ParsedCommand {
     ok: boolean;
     error?: string;
     new_on_hand?: number;
+    new_reserved?: number;
+    noop?: boolean;
 }
 
 interface Props {
@@ -381,10 +422,24 @@ export function VoiceStockDictate({ companies, defaultCompanyId, className = '' 
                                     {finalBufRef.current ||
                                     interim ||
                                     (phase === 'idle' ? (
-                                        <em className="text-zinc-400 dark:text-zinc-500">
-                                            Ejemplo: &ldquo;Recibí 20 Cargo Verde cintura 32 y 10 Camisa
-                                            Reflectiva mujer talla M&rdquo;.
-                                        </em>
+                                        <div className="text-zinc-400 dark:text-zinc-500 text-xs space-y-1">
+                                            <div>
+                                                <strong>Entrada:</strong> &ldquo;Recibí 20 Cargo Verde
+                                                cintura 32&rdquo;
+                                            </div>
+                                            <div>
+                                                <strong>Salida:</strong> &ldquo;Despaché 5 Camisa Azul
+                                                hombre talla M&rdquo;
+                                            </div>
+                                            <div>
+                                                <strong>Reserva:</strong> &ldquo;Aparté 3 Cargo Verde
+                                                cintura 34 para la orden mil&rdquo;
+                                            </div>
+                                            <div>
+                                                <strong>Ajuste:</strong> &ldquo;El conteo de Camisa
+                                                Reflectiva mujer talla L es 8&rdquo;
+                                            </div>
+                                        </div>
                                     ) : (
                                         ''
                                     ))}
@@ -473,15 +528,18 @@ function ReviewTable({
                         <thead className="bg-zinc-50 dark:bg-zinc-900/60 text-xs font-semibold text-zinc-600 dark:text-zinc-400">
                             <tr>
                                 <th className="p-2 text-left">Producto</th>
+                                <th className="p-2 text-left w-28">Tipo</th>
                                 <th className="p-2 text-left">Talla</th>
                                 <th className="p-2 text-right w-24">Cantidad</th>
                                 <th className="p-2 text-left">Motivo</th>
-                                <th className="p-2 w-16"></th>
+                                <th className="p-2 w-12"></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                             {edited.map((cmd, idx) => {
                                 const low = cmd.confidence < 0.7;
+                                const meta = typeMeta(cmd.type);
+                                const isAdjustment = cmd.type === 'adjustment';
                                 return (
                                     <tr
                                         key={idx}
@@ -502,16 +560,38 @@ function ReviewTable({
                                                 </div>
                                             )}
                                         </td>
+                                        <td className="p-2">
+                                            <select
+                                                value={cmd.type}
+                                                onChange={(e) =>
+                                                    update(idx, {
+                                                        type: e.target.value as MovementType
+                                                    })
+                                                }
+                                                className={`w-full p-1 rounded text-xs font-bold border border-transparent ${meta.cls}`}
+                                            >
+                                                {MOVEMENT_TYPES.map((t) => (
+                                                    <option key={t.value} value={t.value}>
+                                                        {t.label}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            {isAdjustment && (
+                                                <div className="text-[10px] text-purple-700 dark:text-purple-300 mt-1 font-semibold">
+                                                    Cantidad = total final
+                                                </div>
+                                            )}
+                                        </td>
                                         <td className="p-2 font-mono text-xs">{cmd.size}</td>
                                         <td className="p-2 text-right">
                                             <input
                                                 type="number"
-                                                min={1}
+                                                min={isAdjustment ? 0 : 1}
                                                 value={cmd.quantity}
                                                 onChange={(e) =>
                                                     update(idx, {
                                                         quantity: Math.max(
-                                                            1,
+                                                            isAdjustment ? 0 : 1,
                                                             Math.floor(Number(e.target.value) || 0)
                                                         )
                                                     })
@@ -546,7 +626,7 @@ function ReviewTable({
                             {edited.length === 0 && (
                                 <tr>
                                     <td
-                                        colSpan={5}
+                                        colSpan={6}
                                         className="p-4 text-center text-zinc-400 dark:text-zinc-500 text-sm"
                                     >
                                         Todos los movimientos fueron eliminados.
@@ -624,22 +704,46 @@ function ApplyResults({
 
             {applied.length > 0 && (
                 <ul className="text-xs space-y-1">
-                    {applied.map((r, i) => (
-                        <li
-                            key={i}
-                            className="flex justify-between bg-emerald-50 dark:bg-emerald-950/30 px-3 py-1.5 rounded"
-                        >
-                            <span>
-                                {r.product_name} · <span className="font-mono">{r.size}</span> · +
-                                {r.quantity}
-                            </span>
-                            {r.new_on_hand != null && (
-                                <span className="font-mono text-emerald-700 dark:text-emerald-300">
-                                    nuevo on-hand: {r.new_on_hand}
+                    {applied.map((r, i) => {
+                        const meta = typeMeta(r.type);
+                        // Quantity prefix conveys direction at a glance.
+                        const prefix =
+                            r.type === 'entry' || r.type === 'release'
+                                ? '+'
+                                : r.type === 'exit' || r.type === 'reserve'
+                                  ? '−'
+                                  : '→';
+                        return (
+                            <li
+                                key={i}
+                                className="flex justify-between items-center bg-emerald-50 dark:bg-emerald-950/30 px-3 py-1.5 rounded gap-2"
+                            >
+                                <span className="flex items-center gap-2 min-w-0">
+                                    <span
+                                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${meta.cls}`}
+                                    >
+                                        {meta.label}
+                                    </span>
+                                    <span className="truncate">
+                                        {r.product_name} · <span className="font-mono">{r.size}</span> ·{' '}
+                                        <span className="font-bold">
+                                            {prefix}
+                                            {r.quantity}
+                                        </span>
+                                    </span>
                                 </span>
-                            )}
-                        </li>
-                    ))}
+                                <span className="font-mono text-emerald-700 dark:text-emerald-300 shrink-0">
+                                    {r.noop
+                                        ? 'sin cambios'
+                                        : `on-hand: ${r.new_on_hand ?? '?'}${
+                                              r.new_reserved
+                                                  ? ` · reserv: ${r.new_reserved}`
+                                                  : ''
+                                          }`}
+                                </span>
+                            </li>
+                        );
+                    })}
                 </ul>
             )}
 

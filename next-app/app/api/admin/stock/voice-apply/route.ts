@@ -11,6 +11,15 @@ import { buildVoiceCatalog } from '@/lib/services/voice-catalog';
 const ADMIN_EMAIL = 'ulogisticcr@gmail.com';
 const MAX_BATCH = 50;
 
+type MovementType = 'entry' | 'exit' | 'reserve' | 'release' | 'adjustment';
+const VALID_TYPES: MovementType[] = [
+    'entry',
+    'exit',
+    'reserve',
+    'release',
+    'adjustment'
+];
+
 export const maxDuration = 30;
 
 interface InboundCommand {
@@ -36,6 +45,9 @@ interface ResultRow {
     error?: string;
     company_stock_id?: string;
     new_on_hand?: number;
+    new_reserved?: number;
+    /** True when an adjustment didn't change anything (target == current). */
+    noop?: boolean;
 }
 
 export async function POST(req: NextRequest) {
@@ -92,11 +104,12 @@ export async function POST(req: NextRequest) {
     const results: ResultRow[] = [];
 
     for (const raw of commands) {
+        const requestedType = String(raw.type ?? 'entry') as MovementType;
         const cmd: ResultRow = {
             product_id: String(raw.product_id ?? ''),
             product_name: raw.product_name,
             size: String(raw.size ?? ''),
-            type: String(raw.type ?? 'entry'),
+            type: requestedType,
             quantity: Number(raw.quantity ?? 0),
             reason: String(raw.reason ?? 'Recepción por voz').slice(0, 200),
             ok: false
@@ -113,15 +126,17 @@ export async function POST(req: NextRequest) {
             });
             continue;
         }
-        if (!Number.isInteger(cmd.quantity) || cmd.quantity <= 0) {
-            results.push({ ...cmd, error: 'cantidad inválida' });
+        if (!VALID_TYPES.includes(requestedType)) {
+            results.push({ ...cmd, error: `tipo de movimiento inválido: ${requestedType}` });
             continue;
         }
-        if (cmd.type !== 'entry') {
-            results.push({
-                ...cmd,
-                error: 'Phase 1 sólo soporta entradas'
-            });
+        // Adjustments can set the target to 0 (cleared the bin); everything
+        // else requires a positive quantity.
+        const qtyValid =
+            Number.isInteger(cmd.quantity) &&
+            (requestedType === 'adjustment' ? cmd.quantity >= 0 : cmd.quantity > 0);
+        if (!qtyValid) {
+            results.push({ ...cmd, error: 'cantidad inválida' });
             continue;
         }
 
@@ -129,7 +144,7 @@ export async function POST(req: NextRequest) {
             p_company_id: companyId,
             p_product_id: cmd.product_id,
             p_size: cmd.size,
-            p_type: 'entry',
+            p_type: requestedType,
             p_quantity: cmd.quantity,
             p_reason: `🎙 ${cmd.reason}`,
             p_source: 'voice'
@@ -138,13 +153,21 @@ export async function POST(req: NextRequest) {
             results.push({ ...cmd, error: error.message });
         } else {
             const payload = data as
-                | { ok?: boolean; company_stock_id?: string; on_hand?: number }
+                | {
+                      ok?: boolean;
+                      company_stock_id?: string;
+                      on_hand?: number;
+                      reserved?: number;
+                      noop?: boolean;
+                  }
                 | null;
             results.push({
                 ...cmd,
                 ok: true,
                 company_stock_id: payload?.company_stock_id,
-                new_on_hand: payload?.on_hand
+                new_on_hand: payload?.on_hand,
+                new_reserved: payload?.reserved,
+                noop: payload?.noop ?? false
             });
         }
     }

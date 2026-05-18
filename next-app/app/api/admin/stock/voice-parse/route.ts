@@ -22,13 +22,23 @@ const MAX_TOKENS = 2048;
 // bound generous enough.
 export const maxDuration = 30;
 
+type MovementType = 'entry' | 'exit' | 'reserve' | 'release' | 'adjustment';
+
+const VALID_TYPES: MovementType[] = [
+    'entry',
+    'exit',
+    'reserve',
+    'release',
+    'adjustment'
+];
+
 interface ParsedCommand {
     product_id: string;
     product_name: string;
     product_code: string;
     size: string;
     company_stock_id: string | null;
-    type: 'entry';
+    type: MovementType;
     quantity: number;
     reason: string;
     confidence: number;
@@ -136,11 +146,16 @@ export async function POST(req: NextRequest) {
                                 description:
                                     'Cadena exacta de la talla tal como aparece en el catálogo para ese producto'
                             },
-                            quantity: { type: 'number' },
+                            quantity: {
+                                type: 'number',
+                                description:
+                                    'Para entry/exit/reserve/release es la cantidad afectada. Para adjustment es el TOTAL final que el conteo físico arroja.'
+                            },
                             type: {
                                 type: 'string',
-                                enum: ['entry'],
-                                description: 'Phase 1: sólo entradas'
+                                enum: ['entry', 'exit', 'reserve', 'release', 'adjustment'],
+                                description:
+                                    'entry=recepción, exit=salida/despacho, reserve=bloquear stock para una orden, release=liberar reserva, adjustment=corrección por conteo físico (quantity es el TOTAL final)'
                             },
                             reason: { type: 'string' },
                             confidence: { type: 'number' }
@@ -175,19 +190,29 @@ export async function POST(req: NextRequest) {
     const systemPrompt = `Eres un asistente que extrae movimientos de stock de uniformes a partir de transcripciones de voz en español de Costa Rica.
 
 Reglas estrictas:
-- Sólo aceptás ENTRADAS de stock (recibí, llegó, ingresó, agregar, sumar, entré, entraron). Otros tipos van a 'unmatched'.
 - Sólo usás product_id que aparezcan EXACTAMENTE en el catálogo de abajo.
 - Para la talla, copiá UNA de las cadenas exactas listadas para ese producto. No inventes tallas nuevas.
 - Convertí números escritos en palabras a dígitos ("veinte" → 20, "tres docenas" → 36, "una docena y media" → 18).
-- Mapeá el lenguaje natural a tallas canónicas:
-  • "hombre talla M" → "H · M"
-  • "mujer XL" → "M · XL"
-  • "cintura 32" → "C32\\""
-  • "cintura 34 largo 30" → "C34\\" / L30\\""
-  • "mediana" → M, "grande" → L, "extra grande" → XL, "doble extra grande" → 2XL, "triple extra grande" → 3XL.
+
+Detección de TIPO de movimiento (mapeá el verbo dictado a uno de los enums):
+- **entry** (recepción): "recibí", "llegó", "llegaron", "ingresó", "ingresaron", "agregar", "sumar", "entró", "entraron", "metí", "metieron al stock".
+- **exit** (despacho / merma): "saqué", "salió", "salieron", "despaché", "vendí", "entregué", "entregamos", "se mermó", "se perdió", "se dañó", "descarté".
+- **reserve** (bloquear stock para una orden): "reservé", "reservar", "aparté", "separé", "comprometí", "bloquear para".
+- **release** (liberar una reserva): "liberé", "devolví al stock disponible", "cancelar reserva", "liberar".
+- **adjustment** (corrección por conteo físico — el 'quantity' es el TOTAL FINAL, no un delta): "el conteo dice", "el conteo arroja", "conté X y son", "el inventario físico es", "ajustar a", "corregir a", "en bodega hay realmente", "el conteo cierra en".
+
+Tallas canónicas:
+- "hombre talla M" → "H · M"
+- "mujer XL" → "M · XL"
+- "cintura 32" → "C32\\""
+- "cintura 34 largo 30" → "C34\\" / L30\\""
+- "mediana" → M, "grande" → L, "extra grande" → XL, "doble extra grande" → 2XL, "triple extra grande" → 3XL.
+
+Reglas adicionales:
 - Si hay ambigüedad de producto ("camisa azul" cuando hay dos azules), elegí el más probable y bajá confidence a 0.6.
-- Si el producto/talla mencionado NO está en el catálogo, NO inventes nada — ponelo en 'unmatched' con la frase original.
-- 'reason' por defecto es "Recepción por voz" salvo que el usuario diga otra cosa explícita (p.ej. "factura 4521", "OC numero mil doscientos").
+- Si el producto/talla NO está en el catálogo, NO inventes nada — ponelo en 'unmatched' con la frase original.
+- Si NO podés identificar un tipo claro de movimiento, mové la frase a 'unmatched' antes que asumir 'entry'.
+- 'reason' por defecto depende del tipo: "Recepción por voz" (entry), "Despacho por voz" (exit), "Reserva por voz" (reserve), "Liberación de reserva por voz" (release), "Ajuste por conteo físico" (adjustment). Si el usuario especifica un motivo concreto ("factura 4521", "OC numero mil doscientos", "merma por humedad", "conteo del lunes"), usalo en su lugar.
 
 CATÁLOGO DISPONIBLE PARA ESTA EMPRESA:
 ${catalogLines}`;
@@ -221,27 +246,40 @@ ${catalogLines}`;
     // (product_id, size) pair from the catalog. The LLM can't introduce
     // foreign UUIDs through this filter.
     const byKey = new Map(catalog.map((c) => [`${c.product_id}|${c.size}`, c]));
+    const DEFAULT_REASON: Record<MovementType, string> = {
+        entry: 'Recepción por voz',
+        exit: 'Despacho por voz',
+        reserve: 'Reserva por voz',
+        release: 'Liberación de reserva por voz',
+        adjustment: 'Ajuste por conteo físico'
+    };
 
     const commands: ParsedCommand[] = (args.commands ?? [])
         .filter((c) => {
-            if (!c || c.type !== 'entry') return false;
+            if (!c) return false;
+            const type = c.type as MovementType | undefined;
+            if (!type || !VALID_TYPES.includes(type)) return false;
             if (!c.product_id || !c.size) return false;
             const entry = byKey.get(`${c.product_id}|${c.size}`);
             if (!entry) return false;
             const q = Number(c.quantity);
-            return Number.isFinite(q) && q > 0;
+            if (!Number.isFinite(q)) return false;
+            // Adjustment can target 0 (cleared the bin); the others need > 0.
+            if (type === 'adjustment') return q >= 0;
+            return q > 0;
         })
         .map((c) => {
             const entry = byKey.get(`${c.product_id}|${c.size}`) as VoiceCatalogEntry;
+            const type = c.type as MovementType;
             return {
                 product_id: entry.product_id,
                 product_name: entry.product_name,
                 product_code: entry.product_code,
                 size: entry.size,
                 company_stock_id: entry.company_stock_id,
-                type: 'entry' as const,
+                type,
                 quantity: Math.floor(Number(c.quantity)),
-                reason: String(c.reason ?? 'Recepción por voz').slice(0, 200),
+                reason: String(c.reason ?? DEFAULT_REASON[type]).slice(0, 200),
                 confidence: Math.max(0, Math.min(1, Number(c.confidence ?? 0.7)))
             };
         });
