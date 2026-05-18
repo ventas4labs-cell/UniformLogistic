@@ -11,6 +11,7 @@ import {
     uploadProductImageAction
 } from '@/app/(admin)/admin/products/actions';
 import { validateCABYS } from '@/lib/facturacion/validation/cabys-validator';
+import { VoiceProductDictate } from '@/components/admin/voice-product-dictate';
 
 const emptyForm: ProductInput = {
     productCode: '',
@@ -74,6 +75,22 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
     const startCreate = () => {
         setEditing(null);
         setForm(emptyForm);
+        setShowForm(true);
+        setError(null);
+    };
+
+    // Called by VoiceProductDictate after the LLM has parsed a dictation.
+    // We merge the parsed fields over emptyForm so anything not detected
+    // falls back to defaults (and the admin can edit before saving).
+    const startCreateWithVoice = (patch: Partial<ProductInput>) => {
+        setEditing(null);
+        setForm({
+            ...emptyForm,
+            ...patch,
+            // Merge sizes per-bucket so a partial sizes patch doesn't blow
+            // away keys the patch didn't touch.
+            sizes: { ...emptyForm.sizes, ...(patch.sizes || {}) }
+        });
         setShowForm(true);
         setError(null);
     };
@@ -145,12 +162,15 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
                         Catálogo maestro. Asígnalos a empresas en la pestaña &ldquo;Catálogo&rdquo;.
                     </p>
                 </div>
-                <button
-                    onClick={startCreate}
-                    className="bg-orange-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-orange-700 shadow-md flex items-center gap-2"
-                >
-                    <Plus size={18} /> Nuevo Producto
-                </button>
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                    <VoiceProductDictate onPrefill={startCreateWithVoice} />
+                    <button
+                        onClick={startCreate}
+                        className="bg-orange-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-orange-700 shadow-md flex items-center gap-2"
+                    >
+                        <Plus size={18} /> Nuevo Producto
+                    </button>
+                </div>
             </div>
 
             <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm overflow-hidden">
