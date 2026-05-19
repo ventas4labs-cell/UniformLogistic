@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
     AlertTriangle,
     Loader2,
@@ -10,6 +10,7 @@ import {
     X
 } from 'lucide-react';
 import type { ProductInput } from '@/lib/services/products';
+import { useDictation } from '@/lib/hooks/use-dictation';
 
 // Single-shot product dictation: opens a small modal, records one
 // utterance, parses, and prefills the parent's product form via a
@@ -41,37 +42,6 @@ interface Props {
 }
 
 type Phase = 'idle' | 'recording' | 'parsing' | 'done';
-
-// Minimal SpeechRecognition typings (same as voice-stock-dictate).
-interface SpeechRecognitionLike extends EventTarget {
-    lang: string;
-    continuous: boolean;
-    interimResults: boolean;
-    start(): void;
-    stop(): void;
-    abort(): void;
-    onresult: ((e: SpeechRecognitionEventLike) => void) | null;
-    onend: (() => void) | null;
-    onerror: ((e: { error?: string }) => void) | null;
-}
-interface SpeechRecognitionEventLike {
-    resultIndex: number;
-    results: ArrayLike<ArrayLike<{ transcript?: string }> & { isFinal: boolean }>;
-}
-
-function getRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
-    if (typeof window === 'undefined') return null;
-    return (
-        (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike })
-            .SpeechRecognition ||
-        (
-            window as unknown as {
-                webkitSpeechRecognition?: new () => SpeechRecognitionLike;
-            }
-        ).webkitSpeechRecognition ||
-        null
-    );
-}
 
 /**
  * Map the ParsedProduct shape (nullable fields) to the partial
@@ -122,22 +92,19 @@ export function VoiceProductDictate({ onPrefill, className = '', mode = 'create'
               };
     const [open, setOpen] = useState(false);
     const [phase, setPhase] = useState<Phase>('idle');
-    const [interim, setInterim] = useState('');
-    const finalBufRef = useRef('');
-    const userStoppedRef = useRef(false);
-    const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
     const [parsed, setParsed] = useState<ParsedProduct | null>(null);
     const [error, setError] = useState<string | null>(null);
 
-    const isIOS =
-        typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const dictation = useDictation({
+        lang: 'es-CR',
+        // We reuse the stock transcribe endpoint — it's a thin Whisper
+        // proxy and doesn't care which flow asked.
+        transcribeUrl: '/api/admin/stock/voice-transcribe'
+    });
+    const displayedError = error || dictation.error;
 
     const reset = () => {
-        recognitionRef.current?.abort();
-        recognitionRef.current = null;
-        userStoppedRef.current = false;
-        finalBufRef.current = '';
-        setInterim('');
+        dictation.reset();
         setParsed(null);
         setError(null);
         setPhase('idle');
@@ -148,86 +115,23 @@ export function VoiceProductDictate({ onPrefill, className = '', mode = 'create'
     };
 
     useEffect(() => {
-        if (!open) recognitionRef.current?.abort();
-    }, [open]);
+        if (!open) dictation.reset();
+    }, [open, dictation]);
 
     const startRecording = useCallback(() => {
         setError(null);
-        const Ctor = getRecognitionCtor();
-        if (!Ctor) {
-            setError(
-                'Tu navegador no soporta dictado nativo. Usá Chrome de escritorio o Safari macOS.'
-            );
-            return;
-        }
-        if (typeof window !== 'undefined' && !window.isSecureContext) {
-            setError('Dictado requiere HTTPS o localhost.');
-            return;
-        }
-        userStoppedRef.current = false;
-        finalBufRef.current = '';
-        setInterim('');
-
-        const r = new Ctor();
-        r.continuous = !isIOS;
-        r.interimResults = true;
-        r.lang = 'es-CR';
-
-        r.onresult = (e) => {
-            let interimText = '';
-            let finalText = '';
-            for (let i = e.resultIndex; i < e.results.length; i++) {
-                const res = e.results[i];
-                const t = res?.[0]?.transcript ?? '';
-                if (!t) continue;
-                if (res.isFinal) finalText += t;
-                else interimText += t;
-            }
-            if (finalText) finalBufRef.current += finalText;
-            setInterim(interimText);
-        };
-        r.onend = () => {
-            if (!userStoppedRef.current && isIOS) {
-                try {
-                    r.start();
-                } catch {
-                    /* swallow */
-                }
-            }
-        };
-        r.onerror = (e) => {
-            if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-                userStoppedRef.current = true;
-                setError('Permiso de micrófono denegado.');
-                setPhase('idle');
-            } else if (e.error === 'network') {
-                userStoppedRef.current = true;
-                setError('Error de red en el reconocimiento de voz.');
-                setPhase('idle');
-            }
-        };
-
-        recognitionRef.current = r;
-        try {
-            r.start();
-            setPhase('recording');
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'No se pudo iniciar el dictado.');
-        }
-    }, [isIOS]);
+        dictation.start();
+        setPhase('recording');
+    }, [dictation]);
 
     const stopAndParse = useCallback(async () => {
-        userStoppedRef.current = true;
-        recognitionRef.current?.stop();
-        await new Promise((r) => setTimeout(r, 200));
-        const transcript = (finalBufRef.current + ' ' + interim).trim();
-        recognitionRef.current = null;
+        setPhase('parsing');
+        const transcript = await dictation.stop();
         if (!transcript) {
             setError('No escuché nada. Intentá de nuevo.');
             setPhase('idle');
             return;
         }
-        setPhase('parsing');
         try {
             const res = await fetch('/api/admin/products/voice-parse', {
                 method: 'POST',
@@ -245,7 +149,7 @@ export function VoiceProductDictate({ onPrefill, className = '', mode = 'create'
             setError(e instanceof Error ? e.message : 'Error al procesar el dictado.');
             setPhase('idle');
         }
-    }, [interim]);
+    }, [dictation]);
 
     const accept = () => {
         if (!parsed) return;
@@ -314,7 +218,7 @@ export function VoiceProductDictate({ onPrefill, className = '', mode = 'create'
                                             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-200 dark:bg-zinc-800 text-zinc-500 font-bold"
                                         >
                                             <Loader2 size={16} className="animate-spin" />
-                                            Analizando…
+                                            {dictation.isFinalizing ? 'Transcribiendo…' : 'Analizando…'}
                                         </button>
                                     ) : (
                                         <button
@@ -337,28 +241,45 @@ export function VoiceProductDictate({ onPrefill, className = '', mode = 'create'
                                 </div>
 
                                 <div className="text-sm text-zinc-700 dark:text-zinc-200 min-h-[3rem] whitespace-pre-wrap leading-relaxed">
-                                    {finalBufRef.current ||
-                                    interim ||
+                                    {dictation.final ||
+                                    dictation.interim ||
                                     (phase === 'idle' ? (
+                                        <div className="space-y-1">
+                                            <em className="text-zinc-400 dark:text-zinc-500">
+                                                Ejemplo: &ldquo;Crear Camisa Polo Roja, mujer, tela
+                                                algodón, tallas S a XL, código CABYS seis dos cero uno
+                                                cero cero cero cero cero cero cero cero cero, precio
+                                                doce mil quinientos&rdquo;.
+                                            </em>
+                                            {dictation.mode === 'whisper' && (
+                                                <div className="pt-1 italic text-zinc-400 dark:text-zinc-500 text-xs">
+                                                    Tu navegador no soporta dictado nativo — vamos a
+                                                    grabar y transcribir al detenerte.
+                                                </div>
+                                            )}
+                                            {dictation.mode === 'unsupported' && (
+                                                <div className="pt-1 text-red-500 dark:text-red-400 italic text-xs">
+                                                    Este navegador no soporta dictado.
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : phase === 'recording' && dictation.mode === 'whisper' ? (
                                         <em className="text-zinc-400 dark:text-zinc-500">
-                                            Ejemplo: &ldquo;Crear Camisa Polo Roja, mujer, tela algodón,
-                                            tallas S a XL, código CABYS seis dos cero uno cero cero cero
-                                            cero cero cero cero cero cero, precio doce mil
-                                            quinientos&rdquo;.
+                                            Grabando… la transcripción aparecerá al detenerte.
                                         </em>
                                     ) : (
                                         ''
                                     ))}
-                                    {interim && (
-                                        <span className="text-zinc-400 dark:text-zinc-500"> {interim}</span>
+                                    {dictation.interim && (
+                                        <span className="text-zinc-400 dark:text-zinc-500"> {dictation.interim}</span>
                                     )}
                                 </div>
                             </div>
 
-                            {error && (
+                            {displayedError && (
                                 <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/60 text-red-800 dark:text-red-300 p-3 rounded-lg text-sm flex items-start gap-2">
                                     <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-                                    {error}
+                                    {displayedError}
                                 </div>
                             )}
 

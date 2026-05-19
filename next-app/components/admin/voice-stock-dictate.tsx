@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     AlertTriangle,
@@ -14,6 +14,7 @@ import {
     Trash2,
     X
 } from 'lucide-react';
+import { useDictation } from '@/lib/hooks/use-dictation';
 
 // Voice dictation flow:
 //   idle  →  recording  →  parsing  →  review  →  applying  →  done
@@ -106,38 +107,6 @@ interface Props {
 
 type Phase = 'idle' | 'recording' | 'parsing' | 'review' | 'applying' | 'done';
 
-// Minimal SpeechRecognition typings — the DOM lib types only ship in
-// some TS-DOM versions, and we don't want a runtime dependency.
-interface SpeechRecognitionLike extends EventTarget {
-    lang: string;
-    continuous: boolean;
-    interimResults: boolean;
-    start(): void;
-    stop(): void;
-    abort(): void;
-    onresult: ((e: SpeechRecognitionEventLike) => void) | null;
-    onend: (() => void) | null;
-    onerror: ((e: { error?: string }) => void) | null;
-}
-interface SpeechRecognitionEventLike {
-    resultIndex: number;
-    results: ArrayLike<ArrayLike<{ transcript?: string }> & { isFinal: boolean }>;
-}
-
-function getRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
-    if (typeof window === 'undefined') return null;
-    return (
-        (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike })
-            .SpeechRecognition ||
-        (
-            window as unknown as {
-                webkitSpeechRecognition?: new () => SpeechRecognitionLike;
-            }
-        ).webkitSpeechRecognition ||
-        null
-    );
-}
-
 export function VoiceStockDictate({ companies, defaultCompanyId, className = '' }: Props) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
@@ -146,25 +115,23 @@ export function VoiceStockDictate({ companies, defaultCompanyId, className = '' 
         defaultCompanyId || companies[0]?.id || ''
     );
 
-    const [interim, setInterim] = useState('');
-    const finalBufRef = useRef('');
-    const userStoppedRef = useRef(false);
-    const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+    // STT abstraction: native SpeechRecognition when available, else
+    // MediaRecorder → Whisper proxy.
+    const dictation = useDictation({
+        lang: 'es-CR',
+        transcribeUrl: '/api/admin/stock/voice-transcribe'
+    });
 
     const [parsed, setParsed] = useState<ParseResponse | null>(null);
     const [edited, setEdited] = useState<ParsedCommand[]>([]);
     const [results, setResults] = useState<ApplyResultRow[]>([]);
     const [error, setError] = useState<string | null>(null);
 
-    const isIOS =
-        typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+    // Combine dictation hook errors with local ones — whichever is set wins.
+    const displayedError = error || dictation.error;
 
     const reset = () => {
-        recognitionRef.current?.abort();
-        recognitionRef.current = null;
-        userStoppedRef.current = false;
-        finalBufRef.current = '';
-        setInterim('');
+        dictation.reset();
         setParsed(null);
         setEdited([]);
         setResults([]);
@@ -177,96 +144,32 @@ export function VoiceStockDictate({ companies, defaultCompanyId, className = '' 
         setOpen(false);
     };
 
-    // Stop recognition cleanly on unmount / modal close
+    // Tear down audio when the modal is closed.
     useEffect(() => {
-        if (!open) recognitionRef.current?.abort();
-    }, [open]);
+        if (!open) dictation.reset();
+    }, [open, dictation]);
 
     const startRecording = useCallback(() => {
         setError(null);
-        const Ctor = getRecognitionCtor();
-        if (!Ctor) {
-            setError(
-                'Tu navegador no soporta dictado nativo. Usá Chrome de escritorio o Safari macOS.'
-            );
-            return;
-        }
-        if (typeof window !== 'undefined' && !window.isSecureContext) {
-            setError('Dictado requiere HTTPS o localhost.');
-            return;
-        }
         if (!companyId) {
             setError('Seleccioná una empresa primero.');
             return;
         }
-
-        userStoppedRef.current = false;
-        finalBufRef.current = '';
-        setInterim('');
-
-        const r = new Ctor();
-        r.continuous = !isIOS;
-        r.interimResults = true;
-        r.lang = 'es-CR';
-
-        r.onresult = (e) => {
-            let interimText = '';
-            let finalText = '';
-            for (let i = e.resultIndex; i < e.results.length; i++) {
-                const res = e.results[i];
-                const t = res?.[0]?.transcript ?? '';
-                if (!t) continue;
-                if (res.isFinal) finalText += t;
-                else interimText += t;
-            }
-            if (finalText) finalBufRef.current += finalText;
-            setInterim(interimText);
-        };
-        r.onend = () => {
-            if (!userStoppedRef.current && isIOS) {
-                try {
-                    r.start();
-                } catch {
-                    /* swallow — Safari throws if already started */
-                }
-            }
-        };
-        r.onerror = (e) => {
-            if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-                userStoppedRef.current = true;
-                setError(
-                    'Permiso de micrófono denegado. Habilitalo en los ajustes del navegador.'
-                );
-                setPhase('idle');
-            } else if (e.error === 'network') {
-                userStoppedRef.current = true;
-                setError('Error de red en el reconocimiento de voz. Reintentá.');
-                setPhase('idle');
-            }
-        };
-
-        recognitionRef.current = r;
-        try {
-            r.start();
-            setPhase('recording');
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'No se pudo iniciar el dictado.');
-        }
-    }, [companyId, isIOS]);
+        dictation.start();
+        setPhase('recording');
+    }, [companyId, dictation]);
 
     const stopAndParse = useCallback(async () => {
-        userStoppedRef.current = true;
-        recognitionRef.current?.stop();
-        // Let iOS flush trailing interim words.
-        await new Promise((r) => setTimeout(r, 200));
-        const transcript = (finalBufRef.current + ' ' + interim).trim();
-        recognitionRef.current = null;
+        // In whisper mode the hook flips to isFinalizing while waiting for
+        // the upload+Whisper round-trip. We keep our phase at 'parsing'
+        // throughout so the UI shows a single "analizando" state.
+        setPhase('parsing');
+        const transcript = await dictation.stop();
         if (!transcript) {
             setError('No escuché nada. Intentá de nuevo.');
             setPhase('idle');
             return;
         }
-        setPhase('parsing');
         try {
             const res = await fetch('/api/admin/stock/voice-parse', {
                 method: 'POST',
@@ -285,7 +188,7 @@ export function VoiceStockDictate({ companies, defaultCompanyId, className = '' 
             setError(e instanceof Error ? e.message : 'Error al procesar el dictado.');
             setPhase('idle');
         }
-    }, [companyId, interim]);
+    }, [companyId, dictation]);
 
     const apply = useCallback(async () => {
         if (!parsed || edited.length === 0) return;
@@ -397,7 +300,11 @@ export function VoiceStockDictate({ companies, defaultCompanyId, className = '' 
                                             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-200 dark:bg-zinc-800 text-zinc-500 font-bold"
                                         >
                                             <Loader2 size={16} className="animate-spin" />
-                                            {phase === 'parsing' ? 'Analizando…' : 'Aplicando…'}
+                                            {phase === 'applying'
+                                                ? 'Aplicando…'
+                                                : dictation.isFinalizing
+                                                  ? 'Transcribiendo…'
+                                                  : 'Analizando…'}
                                         </button>
                                     ) : (
                                         <button
@@ -419,8 +326,8 @@ export function VoiceStockDictate({ companies, defaultCompanyId, className = '' 
                                 </div>
 
                                 <div className="text-sm text-zinc-700 dark:text-zinc-200 min-h-[3.5rem] whitespace-pre-wrap leading-relaxed">
-                                    {finalBufRef.current ||
-                                    interim ||
+                                    {dictation.final ||
+                                    dictation.interim ||
                                     (phase === 'idle' ? (
                                         <div className="text-zinc-400 dark:text-zinc-500 text-xs space-y-1">
                                             <div>
@@ -439,20 +346,35 @@ export function VoiceStockDictate({ companies, defaultCompanyId, className = '' 
                                                 <strong>Ajuste:</strong> &ldquo;El conteo de Camisa
                                                 Reflectiva mujer talla L es 8&rdquo;
                                             </div>
+                                            {dictation.mode === 'whisper' && (
+                                                <div className="pt-1 italic">
+                                                    Tu navegador no soporta dictado nativo — vamos a
+                                                    grabar el audio y transcribir al detenerte.
+                                                </div>
+                                            )}
+                                            {dictation.mode === 'unsupported' && (
+                                                <div className="pt-1 text-red-500 dark:text-red-400 italic">
+                                                    Este navegador no soporta dictado.
+                                                </div>
+                                            )}
                                         </div>
+                                    ) : phase === 'recording' && dictation.mode === 'whisper' ? (
+                                        <em className="text-zinc-400 dark:text-zinc-500">
+                                            Grabando… la transcripción aparecerá al detenerte.
+                                        </em>
                                     ) : (
                                         ''
                                     ))}
-                                    {interim && (
-                                        <span className="text-zinc-400 dark:text-zinc-500"> {interim}</span>
+                                    {dictation.interim && (
+                                        <span className="text-zinc-400 dark:text-zinc-500"> {dictation.interim}</span>
                                     )}
                                 </div>
                             </div>
 
-                            {error && (
+                            {displayedError && (
                                 <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/60 text-red-800 dark:text-red-300 p-3 rounded-lg text-sm flex items-start gap-2">
                                     <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-                                    {error}
+                                    {displayedError}
                                 </div>
                             )}
 
