@@ -46,3 +46,12 @@ modify_psd*.py
 
 # Local Claude Code settings — per-developer
 .claude/
+
+# Loose reference assets at the repo root (font source zips, design refs,
+# raw photos) — these aren't part of the app. The leading "/" anchors the
+# pattern to the repo root so files in subdirs (next-app/public, etc.) are
+# unaffected.
+/*.zip
+/*.jpg
+/*.jpeg
+/*.png
