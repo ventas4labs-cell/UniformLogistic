@@ -8,64 +8,65 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * ─── Typography — TT Norms (content) + TT Norms Condensed (titles) ──
- * Self-hosted from /public/fonts/. Drop the woff2 files there with the
- * exact names referenced below. If a file is missing the stack
- * gracefully falls through to SF (Apple) / Inter (cross-platform).
+ * ─── Typography — TT Norms Pro (content) + Condensed (titles) ───────
+ * Self-hosted woff2 files in public/fonts/, converted from the licensed
+ * OTFs in TT_norms_pro.zip via fonttools+brotli. 8 weights total
+ * (~1 MB on the wire). font-display: swap keeps first-paint instant
+ * with SF/Inter as fallback while the woff2s download.
  */
 @font-face {
-  font-family: "TT Norms";
-  src: url("/fonts/TTNorms-Regular.woff2") format("woff2");
+  font-family: "TT Norms Pro";
+  src: url("/fonts/TTNormsPro-Regular.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
-  font-family: "TT Norms";
-  src: url("/fonts/TTNorms-Medium.woff2") format("woff2");
+  font-family: "TT Norms Pro";
+  src: url("/fonts/TTNormsPro-Medium.woff2") format("woff2");
   font-weight: 500;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
-  font-family: "TT Norms";
-  src: url("/fonts/TTNorms-Bold.woff2") format("woff2");
+  font-family: "TT Norms Pro";
+  src: url("/fonts/TTNormsPro-Bold.woff2") format("woff2");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
-  font-family: "TT Norms";
-  src: url("/fonts/TTNorms-ExtraBold.woff2") format("woff2");
+  font-family: "TT Norms Pro";
+  src: url("/fonts/TTNormsPro-ExtraBold.woff2") format("woff2");
   font-weight: 800;
   font-style: normal;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "TT Norms Condensed";
-  src: url("/fonts/TTNormsCondensed-Regular.woff2") format("woff2");
+  font-family: "TT Norms Pro Condensed";
+  src: url("/fonts/TTNormsProCondensed-Regular.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
-  font-family: "TT Norms Condensed";
-  src: url("/fonts/TTNormsCondensed-Bold.woff2") format("woff2");
+  font-family: "TT Norms Pro Condensed";
+  src: url("/fonts/TTNormsProCondensed-Bold.woff2") format("woff2");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
-  font-family: "TT Norms Condensed";
-  src: url("/fonts/TTNormsCondensed-ExtraBold.woff2") format("woff2");
+  font-family: "TT Norms Pro Condensed";
+  src: url("/fonts/TTNormsProCondensed-ExtraBold.woff2") format("woff2");
   font-weight: 800;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
-  font-family: "TT Norms Condensed";
-  src: url("/fonts/TTNormsCondensed-Black.woff2") format("woff2");
+  font-family: "TT Norms Pro Condensed";
+  src: url("/fonts/TTNormsProCondensed-Black.woff2") format("woff2");
   font-weight: 900;
   font-style: normal;
   font-display: swap;
@@ -86,11 +87,11 @@
   --color-foreground: var(--foreground);
 
   /*
-   * Body / UI font stack. TT Norms is the brand face; SF / Inter are
-   * fallbacks so the design never breaks if a license/font isn't loaded.
+   * Body / UI font stack. TT Norms Pro is the brand face; SF / Inter are
+   * fallbacks so the design never breaks if the woff2 fails to load.
    */
   --font-sans:
-    "TT Norms",
+    "TT Norms Pro",
     -apple-system,
     BlinkMacSystemFont,
     "SF Pro Text",
@@ -104,14 +105,13 @@
     sans-serif;
 
   /*
-   * Display / titles. Adds TT Norms Condensed in front of the same stack,
-   * so headings get the condensed face while everything else stays with
-   * the regular face. Exposed as `font-display` Tailwind utility via
-   * Tailwind v4's automatic --font-* → utility generation.
+   * Display / titles. Condensed in front of the regular family, then
+   * the same system fallbacks. Exposed as the `font-display` Tailwind
+   * utility via Tailwind v4's automatic --font-* → utility generation.
    */
   --font-display:
-    "TT Norms Condensed",
-    "TT Norms",
+    "TT Norms Pro Condensed",
+    "TT Norms Pro",
     -apple-system,
     BlinkMacSystemFont,
     "SF Pro Display",
