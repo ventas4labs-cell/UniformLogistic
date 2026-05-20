@@ -189,6 +189,120 @@ export const fetchAllInvoicesGroupedByCompany = async (
     });
 };
 
+/**
+ * After a successful Hacienda emission, link the fe_documento to an
+ * invoices row so the customer-facing /cuentas dashboard reflects the
+ * receivable. Creates a new invoice when none exists for the order.
+ *
+ * Returns the resulting invoice id (or null if linking was skipped because
+ * the document is not a factura/nc/nd type or no order is attached).
+ */
+export const linkFeDocumentoToInvoice = async (
+    supabase: SupabaseClient,
+    params: {
+        feDocumentoId: string;
+        orderId: string | null;
+        companyId: string;
+        total: number;
+        ivaAmount: number;
+        subtotal: number;
+        tipoDocumento: string; // '01'|'02'|'03'|'04'|'08'|'10'
+        consecutivo: string;
+        paymentTermDays?: number; // default 30
+    }
+): Promise<string | null> => {
+    // Only Factura (01), Nota Débito (02), Nota Crédito (03), Tiquete (04),
+    // Factura Compra (08) create/affect receivables. MensajeReceptor (10) does not.
+    if (!['01', '02', '03', '04', '08'].includes(params.tipoDocumento)) {
+        return null;
+    }
+    if (!params.orderId) {
+        // We could still create a standalone invoice, but for now require an order.
+        return null;
+    }
+    const dueDays = params.paymentTermDays ?? 30;
+    const today = new Date();
+    const due = new Date(today);
+    due.setDate(due.getDate() + dueDays);
+    const isoToday = today.toISOString().slice(0, 10);
+    const isoDue = due.toISOString().slice(0, 10);
+
+    // Existing invoice for this order?
+    const { data: existing } = await supabase
+        .from('invoices')
+        .select('id')
+        .eq('order_id', params.orderId)
+        .maybeSingle();
+
+    // Nota Crédito reduces the receivable: we record it as a separate
+    // invoice with negative total OR mark the original as paid/cancelled.
+    // For now, simplest: create a separate row with negative total, fe-linked.
+    if (params.tipoDocumento === '03') {
+        const { data, error } = await supabase
+            .from('invoices')
+            .insert({
+                invoice_number: `NC-${params.consecutivo.slice(-10)}`,
+                company_id: params.companyId,
+                order_id: params.orderId,
+                fe_documento_id: params.feDocumentoId,
+                issued_date: isoToday,
+                due_date: isoDue,
+                subtotal: -Math.abs(params.subtotal),
+                iva_amount: -Math.abs(params.ivaAmount),
+                total: -Math.abs(params.total),
+                paid_amount: 0,
+                status: 'pending',
+                notes: `Nota crédito ${params.consecutivo}`
+            })
+            .select('id')
+            .single();
+        if (error) throw error;
+        return data!.id;
+    }
+
+    if (existing) {
+        // Update the existing row to attach the FE document. Totals are
+        // recomputed from Hacienda's response (the source of truth).
+        const { data, error } = await supabase
+            .from('invoices')
+            .update({
+                fe_documento_id: params.feDocumentoId,
+                subtotal: params.subtotal,
+                iva_amount: params.ivaAmount,
+                total: params.total,
+                issued_date: isoToday,
+                due_date: isoDue
+            })
+            .eq('id', existing.id)
+            .select('id')
+            .single();
+        if (error) throw error;
+        return data!.id;
+    }
+
+    // First emission for this order → create the invoice.
+    const invoiceNumber = `INV-${params.consecutivo.slice(-10)}`;
+    const { data, error } = await supabase
+        .from('invoices')
+        .insert({
+            invoice_number: invoiceNumber,
+            company_id: params.companyId,
+            order_id: params.orderId,
+            fe_documento_id: params.feDocumentoId,
+            issued_date: isoToday,
+            due_date: isoDue,
+            subtotal: params.subtotal,
+            iva_amount: params.ivaAmount,
+            total: params.total,
+            paid_amount: 0,
+            status: 'pending'
+        })
+        .select('id')
+        .single();
+    if (error) throw error;
+    return data!.id;
+};
+
 export const summarizeInvoices = (rows: InvoiceRow[]): InvoiceSummary => {
     let pending = 0;
     let overdue = 0;

@@ -1,7 +1,0 @@
-{
-  "name": "Uniform Logistic Ordering",
-  "description": "Mobile-first uniform ordering system with AI counting and PDF generation.",
-  "requestFramePermissions": [
-    "camera"
-  ]
-}

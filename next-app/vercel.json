@@ -1,0 +1,16 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/facturacion/poll",
+      "schedule": "*/3 * * * *"
+    },
+    {
+      "path": "/api/cron/facturacion/retry-queue",
+      "schedule": "*/15 * * * *"
+    }
+  ],
+  "functions": {
+    "app/api/admin/facturacion/**": { "maxDuration": 60 },
+    "app/api/cron/facturacion/**": { "maxDuration": 300 }
+  }
+}
