@@ -11,12 +11,22 @@ interface Props {
 }
 
 export function SizeSelector({ product, onAdd, onCancel }: Props) {
+    // products-manager saves empty buckets as `[]` rather than dropping them,
+    // so a Women-only product still has `sizes.men = []`. An empty array is
+    // truthy in JavaScript, which would otherwise (a) show the Hombre/Mujer
+    // toggle for a single-gender product and (b) leave `selectedGender`
+    // stuck on null. Collapse "has sizes" to a length check.
+    const hasMen = (product.sizes.men?.length ?? 0) > 0;
+    const hasWomen = (product.sizes.women?.length ?? 0) > 0;
+
     const [selectedGender, setSelectedGender] = useState<'Men' | 'Women' | null>(
-        product.sizes.men && !product.sizes.women
+        hasMen && !hasWomen
             ? 'Men'
-            : !product.sizes.men && product.sizes.women
+            : !hasMen && hasWomen
                 ? 'Women'
-                : null
+                : hasMen && hasWomen
+                    ? 'Men'
+                    : null
     );
 
     const [quantities, setQuantities] = useState<Record<string, number>>({});
@@ -142,7 +152,7 @@ export function SizeSelector({ product, onAdd, onCancel }: Props) {
                 <div className="flex-1 overflow-y-auto min-h-0">
                     {isShirt && (
                         <div className="space-y-6">
-                            {product.sizes.men && product.sizes.women && (
+                            {hasMen && hasWomen && (
                                 <div className="flex p-1 bg-zinc-100 rounded-lg max-w-sm mx-auto">
                                     <button
                                         onClick={() => setSelectedGender('Men')}
