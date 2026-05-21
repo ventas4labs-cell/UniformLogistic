@@ -39,10 +39,31 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
     const [editing, setEditing] = useState<AdminProduct | null>(null);
     const [showForm, setShowForm] = useState(false);
     const [form, setForm] = useState<ProductInput>(emptyForm);
+    // Raw text for the comma-separated size inputs. Storing the typed
+    // string separately from form.sizes (number[]/string[]) avoids the
+    // "controlled input strips trailing comma" feedback loop: parsing
+    // ",, " into [] and re-rendering the field would erase whatever the
+    // user typed mid-keystroke. We parse into form.sizes for
+    // submission, but the input value is always the raw text.
+    const emptySizesText = { men: '', women: '', waist: '', inseam: '' };
+    const [sizesText, setSizesText] = useState<{
+        men: string;
+        women: string;
+        waist: string;
+        inseam: string;
+    }>(emptySizesText);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [uploadingImage, setUploadingImage] = useState(false);
     const [dragging, setDragging] = useState(false);
+
+    /** Rebuild raw size text from a form's parsed sizes — used on open + voice merges. */
+    const sizesTextFromForm = (s: ProductInput['sizes']) => ({
+        men: (s.men || []).join(', '),
+        women: (s.women || []).join(', '),
+        waist: (s.waist || []).join(', '),
+        inseam: (s.inseam || []).join(', ')
+    });
 
     const handleImageFile = async (file: File) => {
         setUploadingImage(true);
@@ -75,6 +96,7 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
     const startCreate = () => {
         setEditing(null);
         setForm(emptyForm);
+        setSizesText(emptySizesText);
         setShowForm(true);
         setError(null);
     };
@@ -84,13 +106,15 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
     // falls back to defaults (and the admin can edit before saving).
     const startCreateWithVoice = (patch: Partial<ProductInput>) => {
         setEditing(null);
+        const mergedSizes = { ...emptyForm.sizes, ...(patch.sizes || {}) };
         setForm({
             ...emptyForm,
             ...patch,
             // Merge sizes per-bucket so a partial sizes patch doesn't blow
             // away keys the patch didn't touch.
-            sizes: { ...emptyForm.sizes, ...(patch.sizes || {}) }
+            sizes: mergedSizes
         });
+        setSizesText(sizesTextFromForm(mergedSizes));
         setShowForm(true);
         setError(null);
     };
@@ -99,11 +123,29 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
     // mic button inside the open modal — typical use case is "edit
     // existing product and dictate a couple of corrections").
     const mergeVoiceIntoForm = (patch: Partial<ProductInput>) => {
-        setForm((prev) => ({
-            ...prev,
-            ...patch,
-            sizes: { ...prev.sizes, ...(patch.sizes || {}) }
-        }));
+        setForm((prev) => {
+            const mergedSizes = { ...prev.sizes, ...(patch.sizes || {}) };
+            // Only refresh sizesText for buckets the voice patch touched
+            // so we don't clobber whatever the admin is mid-typing.
+            if (patch.sizes) {
+                setSizesText((t) => ({
+                    ...t,
+                    ...(patch.sizes!.men !== undefined
+                        ? { men: (patch.sizes!.men || []).join(', ') }
+                        : {}),
+                    ...(patch.sizes!.women !== undefined
+                        ? { women: (patch.sizes!.women || []).join(', ') }
+                        : {}),
+                    ...(patch.sizes!.waist !== undefined
+                        ? { waist: (patch.sizes!.waist || []).join(', ') }
+                        : {}),
+                    ...(patch.sizes!.inseam !== undefined
+                        ? { inseam: (patch.sizes!.inseam || []).join(', ') }
+                        : {})
+                }));
+            }
+            return { ...prev, ...patch, sizes: mergedSizes };
+        });
         setError(null);
     };
 
@@ -122,6 +164,7 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
             bom: p.bom || [],
             codigoCabys: p.codigoCabys || ''
         });
+        setSizesText(sizesTextFromForm(p.sizes));
         setShowForm(true);
         setError(null);
     };
@@ -457,13 +500,15 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
                                     <Field label="Tallas Hombre (coma)">
                                         <input
                                             type="text"
-                                            value={(form.sizes.men || []).join(', ')}
-                                            onChange={(e) =>
-                                                setForm({
-                                                    ...form,
-                                                    sizes: { ...form.sizes, men: parseList(e.target.value) }
-                                                })
-                                            }
+                                            value={sizesText.men}
+                                            onChange={(e) => {
+                                                const raw = e.target.value;
+                                                setSizesText((t) => ({ ...t, men: raw }));
+                                                setForm((f) => ({
+                                                    ...f,
+                                                    sizes: { ...f.sizes, men: parseList(raw) }
+                                                }));
+                                            }}
                                             className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none"
                                             placeholder="S, M, L, XL, 2XL"
                                         />
@@ -471,13 +516,15 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
                                     <Field label="Tallas Mujer (coma)">
                                         <input
                                             type="text"
-                                            value={(form.sizes.women || []).join(', ')}
-                                            onChange={(e) =>
-                                                setForm({
-                                                    ...form,
-                                                    sizes: { ...form.sizes, women: parseList(e.target.value) }
-                                                })
-                                            }
+                                            value={sizesText.women}
+                                            onChange={(e) => {
+                                                const raw = e.target.value;
+                                                setSizesText((t) => ({ ...t, women: raw }));
+                                                setForm((f) => ({
+                                                    ...f,
+                                                    sizes: { ...f.sizes, women: parseList(raw) }
+                                                }));
+                                            }}
                                             className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none"
                                             placeholder="S, M, L, XL"
                                         />
@@ -488,13 +535,15 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
                                     <Field label="Cintura (números, coma)">
                                         <input
                                             type="text"
-                                            value={(form.sizes.waist || []).join(', ')}
-                                            onChange={(e) =>
-                                                setForm({
-                                                    ...form,
-                                                    sizes: { ...form.sizes, waist: parseNumList(e.target.value) }
-                                                })
-                                            }
+                                            value={sizesText.waist}
+                                            onChange={(e) => {
+                                                const raw = e.target.value;
+                                                setSizesText((t) => ({ ...t, waist: raw }));
+                                                setForm((f) => ({
+                                                    ...f,
+                                                    sizes: { ...f.sizes, waist: parseNumList(raw) }
+                                                }));
+                                            }}
                                             className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none"
                                             placeholder="30, 32, 34, 36"
                                         />
@@ -502,13 +551,15 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
                                     <Field label="Largo / Inseam (opcional)">
                                         <input
                                             type="text"
-                                            value={(form.sizes.inseam || []).join(', ')}
-                                            onChange={(e) =>
-                                                setForm({
-                                                    ...form,
-                                                    sizes: { ...form.sizes, inseam: parseNumList(e.target.value) }
-                                                })
-                                            }
+                                            value={sizesText.inseam}
+                                            onChange={(e) => {
+                                                const raw = e.target.value;
+                                                setSizesText((t) => ({ ...t, inseam: raw }));
+                                                setForm((f) => ({
+                                                    ...f,
+                                                    sizes: { ...f.sizes, inseam: parseNumList(raw) }
+                                                }));
+                                            }}
                                             className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none"
                                             placeholder="30, 32, 34"
                                         />
