@@ -16,10 +16,14 @@ const TITLES: Record<string, string> = {
     '/cuentas': 'Cuentas',
 };
 
-export function TopNav() {
+export function TopNav({ isAdmin = false }: { isAdmin?: boolean }) {
     const pathname = usePathname() || '';
     const router = useRouter();
     const { cart } = useCart();
+
+    // Admin lands on the dashboard, customers on the warehouse home page.
+    // The icon is the same either way — only the destination shifts.
+    const homeHref = isAdmin ? '/admin' : '/home';
 
     // Hide nav on landing / success / admin routes
     if (
@@ -56,7 +60,7 @@ export function TopNav() {
                 <div className="flex items-center gap-3">
                     <ThemeToggle />
                     <Link
-                        href="/home"
+                        href={homeHref}
                         className="p-2.5 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-zinc-600 dark:text-zinc-300 hover:bg-orange-50 hover:text-orange-600 dark:hover:bg-zinc-700 dark:hover:text-white transition-all active:scale-90"
                         title="Inicio"
                     >
