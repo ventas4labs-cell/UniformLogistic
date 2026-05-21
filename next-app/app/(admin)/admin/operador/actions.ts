@@ -4,6 +4,10 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/utils/supabase/server';
 import { updateOrderStatus, OrderStatus } from '@/lib/services/orders';
 import { createMissingReport } from '@/lib/services/missing-insumos';
+import {
+    markInsumoComplete,
+    unmarkInsumoComplete,
+} from '@/lib/services/insumo-completions';
 
 export async function updateOrderStatusAction(orderUuid: string, status: OrderStatus) {
     const supabase = await createClient();
@@ -33,4 +37,20 @@ export async function reportMissingInsumoAction(
 
     revalidatePath('/admin/operador');
     revalidatePath('/admin/notificaciones');
+}
+
+export async function toggleInsumoCompleteAction(
+    orderId: string,
+    insumoName: string,
+    completed: boolean
+) {
+    const supabase = await createClient();
+    if (completed) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('No autenticado');
+        await markInsumoComplete(supabase, orderId, insumoName, user.id);
+    } else {
+        await unmarkInsumoComplete(supabase, orderId, insumoName);
+    }
+    revalidatePath('/admin/operador');
 }

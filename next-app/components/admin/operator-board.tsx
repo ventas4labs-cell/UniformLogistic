@@ -21,13 +21,19 @@ import {
     X,
     Send,
     ImageIcon,
+    Check,
 } from 'lucide-react';
 import type { Order, CartItem } from '@/lib/types';
 import { ORDER_STATUS_OPTIONS, OrderStatus } from '@/lib/services/orders';
+import type { InsumoCompletion } from '@/lib/services/insumo-completions';
 import {
     updateOrderStatusAction,
     reportMissingInsumoAction,
+    toggleInsumoCompleteAction,
 } from '@/app/(admin)/admin/operador/actions';
+
+const completionKey = (orderId: string, insumoName: string) =>
+    `${orderId}|${insumoName}`;
 
 const STATUS_ICONS: Record<string, React.ReactNode> = {
     pending: <Clock size={16} />,
@@ -192,10 +198,14 @@ function OrderCard({
     order,
     onStatusChange,
     isPending,
+    completedInsumos,
+    onToggleInsumo,
 }: {
     order: Order;
     onStatusChange: (uuid: string, status: OrderStatus) => void;
     isPending: boolean;
+    completedInsumos: Set<string>;
+    onToggleInsumo: (orderId: string, insumoName: string, completed: boolean) => void;
 }) {
     const [expanded, setExpanded] = useState(false);
     const [reportingInsumo, setReportingInsumo] = useState<string | null>(null);
@@ -341,51 +351,89 @@ function OrderCard({
                                     Insumos necesarios
                                 </h4>
                                 <div className="space-y-1.5">
-                                    {insumos.map((ins) => (
-                                        <div key={ins.name}>
-                                            <div className="flex items-center justify-between bg-purple-50 dark:bg-purple-950/30 rounded-lg px-3 py-2 text-sm">
-                                                <span className="text-purple-900 dark:text-purple-200 truncate">
-                                                    {ins.name}
-                                                </span>
-                                                <div className="flex items-center gap-2 shrink-0 ml-2">
-                                                    <span className="font-bold text-purple-700 dark:text-purple-300">
-                                                        {ins.totalQty}
+                                    {insumos.map((ins) => {
+                                        const isCompleted =
+                                            !!order.uuid &&
+                                            completedInsumos.has(completionKey(order.uuid, ins.name));
+                                        return (
+                                            <div key={ins.name}>
+                                                <div
+                                                    className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors ${
+                                                        isCompleted
+                                                            ? 'bg-green-50 dark:bg-green-950/30'
+                                                            : 'bg-purple-50 dark:bg-purple-950/30'
+                                                    }`}
+                                                >
+                                                    <span
+                                                        className={`truncate ${
+                                                            isCompleted
+                                                                ? 'text-green-800 dark:text-green-300 line-through'
+                                                                : 'text-purple-900 dark:text-purple-200'
+                                                        }`}
+                                                    >
+                                                        {ins.name}
                                                     </span>
-                                                    {sentReports.has(ins.name) ? (
-                                                        <span className="text-red-500 dark:text-red-400" title="Faltante reportado">
-                                                            <CheckCircle2 size={14} />
-                                                        </span>
-                                                    ) : (
-                                                        <button
-                                                            onClick={() =>
-                                                                setReportingInsumo(
-                                                                    reportingInsumo === ins.name ? null : ins.name
-                                                                )
-                                                            }
-                                                            className="text-red-400 hover:text-red-600 dark:text-red-500 dark:hover:text-red-300 transition-colors"
-                                                            title="Reportar faltante"
+                                                    <div className="flex items-center gap-2 shrink-0 ml-2">
+                                                        <span
+                                                            className={`font-bold ${
+                                                                isCompleted
+                                                                    ? 'text-green-700 dark:text-green-300'
+                                                                    : 'text-purple-700 dark:text-purple-300'
+                                                            }`}
                                                         >
-                                                            <AlertTriangle size={14} />
-                                                        </button>
-                                                    )}
+                                                            {ins.totalQty}
+                                                        </span>
+                                                        {order.uuid && (
+                                                            <button
+                                                                onClick={() =>
+                                                                    onToggleInsumo(order.uuid!, ins.name, !isCompleted)
+                                                                }
+                                                                className={`rounded-full p-1 transition-colors ${
+                                                                    isCompleted
+                                                                        ? 'bg-green-600 text-white hover:bg-green-700'
+                                                                        : 'bg-white dark:bg-zinc-900 border border-gray-300 dark:border-zinc-700 text-gray-400 dark:text-zinc-500 hover:border-green-500 hover:text-green-600'
+                                                                }`}
+                                                                title={isCompleted ? 'Marcar como pendiente' : 'Marcar como completo'}
+                                                            >
+                                                                <Check size={12} strokeWidth={3} />
+                                                            </button>
+                                                        )}
+                                                        {sentReports.has(ins.name) ? (
+                                                            <span className="text-red-500 dark:text-red-400" title="Faltante reportado">
+                                                                <CheckCircle2 size={14} />
+                                                            </span>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() =>
+                                                                    setReportingInsumo(
+                                                                        reportingInsumo === ins.name ? null : ins.name
+                                                                    )
+                                                                }
+                                                                className="text-red-400 hover:text-red-600 dark:text-red-500 dark:hover:text-red-300 transition-colors"
+                                                                title="Reportar faltante"
+                                                            >
+                                                                <AlertTriangle size={14} />
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
+                                                {reportingInsumo === ins.name && order.uuid && (
+                                                    <ReportMissingForm
+                                                        orderId={order.uuid}
+                                                        insumoName={ins.name}
+                                                        requiredQty={ins.totalQty}
+                                                        onClose={() => setReportingInsumo(null)}
+                                                        onSent={() => {
+                                                            setReportingInsumo(null);
+                                                            setSentReports((prev) =>
+                                                                new Set(prev).add(ins.name)
+                                                            );
+                                                        }}
+                                                    />
+                                                )}
                                             </div>
-                                            {reportingInsumo === ins.name && order.uuid && (
-                                                <ReportMissingForm
-                                                    orderId={order.uuid}
-                                                    insumoName={ins.name}
-                                                    requiredQty={ins.totalQty}
-                                                    onClose={() => setReportingInsumo(null)}
-                                                    onSent={() => {
-                                                        setReportingInsumo(null);
-                                                        setSentReports((prev) =>
-                                                            new Set(prev).add(ins.name)
-                                                        );
-                                                    }}
-                                                />
-                                            )}
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </>
                         )}
@@ -404,8 +452,17 @@ function OrderCard({
     );
 }
 
-export function OperatorBoard({ initialOrders }: { initialOrders: Order[] }) {
+export function OperatorBoard({
+    initialOrders,
+    initialCompletions,
+}: {
+    initialOrders: Order[];
+    initialCompletions: InsumoCompletion[];
+}) {
     const [orders, setOrders] = useState<Order[]>(initialOrders);
+    const [completedInsumos, setCompletedInsumos] = useState<Set<string>>(
+        () => new Set(initialCompletions.map((c) => completionKey(c.orderId, c.insumoName)))
+    );
     const [searchTerm, setSearchTerm] = useState('');
     const [activeFilter, setActiveFilter] = useState<OrderStatus | 'all'>('all');
     const [showGlobalInsumos, setShowGlobalInsumos] = useState(false);
@@ -422,6 +479,33 @@ export function OperatorBoard({ initialOrders }: { initialOrders: Order[] }) {
             } catch {
                 alert('Error al actualizar estado');
                 router.refresh();
+            }
+        });
+    };
+
+    const handleToggleInsumo = (
+        orderId: string,
+        insumoName: string,
+        completed: boolean
+    ) => {
+        const key = completionKey(orderId, insumoName);
+        setCompletedInsumos((prev) => {
+            const next = new Set(prev);
+            if (completed) next.add(key);
+            else next.delete(key);
+            return next;
+        });
+        startTransition(async () => {
+            try {
+                await toggleInsumoCompleteAction(orderId, insumoName, completed);
+            } catch {
+                alert('Error al actualizar insumo');
+                setCompletedInsumos((prev) => {
+                    const rollback = new Set(prev);
+                    if (completed) rollback.delete(key);
+                    else rollback.add(key);
+                    return rollback;
+                });
             }
         });
     };
@@ -575,6 +659,8 @@ export function OperatorBoard({ initialOrders }: { initialOrders: Order[] }) {
                             order={order}
                             onStatusChange={handleUpdateStatus}
                             isPending={pending}
+                            completedInsumos={completedInsumos}
+                            onToggleInsumo={handleToggleInsumo}
                         />
                     ))}
                 </div>
