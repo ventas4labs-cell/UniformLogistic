@@ -50,6 +50,31 @@ export const mapProductRow = (row: ProductRow): AdminProduct => ({
     codigoCabys: row.codigo_cabys || ''
 });
 
+export const fetchCatalogForCompany = async (
+    supabase: SupabaseClient,
+    companyId: string
+): Promise<AdminProduct[]> => {
+    const { data, error } = await supabase
+        .from('company_products')
+        .select(`
+            product:products (
+                id, product_code, name, description, image_url,
+                product_type, gender, sizes_json, fabric_type, is_active, bom_json, codigo_cabys
+            )
+        `)
+        .eq('company_id', companyId)
+        .eq('is_active', true);
+    if (error) throw error;
+
+    return (data || [])
+        .map((row: { product: ProductRow | ProductRow[] | null }) =>
+            Array.isArray(row.product) ? row.product[0] : row.product
+        )
+        .filter((p): p is ProductRow => Boolean(p))
+        .filter((p) => p.is_active !== false)
+        .map(mapProductRow);
+};
+
 export const fetchCatalogForUser = async (
     supabase: SupabaseClient,
     userId: string
@@ -61,26 +86,7 @@ export const fetchCatalogForUser = async (
         .maybeSingle();
     if (linkError) throw linkError;
     if (!link?.company_id) return [];
-
-    const { data, error } = await supabase
-        .from('company_products')
-        .select(`
-            product:products (
-                id, product_code, name, description, image_url,
-                product_type, gender, sizes_json, fabric_type, is_active, bom_json, codigo_cabys
-            )
-        `)
-        .eq('company_id', link.company_id)
-        .eq('is_active', true);
-    if (error) throw error;
-
-    return (data || [])
-        .map((row: { product: ProductRow | ProductRow[] | null }) =>
-            Array.isArray(row.product) ? row.product[0] : row.product
-        )
-        .filter((p): p is ProductRow => Boolean(p))
-        .filter((p) => p.is_active !== false)
-        .map(mapProductRow);
+    return fetchCatalogForCompany(supabase, link.company_id);
 };
 
 export const fetchUserCompanyId = async (

@@ -1,11 +1,14 @@
 'use client';
 
 import Image from 'next/image';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
+import { Building2, Repeat } from 'lucide-react';
 import type { AdminProduct } from '@/lib/services/products';
 import type { Product } from '@/lib/types';
 import { useCart } from '@/components/cart-provider';
 import { SizeSelector } from '@/components/size-selector';
+import { clearActingCompanyAction } from './actions';
 
 type Category = 'All' | 'Men' | 'Women';
 
@@ -16,7 +19,16 @@ type Category = 'All' | 'Men' | 'Women';
 const fold = (s: string) =>
     s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
-export function CatalogGrid({ catalog }: { catalog: AdminProduct[] }) {
+interface Props {
+    catalog: AdminProduct[];
+    // Only set when the admin is acting on behalf of a customer company.
+    // Renders the "Pedido para X · Cambiar" banner and exposes the cart
+    // clear+cookie-clear flow.
+    actingCompany?: { id: string; name: string } | null;
+}
+
+export function CatalogGrid({ catalog, actingCompany }: Props) {
+    const router = useRouter();
     const [categoryFilter, setCategoryFilter] = useState<Category>('All');
     const [query, setQuery] = useState('');
     const [active, setActive] = useState<Product | null>(null);
@@ -24,7 +36,18 @@ export function CatalogGrid({ catalog }: { catalog: AdminProduct[] }) {
     // remote image 404s or otherwise fails to load, instead of leaving the
     // browser's broken-image glyph in place.
     const [imgFailed, setImgFailed] = useState<Record<string, boolean>>({});
-    const { cart, addItems } = useCart();
+    const { cart, addItems, clear } = useCart();
+    const [isSwitching, startSwitch] = useTransition();
+
+    const handleSwitchCompany = () => {
+        // Clear the cart locally — items from company A make no sense once
+        // we drop back to the picker, and may not even exist in B's catalog.
+        clear();
+        startSwitch(async () => {
+            await clearActingCompanyAction();
+            router.refresh();
+        });
+    };
 
     const foldedQuery = useMemo(() => fold(query.trim()), [query]);
 
@@ -39,6 +62,45 @@ export function CatalogGrid({ catalog }: { catalog: AdminProduct[] }) {
 
     return (
         <div className="pb-24 max-w-6xl mx-auto">
+            {actingCompany && (
+                <div className="px-4 pt-4">
+                    <div className="max-w-3xl mx-auto flex items-center gap-3 p-3 rounded-2xl bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-900/50">
+                        <div className="w-9 h-9 rounded-xl bg-orange-100 dark:bg-orange-900/50 flex items-center justify-center text-orange-600 dark:text-orange-300 shrink-0">
+                            <Building2 size={18} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-[11px] font-bold uppercase tracking-wide text-orange-700 dark:text-orange-400">
+                                Pedido a nombre de
+                            </p>
+                            <p className="font-bold text-zinc-900 dark:text-zinc-100 truncate">
+                                {actingCompany.name}
+                            </p>
+                        </div>
+                        <button
+                            onClick={handleSwitchCompany}
+                            disabled={isSwitching}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white dark:bg-zinc-900 border border-orange-300 dark:border-orange-800 text-orange-700 dark:text-orange-300 text-xs font-bold hover:bg-orange-100 dark:hover:bg-orange-950/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                        >
+                            <Repeat size={14} />
+                            Cambiar
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {actingCompany && catalog.length === 0 && (
+                <div className="px-4 mt-6">
+                    <div className="max-w-md mx-auto bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 p-8 rounded-2xl text-center">
+                        <p className="text-sm">
+                            Esta empresa aún no tiene productos asignados en su
+                            catálogo. Asignalos desde{' '}
+                            <span className="font-semibold">Admin → Catálogo</span>{' '}
+                            antes de hacer un pedido.
+                        </p>
+                    </div>
+                </div>
+            )}
+
             <div className="px-4 pt-4 pb-6 sticky top-16 bg-zinc-50/85 dark:bg-zinc-950/85 backdrop-blur-md z-20">
                 <div className="max-w-md mx-auto space-y-3">
                     {/* Search — folded match against name + description.

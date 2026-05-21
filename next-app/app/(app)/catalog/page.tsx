@@ -1,13 +1,54 @@
 import { AlertCircle, Package } from 'lucide-react';
 import { createClient } from '@/utils/supabase/server';
-import { fetchCatalogForUser, fetchUserCompanyId } from '@/lib/services/products';
+import {
+    fetchCatalogForCompany,
+    fetchCatalogForUser,
+    fetchUserCompanyId
+} from '@/lib/services/products';
+import { fetchCompanies } from '@/lib/services/companies';
+import { getActingCompanyId, isAdminEmail } from '@/lib/admin-acting-company';
 import { CatalogGrid } from './catalog-grid';
+import { CompanyPicker } from './company-picker';
 
 export default async function CatalogPage() {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null; // layout already redirects
 
+    // ─── Admin branch ────────────────────────────────────────────────
+    // Admin doesn't have a company_users link; they choose which company
+    // to place the order for via a cookie set by the company picker.
+    if (isAdminEmail(user.email)) {
+        const companies = (await fetchCompanies(supabase)).filter((c) => c.isActive);
+        const actingId = await getActingCompanyId();
+        const acting = actingId
+            ? companies.find((c) => c.id === actingId) || null
+            : null;
+
+        if (!acting) {
+            return <CompanyPicker companies={companies} />;
+        }
+
+        const catalog = await fetchCatalogForCompany(supabase, acting.id);
+
+        if (catalog.length === 0) {
+            return (
+                <CatalogGrid
+                    catalog={catalog}
+                    actingCompany={{ id: acting.id, name: acting.name }}
+                />
+            );
+        }
+
+        return (
+            <CatalogGrid
+                catalog={catalog}
+                actingCompany={{ id: acting.id, name: acting.name }}
+            />
+        );
+    }
+
+    // ─── Customer branch (unchanged) ─────────────────────────────────
     const catalog = await fetchCatalogForUser(supabase, user.id);
 
     if (catalog.length === 0) {

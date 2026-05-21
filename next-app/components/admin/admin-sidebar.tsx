@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LogOut, ClipboardList, Building2, Package, Layers, Users, ArrowLeft, Receipt, Boxes, Wallet } from 'lucide-react';
+import { LogOut, ClipboardList, Building2, Package, Layers, Users, ArrowLeft, Receipt, Boxes, Wallet, ShoppingCart } from 'lucide-react';
 import { signOutAction } from '@/app/login/actions';
 import { ThemeToggle } from '@/components/theme-toggle';
 
 const TABS: { href: string; label: string; icon: React.ReactNode }[] = [
     { href: '/admin/orders',      label: 'Pedidos',      icon: <ClipboardList size={20} /> },
+    { href: '/catalog',           label: 'Hacer pedido', icon: <ShoppingCart size={20} /> },
     { href: '/admin/stock',       label: 'Stock',        icon: <Boxes size={20} /> },
     { href: '/admin/cuentas',     label: 'Cuentas',      icon: <Wallet size={20} /> },
     { href: '/admin/companies',   label: 'Empresas',     icon: <Building2 size={20} /> },

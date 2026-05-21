@@ -70,11 +70,17 @@ export const createOrder = async (
     supabase: SupabaseClient,
     userId: string,
     form: CustomerForm,
-    cart: CartItem[]
+    cart: CartItem[],
+    // When set, skips the company_users lookup and scopes the order to
+    // this company. Used by the admin "place on behalf of" flow — the
+    // admin user has no company_users link, so the cookie-resolved
+    // companyId is passed in directly.
+    companyIdOverride?: string
 ): Promise<CreateOrderResult> => {
     if (cart.length === 0) throw new Error('El carrito está vacío.');
 
-    const companyId = await getCompanyIdForUser(supabase, userId);
+    const companyId =
+        companyIdOverride || (await getCompanyIdForUser(supabase, userId));
 
     const { data: order, error: orderError } = await supabase
         .from('orders')
