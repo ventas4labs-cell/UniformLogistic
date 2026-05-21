@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { Order, CartItem } from '@/lib/types';
+import { extractSizeLabel, resolveBomQty } from '@/lib/services/products';
 
 const createDoc = () => new jsPDF();
 
@@ -309,23 +310,32 @@ export const generateAdminPDF = (order: Order) => {
     order.items.forEach((item) => {
         const bom = item.bom;
         if (!bom || bom.length === 0) return;
+        const sizeLabel = extractSizeLabel(item.selection.size);
         bom.forEach((b) => {
-            if (!b.name || b.qty <= 0) return;
+            if (!b.name) return;
+            // Resolve per-size override (XXL/XXXL/etc. may consume more
+            // fabric than the base SKU). resolveBomQty falls back to
+            // b.qty when no override matches.
+            const perUnit = resolveBomQty(b, sizeLabel);
+            if (perUnit <= 0) return;
             const entry = bomBreakdown.get(b.name) || {
                 contributors: new Map<string, { perUnit: number; pieces: number }>(),
                 total: 0
             };
             const productKey = item.productName;
             const existing = entry.contributors.get(productKey) || {
-                perUnit: b.qty,
+                perUnit,
                 pieces: 0
             };
-            // perUnit comes from the product's BOM — identical across every line
-            // item of that product, so we store it once (last write wins, same value).
-            existing.perUnit = b.qty;
+            // perUnit on the contributor record is informational. The
+            // rendered "Cant. x Unidad" is computed downstream as a
+            // weighted average (entry.total / piecesUsingInsumo), which
+            // is the right thing when sizes within a product carry
+            // different per-unit overrides.
+            existing.perUnit = perUnit;
             existing.pieces += item.quantity;
             entry.contributors.set(productKey, existing);
-            entry.total += b.qty * item.quantity;
+            entry.total += perUnit * item.quantity;
             bomBreakdown.set(b.name, entry);
         });
     });

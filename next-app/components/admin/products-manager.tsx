@@ -57,6 +57,9 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
     const [error, setError] = useState<string | null>(null);
     const [uploadingImage, setUploadingImage] = useState(false);
     const [dragging, setDragging] = useState(false);
+    // Which BOM rows have their per-size override panel expanded. Index-
+    // keyed so this resets naturally when the form is reopened.
+    const [openOverrides, setOpenOverrides] = useState<Set<number>>(new Set());
 
     /** Rebuild raw size text from a form's parsed sizes — used on open + voice merges. */
     const sizesTextFromForm = (s: ProductInput['sizes']) => ({
@@ -103,6 +106,7 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
         setEditing(null);
         setForm(emptyForm);
         setSizesText(emptySizesText);
+        setOpenOverrides(new Set());
         setShowForm(true);
         setError(null);
     };
@@ -171,6 +175,14 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
             codigoCabys: p.codigoCabys || ''
         });
         setSizesText(sizesTextFromForm(p.sizes));
+        // Auto-expand the override panel for any BOM line that already
+        // has per-size overrides — otherwise the admin would have to
+        // hunt for them under a collapsed disclosure.
+        const auto = new Set<number>();
+        (p.bom || []).forEach((b, i) => {
+            if (b.qtyBySize && Object.keys(b.qtyBySize).length > 0) auto.add(i);
+        });
+        setOpenOverrides(auto);
         setShowForm(true);
         setError(null);
     };
@@ -589,47 +601,171 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
                                 {(form.bom || []).length === 0 && (
                                     <p className="text-xs text-gray-400 dark:text-zinc-500 italic">Sin insumos configurados.</p>
                                 )}
-                                {(form.bom || []).map((item: BomItem, idx: number) => (
-                                    <div key={idx} className="flex items-center gap-2">
-                                        <input
-                                            type="text"
-                                            value={item.name}
-                                            onChange={(e) => {
-                                                const bom = [...(form.bom || [])];
-                                                bom[idx] = { ...bom[idx], name: e.target.value };
-                                                setForm({ ...form, bom });
-                                            }}
-                                            placeholder="Nombre del insumo"
-                                            className="flex-1 p-2 border rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none"
-                                        />
-                                        <input
-                                            type="number"
-                                            step="any"
-                                            min="0"
-                                            value={item.qty || ''}
-                                            onChange={(e) => {
-                                                const bom = [...(form.bom || [])];
-                                                bom[idx] = {
-                                                    ...bom[idx],
-                                                    qty: parseFloat(e.target.value) || 0
-                                                };
-                                                setForm({ ...form, bom });
-                                            }}
-                                            placeholder="Cant."
-                                            className="w-24 p-2 border rounded-lg text-sm text-center focus:ring-2 focus:ring-orange-500 outline-none"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                const bom = (form.bom || []).filter((_, i) => i !== idx);
-                                                setForm({ ...form, bom });
-                                            }}
-                                            className="p-2 text-gray-400 dark:text-zinc-500 hover:text-red-500 hover:bg-red-50 rounded-lg"
+                                {(form.bom || []).map((item: BomItem, idx: number) => {
+                                    // The pool of size labels we offer overrides for is
+                                    // sizes.men ∪ sizes.women for shirts. Pants use waist
+                                    // numbers; we skip per-size overrides there in v1
+                                    // because the user's spec is XL+ shirt sizes.
+                                    const sizePool: string[] =
+                                        form.productType === 'shirt'
+                                            ? Array.from(
+                                                  new Set([
+                                                      ...(form.sizes.men || []),
+                                                      ...(form.sizes.women || [])
+                                                  ])
+                                              )
+                                            : [];
+                                    const overrides = item.qtyBySize || {};
+                                    const isOpen = openOverrides.has(idx);
+                                    const overrideCount = Object.values(overrides).filter(
+                                        (v) => Number.isFinite(v) && v > 0
+                                    ).length;
+                                    const updateBom = (next: BomItem) => {
+                                        const bom = [...(form.bom || [])];
+                                        bom[idx] = next;
+                                        setForm({ ...form, bom });
+                                    };
+                                    return (
+                                        <div
+                                            key={idx}
+                                            className="space-y-2 border-b border-gray-100 dark:border-zinc-800 pb-3 last:border-b-0 last:pb-0"
                                         >
-                                            <Trash2 size={14} />
-                                        </button>
-                                    </div>
-                                ))}
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={item.name}
+                                                    onChange={(e) =>
+                                                        updateBom({ ...item, name: e.target.value })
+                                                    }
+                                                    placeholder="Nombre del insumo"
+                                                    className="flex-1 p-2 border rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                                                />
+                                                <input
+                                                    type="number"
+                                                    step="any"
+                                                    min="0"
+                                                    value={item.qty || ''}
+                                                    onChange={(e) =>
+                                                        updateBom({
+                                                            ...item,
+                                                            qty: parseFloat(e.target.value) || 0
+                                                        })
+                                                    }
+                                                    placeholder="Cant."
+                                                    className="w-24 p-2 border rounded-lg text-sm text-center focus:ring-2 focus:ring-orange-500 outline-none"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const bom = (form.bom || []).filter(
+                                                            (_, i) => i !== idx
+                                                        );
+                                                        setForm({ ...form, bom });
+                                                        setOpenOverrides((s) => {
+                                                            const n = new Set<number>();
+                                                            s.forEach((i) => {
+                                                                if (i < idx) n.add(i);
+                                                                else if (i > idx) n.add(i - 1);
+                                                            });
+                                                            return n;
+                                                        });
+                                                    }}
+                                                    className="p-2 text-gray-400 dark:text-zinc-500 hover:text-red-500 hover:bg-red-50 rounded-lg"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+
+                                            {sizePool.length > 0 && (
+                                                <div className="pl-1">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setOpenOverrides((s) => {
+                                                                const n = new Set(s);
+                                                                if (n.has(idx)) n.delete(idx);
+                                                                else n.add(idx);
+                                                                return n;
+                                                            })
+                                                        }
+                                                        className="text-[11px] font-bold text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-1"
+                                                    >
+                                                        <span>{isOpen ? '▾' : '▸'}</span>
+                                                        Recargo por talla
+                                                        {overrideCount > 0 && (
+                                                            <span className="ml-1 px-1.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-950/40 text-[10px]">
+                                                                {overrideCount}
+                                                            </span>
+                                                        )}
+                                                    </button>
+
+                                                    {isOpen && (
+                                                        <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                                                            {sizePool.map((sz) => {
+                                                                const current = overrides[sz];
+                                                                return (
+                                                                    <label
+                                                                        key={sz}
+                                                                        className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-gray-50 dark:bg-zinc-800/50 border border-gray-200 dark:border-zinc-800"
+                                                                    >
+                                                                        <span className="text-[11px] font-bold uppercase tracking-wide text-gray-600 dark:text-zinc-400 w-8 shrink-0">
+                                                                            {sz}
+                                                                        </span>
+                                                                        <input
+                                                                            type="number"
+                                                                            step="any"
+                                                                            min="0"
+                                                                            value={
+                                                                                current !== undefined &&
+                                                                                Number.isFinite(current)
+                                                                                    ? current
+                                                                                    : ''
+                                                                            }
+                                                                            onChange={(e) => {
+                                                                                const raw = e.target.value;
+                                                                                const next = { ...overrides };
+                                                                                if (raw === '') {
+                                                                                    delete next[sz];
+                                                                                } else {
+                                                                                    const n = parseFloat(raw);
+                                                                                    if (Number.isFinite(n) && n > 0) {
+                                                                                        next[sz] = n;
+                                                                                    } else {
+                                                                                        delete next[sz];
+                                                                                    }
+                                                                                }
+                                                                                updateBom({
+                                                                                    ...item,
+                                                                                    qtyBySize:
+                                                                                        Object.keys(next).length > 0
+                                                                                            ? next
+                                                                                            : undefined
+                                                                                });
+                                                                            }}
+                                                                            placeholder={
+                                                                                item.qty
+                                                                                    ? String(item.qty)
+                                                                                    : '—'
+                                                                            }
+                                                                            className="w-full min-w-0 px-1.5 py-1 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded text-xs text-center focus:ring-2 focus:ring-orange-500 outline-none"
+                                                                        />
+                                                                    </label>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                    {isOpen && (
+                                                        <p className="mt-2 text-[10px] text-gray-500 dark:text-zinc-500 italic">
+                                                            Dejá vacío para usar la cantidad base
+                                                            ({item.qty || 0}). Útil para XXL, XXXL,
+                                                            XXXXL, XXXXXL que llevan más tela.
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
 
                             <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-zinc-300">

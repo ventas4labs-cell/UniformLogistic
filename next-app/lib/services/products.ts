@@ -3,8 +3,63 @@ import type { Product, ProductType } from '@/lib/types';
 
 export interface BomItem {
     name: string;
+    // Default consumption per unit. Used when `qtyBySize` has no entry
+    // matching the line item's size, or when this insumo is consumed
+    // uniformly across every size.
     qty: number;
+    // Optional per-size override. Keys are size labels as they appear
+    // in `sizes.men` / `sizes.women` (e.g. "XXL", "2XL", "3XL"). Lookup
+    // is case-insensitive and whitespace-tolerant — see resolveBomQty.
+    // Used for extra-large shirts where fabric / interlining / zipper
+    // consumption is higher than the base SKU.
+    qtyBySize?: Record<string, number>;
 }
+
+/** Normalize a size label for case-insensitive override lookups. */
+const normSizeKey = (s: string): string => s.trim().toLowerCase();
+
+/**
+ * Resolve the per-unit consumption of a BOM line for an actual order
+ * item size. Returns the override if one is configured for the size,
+ * otherwise the base `qty`.
+ */
+export const resolveBomQty = (
+    item: BomItem,
+    sizeLabel: string | null | undefined
+): number => {
+    if (!sizeLabel || !item.qtyBySize) return item.qty;
+    const want = normSizeKey(sizeLabel);
+    for (const [k, v] of Object.entries(item.qtyBySize)) {
+        if (normSizeKey(k) === want && Number.isFinite(v) && v > 0) return v;
+    }
+    return item.qty;
+};
+
+/**
+ * Pull the bare size label out of the persisted order-item size
+ * string. The string is produced by selectionToSizeString in
+ * services/orders.ts and looks like:
+ *
+ *   "H · XXL"       → "XXL"   (men's shirt, extra-extra-large)
+ *   "M · 2XL"       → "2XL"   (women's shirt)
+ *   "XXL"           → "XXL"   (no gender prefix, possible)
+ *   "C32\" / L30\"" → null    (pants — per-size BOM is shirt-only for now)
+ *
+ * Returning null for pants disables per-size lookup so they fall back
+ * to the base qty without a key-collision risk.
+ */
+export const extractSizeLabel = (
+    storedSize: string | null | undefined
+): string | null => {
+    if (!storedSize) return null;
+    const trimmed = storedSize.trim();
+    if (!trimmed) return null;
+    // Pants — "C32\"" or "C32\" / L30\""
+    if (/^c\d+/i.test(trimmed)) return null;
+    // Strip "H · " or "M · " gender prefix.
+    const m = trimmed.match(/^[HM]\s*·\s*(.+)$/);
+    return (m ? m[1] : trimmed).trim();
+};
 
 export interface ProductRow {
     id: string;
