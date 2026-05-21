@@ -14,6 +14,20 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '6mb',
     },
   },
+  images: {
+    // Whitelist the Supabase Storage CDN so <Image> can render product
+    // photos uploaded through /admin/products. Path is scoped to the
+    // public storage endpoint so this doesn't open the door to arbitrary
+    // Supabase routes. The `*.supabase.co` wildcard covers whichever
+    // project ID the env points at (prod + any preview/branch project).
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '*.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
+    ],
+  },
 };
 
 export default nextConfig;
