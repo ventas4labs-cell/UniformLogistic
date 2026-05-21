@@ -32,6 +32,7 @@ export interface CartItem {
     fabricType?: string;
     bom?: { name: string; qty: number }[];
     codigoCabys?: string;
+    imageUrl?: string;
 }
 
 export interface Order {

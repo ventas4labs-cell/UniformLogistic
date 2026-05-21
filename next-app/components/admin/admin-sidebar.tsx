@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LogOut, ClipboardList, Building2, Package, Layers, Users, ArrowLeft, Receipt, Boxes, Wallet, ShoppingCart } from 'lucide-react';
+import { LogOut, ClipboardList, Building2, Package, Layers, Users, ArrowLeft, Receipt, Boxes, Wallet, ShoppingCart, HardHat, Bell } from 'lucide-react';
 import { signOutAction } from '@/app/login/actions';
 import { ThemeToggle } from '@/components/theme-toggle';
 
 const TABS: { href: string; label: string; icon: React.ReactNode }[] = [
     { href: '/admin/orders',      label: 'Pedidos',      icon: <ClipboardList size={20} /> },
+    { href: '/admin/operador',    label: 'Operador',     icon: <HardHat size={20} /> },
     { href: '/catalog',           label: 'Hacer pedido', icon: <ShoppingCart size={20} /> },
     { href: '/admin/stock',       label: 'Stock',        icon: <Boxes size={20} /> },
     { href: '/admin/cuentas',     label: 'Cuentas',      icon: <Wallet size={20} /> },
@@ -15,10 +16,11 @@ const TABS: { href: string; label: string; icon: React.ReactNode }[] = [
     { href: '/admin/products',    label: 'Productos',    icon: <Package size={20} /> },
     { href: '/admin/catalog',     label: 'Catálogo',     icon: <Layers size={20} /> },
     { href: '/admin/users',       label: 'Usuarios',     icon: <Users size={20} /> },
-    { href: '/admin/facturacion', label: 'Facturación',  icon: <Receipt size={20} /> }
+    { href: '/admin/facturacion', label: 'Facturación',  icon: <Receipt size={20} /> },
+    { href: '/admin/notificaciones', label: 'Notificaciones', icon: <Bell size={20} /> }
 ];
 
-export function AdminSidebar() {
+export function AdminSidebar({ unresolvedCount = 0 }: { unresolvedCount?: number }) {
     const pathname = usePathname();
 
     return (
@@ -31,6 +33,10 @@ export function AdminSidebar() {
             <nav className="flex-1 py-4 px-3 space-y-1">
                 {TABS.map((t) => {
                     const active = pathname === t.href || pathname?.startsWith(t.href + '/');
+                    const badge =
+                        t.href === '/admin/notificaciones' && unresolvedCount > 0
+                            ? unresolvedCount
+                            : null;
                     return (
                         <Link
                             key={t.href}
@@ -42,7 +48,12 @@ export function AdminSidebar() {
                             }`}
                         >
                             {t.icon}
-                            {t.label}
+                            <span className="flex-1">{t.label}</span>
+                            {badge && (
+                                <span className="bg-red-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                                    {badge > 9 ? '9+' : badge}
+                                </span>
+                            )}
                         </Link>
                     );
                 })}

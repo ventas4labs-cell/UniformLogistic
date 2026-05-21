@@ -19,7 +19,7 @@ interface Props {
 
 export function UsersManager({ initialUsers, companies }: Props) {
     const router = useRouter();
-    const [users] = useState<DirectoryUser[]>(initialUsers);
+    const [users, setUsers] = useState<DirectoryUser[]>(initialUsers);
     const [savingUserId, setSavingUserId] = useState<string | null>(null);
     const [, startTransition] = useTransition();
 
@@ -40,12 +40,21 @@ export function UsersManager({ initialUsers, companies }: Props) {
 
     const handleAssign = (userId: string, companyId: string) => {
         setSavingUserId(userId);
+        const matchedCompany = companies.find((c) => c.id === companyId);
+        setUsers((prev) =>
+            prev.map((u) =>
+                u.userId === userId
+                    ? { ...u, companyId: companyId || null, companyName: matchedCompany?.name || null }
+                    : u
+            )
+        );
         startTransition(async () => {
             try {
                 await assignUserAction(userId, companyId);
                 router.refresh();
             } catch (e) {
                 alert(`No se pudo asignar: ${e instanceof Error ? e.message : e}`);
+                router.refresh();
             } finally {
                 setSavingUserId(null);
             }

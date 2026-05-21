@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Edit2, Trash2, Loader2, X, Package, Upload, CheckCircle2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Loader2, X, Package, Upload, CheckCircle2, ImageIcon } from 'lucide-react';
 import type { AdminProduct, ProductInput, BomItem } from '@/lib/services/products';
 import {
     createProductAction,
@@ -57,6 +57,7 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
     const [error, setError] = useState<string | null>(null);
     const [uploadingImage, setUploadingImage] = useState(false);
     const [dragging, setDragging] = useState(false);
+    const [previewImage, setPreviewImage] = useState<{ src: string; alt: string } | null>(null);
     // Which BOM rows have their per-size override panel expanded. Index-
     // keyed so this resets naturally when the form is reopened.
     const [openOverrides, setOpenOverrides] = useState<Set<number>>(new Set());
@@ -250,6 +251,7 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
                 <table className="w-full text-left">
                     <thead className="bg-gray-50 dark:bg-zinc-900/60 border-b border-gray-200 dark:border-zinc-800">
                         <tr>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400 w-16"></th>
                             <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Código</th>
                             <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Nombre</th>
                             <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Tipo</th>
@@ -263,7 +265,7 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
                     <tbody className="divide-y divide-gray-100 dark:divide-zinc-800">
                         {initialProducts.length === 0 ? (
                             <tr>
-                                <td colSpan={8} className="p-8 text-center text-gray-500 dark:text-zinc-400">
+                                <td colSpan={9} className="p-8 text-center text-gray-500 dark:text-zinc-400">
                                     <Package size={32} className="mx-auto mb-2 opacity-30" />
                                     Sin productos registrados.
                                 </td>
@@ -271,6 +273,20 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
                         ) : (
                             initialProducts.map((p) => (
                                 <tr key={p.uuid} className="hover:bg-gray-50 dark:hover:bg-zinc-800">
+                                    <td className="p-4">
+                                        {p.image ? (
+                                            <button
+                                                onClick={() => setPreviewImage({ src: p.image, alt: p.name })}
+                                                className="w-10 h-10 rounded-lg overflow-hidden border border-gray-200 dark:border-zinc-700 hover:ring-2 hover:ring-orange-400 transition-all cursor-pointer"
+                                            >
+                                                <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                                            </button>
+                                        ) : (
+                                            <div className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-zinc-800 flex items-center justify-center">
+                                                <ImageIcon size={16} className="text-gray-300 dark:text-zinc-600" />
+                                            </div>
+                                        )}
+                                    </td>
                                     <td className="p-4 font-mono text-xs text-gray-500 dark:text-zinc-400">{p.id}</td>
                                     <td className="p-4 font-bold text-gray-900 dark:text-zinc-100">{p.name}</td>
                                     <td className="p-4">
@@ -323,6 +339,35 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
                     </tbody>
                 </table>
             </div>
+
+            {previewImage && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+                    onClick={() => setPreviewImage(null)}
+                >
+                    <div
+                        className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden max-w-lg w-full"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <button
+                            onClick={() => setPreviewImage(null)}
+                            className="absolute top-3 right-3 z-10 bg-black/40 hover:bg-black/60 text-white rounded-full p-1.5 transition-colors"
+                        >
+                            <X size={18} />
+                        </button>
+                        <img
+                            src={previewImage.src}
+                            alt={previewImage.alt}
+                            className="w-full h-auto max-h-[70vh] object-contain"
+                        />
+                        <div className="px-4 py-3 border-t border-gray-100 dark:border-zinc-800">
+                            <p className="text-sm font-semibold text-gray-900 dark:text-zinc-100 truncate">
+                                {previewImage.alt}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {showForm && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">

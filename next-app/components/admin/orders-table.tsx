@@ -96,7 +96,7 @@ export function OrdersTable({ initialOrders }: { initialOrders: Order[] }) {
                     <thead className="bg-gray-50 dark:bg-zinc-900/60 border-b border-gray-200 dark:border-zinc-800">
                         <tr>
                             <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Ref</th>
-                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Cliente</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Contacto</th>
                             <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Empresa</th>
                             <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Fecha</th>
                             <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Estado</th>
