@@ -12,6 +12,7 @@ import {
 } from '@/app/(admin)/admin/products/actions';
 import { validateCABYS } from '@/lib/facturacion/validation/cabys-validator';
 import { VoiceProductDictate } from '@/components/admin/voice-product-dictate';
+import { resizeImageFile } from '@/lib/resize-image';
 
 const emptyForm: ProductInput = {
     productCode: '',
@@ -69,8 +70,13 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
         setUploadingImage(true);
         setError(null);
         try {
+            // Resize + re-encode in the browser before sending to the
+            // server action. A 12 MP phone photo (8-15 MB) lands around
+            // 400-800 KB after this, well under the Next.js / Vercel
+            // body limits and the bucket's 5 MB cap.
+            const { file: optimized } = await resizeImageFile(file);
             const fd = new FormData();
-            fd.append('file', file);
+            fd.append('file', optimized);
             const url = await uploadProductImageAction(fd);
             setForm((f) => ({ ...f, imageUrl: url }));
         } catch (err) {
