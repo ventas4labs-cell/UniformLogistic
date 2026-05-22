@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Edit2, Trash2, Loader2, X, Package, Upload, CheckCircle2, ImageIcon } from 'lucide-react';
 import type { AdminProduct, ProductInput, BomItem } from '@/lib/services/products';
@@ -33,6 +33,78 @@ const parseList = (input: string): string[] =>
 
 const parseNumList = (input: string): number[] =>
     parseList(input).map(Number).filter((n) => !Number.isNaN(n));
+
+// Free-form decimal input that accepts both "." and "," as the decimal
+// separator. Browsers' native type="number" silently rejects "," in
+// many locales (en-US in particular), which made it impossible to enter
+// values like 0,1 even though the rest of the UI is Spanish. Holds the
+// raw typed string locally so partial input like "0," renders while the
+// user is mid-type, and only flushes back a parsed number to the parent.
+function DecimalInput({
+    value,
+    onChange,
+    className,
+    placeholder
+}: {
+    value: number;
+    onChange: (next: number) => void;
+    className?: string;
+    placeholder?: string;
+}) {
+    const [text, setText] = useState(() =>
+        Number.isFinite(value) && value > 0 ? String(value) : ''
+    );
+    const [focused, setFocused] = useState(false);
+
+    // Re-sync when the parent value changes externally (e.g. form reset
+    // or another row editing the same row's qty). Skip if the locally
+    // typed text already represents the same number — that means the
+    // change came from this input itself (a "0,5" → 0.5 round-trip)
+    // and we don't want to clobber the user's literal "0,5" with "0.5".
+    // Also skip while focused, as a belt-and-suspenders guard for
+    // mid-typing states like "0," where the parsed value is 0.
+    useEffect(() => {
+        const parsed = parseFloat(text.replace(',', '.'));
+        if (Number.isFinite(parsed) && parsed === value) return;
+        if (focused) return;
+        setText(Number.isFinite(value) && value > 0 ? String(value) : '');
+    }, [value, focused, text]);
+
+    return (
+        <input
+            type="text"
+            inputMode="decimal"
+            value={text}
+            placeholder={placeholder}
+            onFocus={() => setFocused(true)}
+            onBlur={() => {
+                setFocused(false);
+                const normalized = text.replace(',', '.');
+                const n = parseFloat(normalized);
+                if (Number.isFinite(n) && n >= 0) {
+                    setText(String(n));
+                    onChange(n);
+                } else {
+                    setText('');
+                    onChange(0);
+                }
+            }}
+            onChange={(e) => {
+                const raw = e.target.value;
+                // Allow only digits and a single separator.
+                if (!/^\d*[.,]?\d*$/.test(raw)) return;
+                setText(raw);
+                if (raw === '' || raw === '.' || raw === ',') {
+                    onChange(0);
+                    return;
+                }
+                const n = parseFloat(raw.replace(',', '.'));
+                if (Number.isFinite(n) && n >= 0) onChange(n);
+            }}
+            className={className}
+        />
+    );
+}
 
 export function ProductsManager({ initialProducts }: { initialProducts: AdminProduct[] }) {
     const router = useRouter();
@@ -685,16 +757,10 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
                                                     placeholder="Nombre del insumo"
                                                     className="flex-1 p-2 border rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none"
                                                 />
-                                                <input
-                                                    type="number"
-                                                    step="any"
-                                                    min="0"
-                                                    value={item.qty || ''}
-                                                    onChange={(e) =>
-                                                        updateBom({
-                                                            ...item,
-                                                            qty: parseFloat(e.target.value) || 0
-                                                        })
+                                                <DecimalInput
+                                                    value={item.qty}
+                                                    onChange={(qty) =>
+                                                        updateBom({ ...item, qty })
                                                     }
                                                     placeholder="Cant."
                                                     className="w-24 p-2 border rounded-lg text-sm text-center focus:ring-2 focus:ring-orange-500 outline-none"
@@ -756,28 +822,19 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
                                                                         <span className="text-[11px] font-bold uppercase tracking-wide text-gray-600 dark:text-zinc-400 w-8 shrink-0">
                                                                             {sz}
                                                                         </span>
-                                                                        <input
-                                                                            type="number"
-                                                                            step="any"
-                                                                            min="0"
+                                                                        <DecimalInput
                                                                             value={
                                                                                 current !== undefined &&
                                                                                 Number.isFinite(current)
                                                                                     ? current
-                                                                                    : ''
+                                                                                    : 0
                                                                             }
-                                                                            onChange={(e) => {
-                                                                                const raw = e.target.value;
+                                                                            onChange={(n) => {
                                                                                 const next = { ...overrides };
-                                                                                if (raw === '') {
-                                                                                    delete next[sz];
+                                                                                if (Number.isFinite(n) && n > 0) {
+                                                                                    next[sz] = n;
                                                                                 } else {
-                                                                                    const n = parseFloat(raw);
-                                                                                    if (Number.isFinite(n) && n > 0) {
-                                                                                        next[sz] = n;
-                                                                                    } else {
-                                                                                        delete next[sz];
-                                                                                    }
+                                                                                    delete next[sz];
                                                                                 }
                                                                                 updateBom({
                                                                                     ...item,

@@ -123,13 +123,3 @@ export async function unresolveReport(
     if (error) throw error;
 }
 
-export async function countUnresolved(
-    supabase: SupabaseClient
-): Promise<number> {
-    const { count, error } = await supabase
-        .from('missing_insumo_reports')
-        .select('*', { count: 'exact', head: true })
-        .eq('resolved', false);
-    if (error) throw error;
-    return count || 0;
-}

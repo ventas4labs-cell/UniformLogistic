@@ -36,7 +36,7 @@ export async function reportMissingInsumoAction(
     });
 
     revalidatePath('/admin/operador');
-    revalidatePath('/admin/notificaciones');
+    revalidatePath('/admin/orders');
 }
 
 export async function toggleInsumoCompleteAction(

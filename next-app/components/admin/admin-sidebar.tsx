@@ -2,26 +2,61 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LogOut, ClipboardList, Building2, Package, Layers, Users, ArrowLeft, Receipt, Boxes, Wallet, ShoppingCart, HardHat, Bell } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import {
+    LogOut,
+    ClipboardList,
+    Building2,
+    Package,
+    Layers,
+    Users,
+    ArrowLeft,
+    Receipt,
+    Boxes,
+    Wallet,
+    ShoppingCart,
+    HardHat,
+    ChevronDown,
+    ChevronRight,
+    Scissors,
+    Factory,
+    Printer
+} from 'lucide-react';
 import { signOutAction } from '@/app/login/actions';
 import { ThemeToggle } from '@/components/theme-toggle';
 
-const TABS: { href: string; label: string; icon: React.ReactNode }[] = [
-    { href: '/admin/orders',      label: 'Pedidos',      icon: <ClipboardList size={20} /> },
-    { href: '/admin/operador',    label: 'Operador',     icon: <HardHat size={20} /> },
-    { href: '/catalog',           label: 'Hacer pedido', icon: <ShoppingCart size={20} /> },
-    { href: '/admin/stock',       label: 'Stock',        icon: <Boxes size={20} /> },
-    { href: '/admin/cuentas',     label: 'Cuentas',      icon: <Wallet size={20} /> },
-    { href: '/admin/companies',   label: 'Empresas',     icon: <Building2 size={20} /> },
-    { href: '/admin/products',    label: 'Productos',    icon: <Package size={20} /> },
-    { href: '/admin/catalog',     label: 'Catálogo',     icon: <Layers size={20} /> },
-    { href: '/admin/users',       label: 'Usuarios',     icon: <Users size={20} /> },
-    { href: '/admin/facturacion', label: 'Facturación',  icon: <Receipt size={20} /> },
-    { href: '/admin/notificaciones', label: 'Notificaciones', icon: <Bell size={20} /> }
+type Tab = { href: string; label: string; icon: React.ReactNode };
+
+const TABS: Tab[] = [
+    { href: '/admin/orders',         label: 'Pedidos',        icon: <ClipboardList size={20} /> },
+    { href: '/catalog',              label: 'Hacer pedido',   icon: <ShoppingCart size={20} /> },
+    { href: '/admin/stock',          label: 'Stock',          icon: <Boxes size={20} /> },
+    { href: '/admin/cuentas',        label: 'Cuentas',        icon: <Wallet size={20} /> },
+    { href: '/admin/companies',      label: 'Empresas',       icon: <Building2 size={20} /> },
+    { href: '/admin/products',       label: 'Productos',      icon: <Package size={20} /> },
+    { href: '/admin/catalog',        label: 'Catálogo',       icon: <Layers size={20} /> },
+    { href: '/admin/users',          label: 'Usuarios',       icon: <Users size={20} /> },
+    { href: '/admin/facturacion',    label: 'Facturación',    icon: <Receipt size={20} /> }
 ];
 
-export function AdminSidebar({ unresolvedCount = 0 }: { unresolvedCount?: number }) {
+const OPERATIONS_TABS: Tab[] = [
+    { href: '/admin/operador',  label: 'Bodega',    icon: <Package size={16} /> },
+    { href: '/admin/corte',     label: 'Corte',     icon: <Scissors size={16} /> },
+    { href: '/admin/maquila',   label: 'Maquila',   icon: <Factory size={16} /> },
+    { href: '/admin/impresion', label: 'Impresión', icon: <Printer size={16} /> }
+];
+
+export function AdminSidebar() {
     const pathname = usePathname();
+    const operationsActive = OPERATIONS_TABS.some(
+        (t) => pathname === t.href || pathname?.startsWith(t.href + '/')
+    );
+    // Keep the Operations group expanded whenever the user is on one of
+    // its routes. Manual toggle is allowed on other routes.
+    const [operationsOpen, setOperationsOpen] = useState(operationsActive);
+    useEffect(() => {
+        if (operationsActive) setOperationsOpen(true);
+    }, [operationsActive]);
 
     return (
         <aside className="w-64 bg-gray-900 text-white flex flex-col fixed inset-y-0 left-0 z-30">
@@ -30,33 +65,51 @@ export function AdminSidebar({ unresolvedCount = 0 }: { unresolvedCount?: number
                 <p className="text-xs text-gray-400 mt-1">Panel de Administración</p>
             </div>
 
-            <nav className="flex-1 py-4 px-3 space-y-1">
-                {TABS.map((t) => {
-                    const active = pathname === t.href || pathname?.startsWith(t.href + '/');
-                    const badge =
-                        t.href === '/admin/notificaciones' && unresolvedCount > 0
-                            ? unresolvedCount
-                            : null;
-                    return (
-                        <Link
-                            key={t.href}
-                            href={t.href}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-semibold text-sm transition-all ${
-                                active
-                                    ? 'bg-orange-600 text-white shadow-lg'
-                                    : 'text-gray-300 hover:bg-white/10 hover:text-white'
-                            }`}
-                        >
-                            {t.icon}
-                            <span className="flex-1">{t.label}</span>
-                            {badge && (
-                                <span className="bg-red-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
-                                    {badge > 9 ? '9+' : badge}
-                                </span>
-                            )}
-                        </Link>
-                    );
-                })}
+            <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
+                {/* Pedidos */}
+                <SidebarLink tab={TABS[0]} pathname={pathname} />
+
+                {/* Operations expandable group */}
+                <button
+                    type="button"
+                    onClick={() => setOperationsOpen((o) => !o)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-semibold text-sm transition-all ${
+                        operationsActive
+                            ? 'bg-orange-600/20 text-white'
+                            : 'text-gray-300 hover:bg-white/10 hover:text-white'
+                    }`}
+                >
+                    <HardHat size={20} />
+                    <span className="flex-1 text-left">Operations</span>
+                    {operationsOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                </button>
+                {operationsOpen && (
+                    <div className="ml-3 pl-3 border-l border-white/10 space-y-1">
+                        {OPERATIONS_TABS.map((t) => {
+                            const active =
+                                pathname === t.href || pathname?.startsWith(t.href + '/');
+                            return (
+                                <Link
+                                    key={t.href}
+                                    href={t.href}
+                                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${
+                                        active
+                                            ? 'bg-orange-600 text-white shadow-md font-bold'
+                                            : 'text-gray-300 hover:bg-white/10 hover:text-white font-medium'
+                                    }`}
+                                >
+                                    {t.icon}
+                                    <span>{t.label}</span>
+                                </Link>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {/* Everything else */}
+                {TABS.slice(1).map((t) => (
+                    <SidebarLink key={t.href} tab={t} pathname={pathname} />
+                ))}
             </nav>
 
             <div className="p-4 border-t border-white/10 space-y-2">
@@ -84,5 +137,22 @@ export function AdminSidebar({ unresolvedCount = 0 }: { unresolvedCount?: number
                 </form>
             </div>
         </aside>
+    );
+}
+
+function SidebarLink({ tab, pathname }: { tab: Tab; pathname: string | null }) {
+    const active = pathname === tab.href || pathname?.startsWith(tab.href + '/');
+    return (
+        <Link
+            href={tab.href}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-semibold text-sm transition-all ${
+                active
+                    ? 'bg-orange-600 text-white shadow-lg'
+                    : 'text-gray-300 hover:bg-white/10 hover:text-white'
+            }`}
+        >
+            {tab.icon}
+            <span className="flex-1">{tab.label}</span>
+        </Link>
     );
 }

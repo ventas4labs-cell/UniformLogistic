@@ -265,3 +265,109 @@ export const updateOrderStatus = async (
         .eq('id', orderUuid);
     if (error) throw error;
 };
+
+export const deleteOrder = async (
+    supabase: SupabaseClient,
+    orderUuid: string
+): Promise<void> => {
+    // order_items, missing_insumo_reports, and insumo_completions all
+    // cascade on order_id, so a single delete on `orders` cleans up the
+    // full graph.
+    const { error } = await supabase
+        .from('orders')
+        .delete()
+        .eq('id', orderUuid);
+    if (error) throw error;
+};
+
+export interface UpdateOrderHeaderInput {
+    purchaseOrder?: string | null;
+    deliveryDate?: string | null;
+    notes?: string | null;
+}
+
+export interface OrderItemInput {
+    // Existing rows have an id; new rows omit it.
+    id?: string;
+    productCode: string;
+    productName: string;
+    size: string;
+    quantity: number;
+    productUuid: string | null;
+}
+
+export const updateOrderFull = async (
+    supabase: SupabaseClient,
+    orderUuid: string,
+    header: UpdateOrderHeaderInput,
+    items: OrderItemInput[]
+): Promise<void> => {
+    if (items.length === 0) {
+        throw new Error('La orden debe tener al menos un artículo.');
+    }
+
+    const { error: headerError } = await supabase
+        .from('orders')
+        .update({
+            purchase_order: header.purchaseOrder ?? null,
+            estimated_delivery_date: header.deliveryDate || null,
+            notes: header.notes ?? null
+        })
+        .eq('id', orderUuid);
+    if (headerError) throw headerError;
+
+    // Reconcile items: rows in DB that aren't submitted get deleted,
+    // rows with an id get updated, rows without an id get inserted.
+    // Surgical updates avoid churning unchanged rows.
+    const { data: existing, error: fetchError } = await supabase
+        .from('order_items')
+        .select('id')
+        .eq('order_id', orderUuid);
+    if (fetchError) throw fetchError;
+
+    const existingIds = new Set((existing || []).map((r) => r.id as string));
+    const submittedIds = new Set(
+        items.filter((i) => i.id).map((i) => i.id as string)
+    );
+    const toDelete = [...existingIds].filter((id) => !submittedIds.has(id));
+
+    if (toDelete.length > 0) {
+        const { error: delError } = await supabase
+            .from('order_items')
+            .delete()
+            .in('id', toDelete);
+        if (delError) throw delError;
+    }
+
+    const toInsert = items
+        .filter((i) => !i.id)
+        .map((i) => ({
+            order_id: orderUuid,
+            product_code: i.productCode,
+            product_name: i.productName,
+            size: i.size,
+            quantity: i.quantity,
+            product_id: i.productUuid
+        }));
+    if (toInsert.length > 0) {
+        const { error: insError } = await supabase
+            .from('order_items')
+            .insert(toInsert);
+        if (insError) throw insError;
+    }
+
+    const toUpdate = items.filter((i) => i.id);
+    for (const item of toUpdate) {
+        const { error: updError } = await supabase
+            .from('order_items')
+            .update({
+                product_code: item.productCode,
+                product_name: item.productName,
+                size: item.size,
+                quantity: item.quantity,
+                product_id: item.productUuid
+            })
+            .eq('id', item.id!);
+        if (updError) throw updError;
+    }
+};

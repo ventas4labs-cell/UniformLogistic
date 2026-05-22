@@ -23,9 +23,13 @@ import {
     ImageIcon,
     Check,
 } from 'lucide-react';
-import type { Order, CartItem } from '@/lib/types';
+import type { Order } from '@/lib/types';
 import { ORDER_STATUS_OPTIONS, OrderStatus } from '@/lib/services/orders';
 import type { InsumoCompletion } from '@/lib/services/insumo-completions';
+import {
+    aggregateInsumos,
+    aggregateInsumosGlobal,
+} from '@/lib/stage-utils';
 import {
     updateOrderStatusAction,
     reportMissingInsumoAction,
@@ -45,34 +49,6 @@ const STATUS_ICONS: Record<string, React.ReactNode> = {
     completed: <CheckCircle2 size={16} />,
     cancelled: <XCircle size={16} />,
 };
-
-interface InsumoSummary {
-    name: string;
-    totalQty: number;
-}
-
-function roundQty(n: number): number {
-    return Math.round(n * 100) / 100;
-}
-
-function aggregateInsumos(items: CartItem[]): InsumoSummary[] {
-    const map = new Map<string, number>();
-    for (const item of items) {
-        if (!item.bom) continue;
-        for (const b of item.bom) {
-            const key = b.name.trim().toLowerCase();
-            map.set(key, (map.get(key) || 0) + b.qty * item.quantity);
-        }
-    }
-    return Array.from(map.entries())
-        .map(([name, totalQty]) => ({ name, totalQty: roundQty(totalQty) }))
-        .sort((a, b) => a.name.localeCompare(b.name));
-}
-
-function aggregateInsumosGlobal(orders: Order[]): InsumoSummary[] {
-    const allItems = orders.flatMap((o) => o.items);
-    return aggregateInsumos(allItems);
-}
 
 function ReportMissingForm({
     orderId,
