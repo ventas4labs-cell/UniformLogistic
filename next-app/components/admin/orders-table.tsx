@@ -7,7 +7,7 @@ import type { Order } from '@/lib/types';
 import type { AdminProduct } from '@/lib/services/products';
 import type { MissingInsumoReport } from '@/lib/services/missing-insumos';
 import type { StageNotification } from '@/lib/services/stage-notifications';
-import { ORDER_STATUS_OPTIONS, OrderStatus } from '@/lib/services/orders';
+import type { OrderStatus } from '@/lib/services/orders';
 import {
     updateOrderStatusAction,
     deleteOrderAction,
@@ -18,8 +18,8 @@ import {
     acknowledgeStageNotificationAction,
     unacknowledgeStageNotificationAction
 } from '@/app/(admin)/admin/_stage-actions';
-import { StageCompletionStrip } from '@/components/admin/stage-completion-strip';
-import type { StageKey } from '@/lib/services/stage-completions';
+import { StageControlPanel } from '@/components/admin/stage-control-panel';
+import { STAGE_ORDER, type StageKey } from '@/lib/services/stage-completions';
 import { FacturaModal } from '@/components/admin/factura-modal';
 import { OrderEditModal } from '@/components/admin/order-edit-modal';
 import { useRouter } from 'next/navigation';
@@ -43,7 +43,55 @@ export function OrdersTable({
         initialStageNotifications
     );
     const [searchTerm, setSearchTerm] = useState('');
-    const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
+    // Completion-bucket filter. Replaces the old status-enum chips:
+    //   pending     → 0/4 stages done (and not cancelled)
+    //   in-progress → 1-3/4 stages done
+    //   done        → 4/4 stages done
+    //   cancelled   → orders.status === 'cancelled'
+    type BucketFilter = 'all' | 'pending' | 'in-progress' | 'done' | 'cancelled';
+    const [bucketFilter, setBucketFilter] = useState<BucketFilter>('all');
+    // Per-order map of stage → completedAt ISO string. Mutable so admin
+    // overrides from the Pedidos card flip the UI immediately, with
+    // server actions reconciling on the next router.refresh.
+    const [completedAtByOrder, setCompletedAtByOrder] = useState<
+        Map<string, Partial<Record<StageKey, string>>>
+    >(() => {
+        const m = new Map<string, Partial<Record<StageKey, string>>>();
+        for (const c of initialStageCompletions) {
+            const cur = m.get(c.orderId) || {};
+            cur[c.stage] = c.completedAt;
+            m.set(c.orderId, cur);
+        }
+        return m;
+    });
+
+    const handleStageToggle = (
+        uuid: string,
+        stage: StageKey,
+        completed: boolean,
+        completedAt?: string
+    ) => {
+        setCompletedAtByOrder((prev) => {
+            const next = new Map(prev);
+            const cur = { ...(next.get(uuid) || {}) };
+            if (completed) cur[stage] = completedAt || new Date().toISOString();
+            else delete cur[stage];
+            next.set(uuid, cur);
+            return next;
+        });
+    };
+
+    // Bucket the order by completion state. Cancelled wins over
+    // completion progress.
+    const bucketFor = (o: Order): BucketFilter => {
+        if (o.status === 'cancelled') return 'cancelled';
+        if (!o.uuid) return 'pending';
+        const map = completedAtByOrder.get(o.uuid) || {};
+        const done = STAGE_ORDER.filter((s) => !!map[s]).length;
+        if (done === 0) return 'pending';
+        if (done === STAGE_ORDER.length) return 'done';
+        return 'in-progress';
+    };
     const [pending, startTransition] = useTransition();
     const [facturaOrder, setFacturaOrder] = useState<Order | null>(null);
     const [editingOrder, setEditingOrder] = useState<Order | null>(null);
@@ -67,19 +115,6 @@ export function OrdersTable({
         const arr = stageNotifsByOrder.get(n.orderId);
         if (arr) arr.push(n);
         else stageNotifsByOrder.set(n.orderId, [n]);
-    }
-
-    // order_id → Set<StageKey of completed stages>. Drives the per-card
-    // "Bodega · Corte · Maquila · Impresión" strip. Built once per
-    // render — initialStageCompletions changes only on page refresh.
-    const completedStagesByOrder = new Map<string, Set<StageKey>>();
-    for (const c of initialStageCompletions) {
-        let s = completedStagesByOrder.get(c.orderId);
-        if (!s) {
-            s = new Set();
-            completedStagesByOrder.set(c.orderId, s);
-        }
-        s.add(c.stage);
     }
 
     // Bell badge count combines unresolved missing-insumo reports +
@@ -193,7 +228,7 @@ export function OrdersTable({
         order.items.reduce((s, i) => s + i.quantity, 0);
 
     const filtered = orders.filter((o) => {
-        if (statusFilter !== 'all' && (o.status || 'pending') !== statusFilter) return false;
+        if (bucketFilter !== 'all' && bucketFor(o) !== bucketFilter) return false;
         const term = searchTerm.toLowerCase();
         if (!term) return true;
         return (
@@ -203,13 +238,13 @@ export function OrdersTable({
         );
     });
 
-    const statusCounts = orders.reduce(
+    const bucketCounts = orders.reduce(
         (acc, o) => {
-            const s = (o.status as OrderStatus) || 'pending';
-            acc[s] = (acc[s] || 0) + 1;
+            const b = bucketFor(o);
+            acc[b] = (acc[b] || 0) + 1;
             return acc;
         },
-        {} as Record<string, number>
+        {} as Record<BucketFilter, number>
     );
 
     return (
@@ -246,36 +281,31 @@ export function OrdersTable({
                 </button>
             </div>
 
-            {/* Status filter chips */}
+            {/* Completion-bucket filter — replaces the old status-enum chips. */}
             <div className="flex flex-wrap gap-2 mb-4">
-                <button
-                    onClick={() => setStatusFilter('all')}
-                    className={`px-4 py-2 rounded-full text-xs font-bold transition-colors flex items-center gap-1.5 ${
-                        statusFilter === 'all'
-                            ? 'bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-md'
-                            : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-300 hover:bg-gray-200 dark:hover:bg-zinc-700'
-                    }`}
-                >
-                    <Filter size={14} />
-                    Todos ({orders.length})
-                </button>
-                {ORDER_STATUS_OPTIONS.map((opt) => {
-                    const count = statusCounts[opt.value] || 0;
-                    if (count === 0) return null;
+                {(
+                    [
+                        { key: 'all', label: 'Todos', count: orders.length, color: 'bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900' },
+                        { key: 'pending', label: 'Sin iniciar', count: bucketCounts['pending'] || 0, color: 'bg-gray-200 dark:bg-zinc-800 text-gray-700 dark:text-zinc-300' },
+                        { key: 'in-progress', label: 'En proceso', count: bucketCounts['in-progress'] || 0, color: 'bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300' },
+                        { key: 'done', label: 'Listas', count: bucketCounts['done'] || 0, color: 'bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-300' },
+                        { key: 'cancelled', label: 'Canceladas', count: bucketCounts['cancelled'] || 0, color: 'bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300' }
+                    ] as const
+                ).map((b) => {
+                    if (b.key !== 'all' && b.count === 0) return null;
+                    const active = bucketFilter === b.key;
                     return (
                         <button
-                            key={opt.value}
-                            onClick={() =>
-                                setStatusFilter(statusFilter === opt.value ? 'all' : opt.value)
-                            }
-                            className={`px-4 py-2 rounded-full text-xs font-bold transition-colors ${
-                                statusFilter === opt.value
-                                    ? 'ring-2 ring-offset-1 ring-orange-500 dark:ring-offset-zinc-950 shadow-md ' +
-                                      opt.color
-                                    : opt.color + ' opacity-80 hover:opacity-100'
+                            key={b.key}
+                            onClick={() => setBucketFilter(b.key)}
+                            className={`px-4 py-2 rounded-full text-xs font-bold transition-colors flex items-center gap-1.5 ${
+                                active
+                                    ? b.color + ' shadow-md'
+                                    : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-300 hover:bg-gray-200 dark:hover:bg-zinc-700'
                             }`}
                         >
-                            {opt.label} ({count})
+                            {b.key === 'all' && <Filter size={14} />}
+                            {b.label} ({b.count})
                         </button>
                     );
                 })}
@@ -289,10 +319,20 @@ export function OrdersTable({
             ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                     {filtered.map((order) => {
-                        const status = (order.status as OrderStatus) || 'pending';
-                        const statusOption = ORDER_STATUS_OPTIONS.find((s) => s.value === status);
                         const unresolved = unresolvedCountFor(order.uuid);
                         const hasAlert = unresolved > 0;
+                        const bucket = bucketFor(order);
+                        const isCancelled = bucket === 'cancelled';
+                        const completedAt =
+                            (order.uuid && completedAtByOrder.get(order.uuid)) || {};
+                        const bucketBadge =
+                            bucket === 'done'
+                                ? { label: 'Lista', color: 'bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-300' }
+                                : bucket === 'in-progress'
+                                    ? { label: 'En proceso', color: 'bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300' }
+                                    : bucket === 'cancelled'
+                                        ? { label: 'Cancelada', color: 'bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300' }
+                                        : { label: 'Sin iniciar', color: 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-300' };
                         return (
                             <div
                                 key={order.uuid || order.id}
@@ -326,27 +366,31 @@ export function OrdersTable({
                                                 </button>
                                             )}
                                         </div>
-                                        <select
-                                            value={status}
-                                            onChange={(e) =>
-                                                handleUpdateStatus(
-                                                    order.uuid,
-                                                    e.target.value as OrderStatus
-                                                )
-                                            }
-                                            disabled={!order.uuid || pending}
-                                            className={`py-1 px-3 rounded-full text-xs font-bold border-none outline-none cursor-pointer shrink-0 ${statusOption?.color || 'bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-zinc-200'}`}
-                                        >
-                                            {ORDER_STATUS_OPTIONS.map((option) => (
-                                                <option
-                                                    key={option.value}
-                                                    value={option.value}
-                                                    className="bg-white dark:bg-zinc-900 text-gray-900 dark:text-zinc-100"
-                                                >
-                                                    {option.label}
-                                                </option>
-                                            ))}
-                                        </select>
+                                        <div className="flex items-center gap-1.5">
+                                            <span
+                                                className={`py-1 px-3 rounded-full text-xs font-bold ${bucketBadge.color}`}
+                                            >
+                                                {bucketBadge.label}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    handleUpdateStatus(
+                                                        order.uuid,
+                                                        isCancelled ? 'pending' : 'cancelled'
+                                                    )
+                                                }
+                                                disabled={!order.uuid || pending}
+                                                title={isCancelled ? 'Reactivar pedido' : 'Cancelar pedido'}
+                                                className={`p-1.5 rounded-full text-xs font-bold transition-colors disabled:opacity-50 ${
+                                                    isCancelled
+                                                        ? 'bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-950/60'
+                                                        : 'bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-zinc-400 hover:bg-red-100 dark:hover:bg-red-950/40 hover:text-red-600 dark:hover:text-red-300'
+                                                }`}
+                                            >
+                                                {isCancelled ? <Undo2 size={12} /> : <X size={12} />}
+                                            </button>
+                                        </div>
                                     </div>
 
                                     {/* Company + contact */}
@@ -396,18 +440,22 @@ export function OrdersTable({
                                         )}
                                     </div>
 
-                                    {/* Stage completion strip — Bodega · Corte ·
-                                        Maquila · Impresión with per-stage ✓ marks.
-                                        Read-only here; stages mark themselves
-                                        complete from their own boards. */}
-                                    <div className="flex flex-wrap gap-1.5">
-                                        <StageCompletionStrip
-                                            completed={
-                                                (order.uuid &&
-                                                    completedStagesByOrder.get(order.uuid)) ||
-                                                new Set()
-                                            }
-                                            compact
+                                    {/* Stage control center — interactive 4-cell
+                                        panel. Each cell shows the stage and a
+                                        check when done; clicking flips the
+                                        completion via the same actions the
+                                        stage boards use. Hover for timestamps. */}
+                                    <div
+                                        className={`rounded-xl border p-3 ${
+                                            isCancelled
+                                                ? 'opacity-50 pointer-events-none bg-gray-50 dark:bg-zinc-900/40 border-gray-200 dark:border-zinc-800'
+                                                : 'bg-gray-50 dark:bg-zinc-900/60 border-gray-200 dark:border-zinc-800'
+                                        }`}
+                                    >
+                                        <StageControlPanel
+                                            orderUuid={order.uuid}
+                                            completedAt={completedAt}
+                                            onLocalToggle={handleStageToggle}
                                         />
                                     </div>
 
