@@ -143,7 +143,7 @@ export const fetchCatalogForCompany = async (
         )
         .filter((p): p is ProductRow => Boolean(p))
         .filter((p) => p.is_active !== false)
-        .map(mapProductRow);
+        .map((p) => mapProductRow(p));
 };
 
 export const fetchCatalogForUser = async (
