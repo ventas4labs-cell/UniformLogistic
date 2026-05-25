@@ -9,13 +9,10 @@ import {
     Loader2,
     ChevronDown,
     ChevronUp,
-    Layers,
-    BellRing,
-    CheckCircle2
+    Layers
 } from 'lucide-react';
 import type { Order } from '@/lib/types';
 import { aggregateCutLines, parseColor } from '@/lib/stage-utils';
-import { notifyStageFinishedAction } from '@/app/(admin)/admin/_stage-actions';
 import { StageCompleteToggle } from '@/components/admin/stage-complete-toggle';
 import { StageTabBar, type StageTab } from '@/components/admin/stage-tab-bar';
 
@@ -135,16 +132,10 @@ function colorSwatch(color: string): string {
 
 function OrderCard({
     order,
-    onNotifyFinished,
-    notified,
-    isPending,
     isCompleted,
     onLocalCompletionChange
 }: {
     order: Order;
-    onNotifyFinished: (uuid: string) => void;
-    notified: boolean;
-    isPending: boolean;
     isCompleted: boolean;
     onLocalCompletionChange: (uuid: string, next: boolean) => void;
 }) {
@@ -210,28 +201,6 @@ function OrderCard({
                 )}
             </button>
 
-            <div className="border-t border-gray-100 dark:border-zinc-800 p-3 bg-gray-50/60 dark:bg-zinc-900/40">
-                <button
-                    onClick={() => order.uuid && onNotifyFinished(order.uuid)}
-                    disabled={!order.uuid || isPending || notified}
-                    className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-colors shadow-sm ${
-                        notified
-                            ? 'bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-300 cursor-default'
-                            : 'bg-green-600 text-white hover:bg-green-700 disabled:bg-gray-300 dark:disabled:bg-zinc-700'
-                    }`}
-                >
-                    {notified ? (
-                        <>
-                            <CheckCircle2 size={16} /> Notificación enviada
-                        </>
-                    ) : (
-                        <>
-                            <BellRing size={16} /> Notificar corte terminado
-                        </>
-                    )}
-                </button>
-            </div>
-
             {expanded && (
                 <div className="border-t border-gray-100 dark:border-zinc-800 overflow-x-auto">
                     <table className="w-full text-sm">
@@ -295,42 +264,20 @@ function OrderCard({
 
 export function CorteBoard({
     initialOrders,
-    initialNotifiedOrderIds,
     initialCompletedOrderIds
 }: {
     initialOrders: Order[];
-    initialNotifiedOrderIds: string[];
     initialCompletedOrderIds: string[];
 }) {
     const [orders] = useState<Order[]>(initialOrders);
-    const [notifiedOrderIds, setNotifiedOrderIds] = useState<Set<string>>(
-        () => new Set(initialNotifiedOrderIds)
-    );
     const [completed, setCompleted] = useState<Set<string>>(
         () => new Set(initialCompletedOrderIds)
     );
     const [tab, setTab] = useState<StageTab>('pending');
     const [searchTerm, setSearchTerm] = useState('');
-    const [pending, startTransition] = useTransition();
+    const [pending] = useTransition();
     const [showSummary, setShowSummary] = useState(true);
     const router = useRouter();
-
-    const handleNotifyFinished = (uuid: string) => {
-        // Optimistically mark as notified
-        setNotifiedOrderIds((prev) => new Set(prev).add(uuid));
-        startTransition(async () => {
-            try {
-                await notifyStageFinishedAction(uuid, 'corte', 'Corte terminado');
-            } catch {
-                alert('Error al enviar notificación');
-                setNotifiedOrderIds((prev) => {
-                    const next = new Set(prev);
-                    next.delete(uuid);
-                    return next;
-                });
-            }
-        });
-    };
 
     const handleLocalCompletionChange = (uuid: string, next: boolean) => {
         setCompleted((prev) => {
@@ -429,9 +376,6 @@ export function CorteBoard({
                         <OrderCard
                             key={order.uuid || order.id}
                             order={order}
-                            onNotifyFinished={handleNotifyFinished}
-                            notified={!!order.uuid && notifiedOrderIds.has(order.uuid)}
-                            isPending={pending}
                             isCompleted={!!order.uuid && completed.has(order.uuid)}
                             onLocalCompletionChange={handleLocalCompletionChange}
                         />
