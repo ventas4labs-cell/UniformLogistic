@@ -12,20 +12,30 @@ import {
     Package
 } from 'lucide-react';
 import type { Order } from '@/lib/types';
+import type { InsumoCompletion } from '@/lib/services/insumo-completions';
 import { aggregateInsumos, aggregateInsumosGlobal } from '@/lib/stage-utils';
 import { StageCompleteToggle } from '@/components/admin/stage-complete-toggle';
 import { StageTabBar, type StageTab } from '@/components/admin/stage-tab-bar';
+import {
+    InsumoRow,
+    completionKey,
+    useToggleInsumoCompletion
+} from '@/components/admin/insumo-row';
 
 type Tab = StageTab;
 
 function OrderCard({
     order,
     isCompleted,
-    onLocalChange
+    onLocalChange,
+    completedInsumos,
+    onToggleInsumo
 }: {
     order: Order;
     isCompleted: boolean;
     onLocalChange: (uuid: string, next: boolean) => void;
+    completedInsumos: Set<string>;
+    onToggleInsumo: (orderId: string, insumoName: string, completed: boolean) => void;
 }) {
     const [expanded, setExpanded] = useState(true);
     const insumos = aggregateInsumos(order.items);
@@ -139,19 +149,25 @@ function OrderCard({
                                     Insumos necesarios
                                 </h4>
                                 <div className="space-y-1.5">
-                                    {insumos.map((ins) => (
-                                        <div
-                                            key={ins.name}
-                                            className="flex items-center justify-between bg-purple-50 dark:bg-purple-950/30 rounded-lg px-3 py-2 text-sm"
-                                        >
-                                            <span className="text-purple-900 dark:text-purple-200 truncate">
-                                                {ins.name}
-                                            </span>
-                                            <span className="font-bold text-purple-700 dark:text-purple-300 shrink-0 ml-2">
-                                                {ins.totalQty}
-                                            </span>
-                                        </div>
-                                    ))}
+                                    {insumos.map((ins) => {
+                                        const done =
+                                            !!order.uuid &&
+                                            completedInsumos.has(
+                                                completionKey(order.uuid, ins.name)
+                                            );
+                                        return (
+                                            <InsumoRow
+                                                key={ins.name}
+                                                ins={ins}
+                                                orderUuid={order.uuid}
+                                                isCompleted={done}
+                                                onToggleComplete={(completed) =>
+                                                    order.uuid &&
+                                                    onToggleInsumo(order.uuid, ins.name, completed)
+                                                }
+                                            />
+                                        );
+                                    })}
                                 </div>
                             </>
                         )}
@@ -164,15 +180,26 @@ function OrderCard({
 
 export function MaquilaBoard({
     initialOrders,
-    initialCompletedOrderIds
+    initialCompletedOrderIds,
+    initialInsumoCompletions
 }: {
     initialOrders: Order[];
     initialCompletedOrderIds: string[];
+    initialInsumoCompletions: InsumoCompletion[];
 }) {
     const [orders] = useState<Order[]>(initialOrders);
     const [completed, setCompleted] = useState<Set<string>>(
         () => new Set(initialCompletedOrderIds)
     );
+    const [completedInsumos, setCompletedInsumos] = useState<Set<string>>(
+        () =>
+            new Set(
+                initialInsumoCompletions.map((c) =>
+                    completionKey(c.orderId, c.insumoName)
+                )
+            )
+    );
+    const handleToggleInsumo = useToggleInsumoCompletion(setCompletedInsumos);
     const [tab, setTab] = useState<Tab>('pending');
     const [searchTerm, setSearchTerm] = useState('');
     const [pending] = useTransition();
@@ -292,13 +319,15 @@ export function MaquilaBoard({
                             : 'No hay pedidos.'}
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
                     {filtered.map((order) => (
                         <OrderCard
                             key={order.uuid || order.id}
                             order={order}
                             isCompleted={!!order.uuid && completed.has(order.uuid)}
                             onLocalChange={handleLocalChange}
+                            completedInsumos={completedInsumos}
+                            onToggleInsumo={handleToggleInsumo}
                         />
                     ))}
                 </div>

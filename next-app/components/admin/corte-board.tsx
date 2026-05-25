@@ -371,7 +371,7 @@ export function CorteBoard({
                             : 'No hay pedidos.'}
                 </div>
             ) : (
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4">
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4 items-start">
                     {filtered.map((order) => (
                         <OrderCard
                             key={order.uuid || order.id}

@@ -648,7 +648,9 @@ export function OperatorBoard({
                     No se encontraron pedidos.
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {/* items-start so an expanded card doesn't stretch its row
+                    siblings — each card sizes to its own content. */}
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
                     {filtered.map((order) => (
                         <OrderCard
                             key={order.uuid || order.id}

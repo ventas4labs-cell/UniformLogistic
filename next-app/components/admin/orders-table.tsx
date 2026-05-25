@@ -317,7 +317,7 @@ export function OrdersTable({
                     No se encontraron pedidos.
                 </div>
             ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
                     {filtered.map((order) => {
                         const unresolved = unresolvedCountFor(order.uuid);
                         const hasAlert = unresolved > 0;
