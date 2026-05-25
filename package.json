@@ -1,0 +1,13 @@
+{
+    "name": "uniform-logistic-ordering",
+    "version": "0.0.0",
+    "private": true,
+    "description": "Repo-root passthrough. The actual application lives in next-app/. This shim exists so tools that probe the repo root for a package.json (preview servers, lint runners, some CI integrations) can find one and delegate the standard npm scripts into the real workspace.",
+    "scripts": {
+        "dev": "npm --prefix next-app run dev",
+        "build": "npm --prefix next-app run build",
+        "start": "npm --prefix next-app run start",
+        "lint": "npm --prefix next-app run lint",
+        "install:app": "npm --prefix next-app install"
+    }
+}

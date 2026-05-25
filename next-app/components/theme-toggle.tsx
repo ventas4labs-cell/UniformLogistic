@@ -30,6 +30,10 @@ export function ThemeToggle({ className = '' }: { className?: string }) {
         } catch {
             /* localStorage blocked — silently keep in-memory state */
         }
+        // Mirror to a cookie so the root layout can apply the class
+        // server-side on the next request — no client-side script in
+        // <head> needed, no FOUC.
+        document.cookie = `theme=${next}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
         setTheme(next);
     };
 

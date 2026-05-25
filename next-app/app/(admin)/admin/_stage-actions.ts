@@ -23,7 +23,10 @@ const STAGE_PATHS = [
     '/admin/operador',
     '/admin/corte',
     '/admin/maquila',
-    '/admin/impresion'
+    '/admin/impresion',
+    '/admin/bordado',
+    '/admin/empaque',
+    '/admin/ploter'
 ];
 
 export async function updateStageStatusAction(orderUuid: string, status: OrderStatus) {

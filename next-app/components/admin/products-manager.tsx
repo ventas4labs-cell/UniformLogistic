@@ -2,9 +2,23 @@
 
 import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Edit2, Trash2, Loader2, X, Package, Upload, CheckCircle2, ImageIcon } from 'lucide-react';
+import {
+    Plus,
+    Edit2,
+    Trash2,
+    Loader2,
+    X,
+    Package,
+    Upload,
+    CheckCircle2,
+    ImageIcon,
+    Sticker,
+    Sparkles,
+    Printer
+} from 'lucide-react';
 import type { AdminProduct, ProductInput, BomItem } from '@/lib/services/products';
 import type { Company } from '@/lib/services/companies';
+import type { Logo } from '@/lib/services/logos';
 import {
     createProductAction,
     updateProductAction,
@@ -110,10 +124,12 @@ function DecimalInput({
 
 export function ProductsManager({
     initialProducts,
-    companies
+    companies,
+    logos
 }: {
     initialProducts: AdminProduct[];
     companies: Company[];
+    logos: Logo[];
 }) {
     const router = useRouter();
     const [pending, startTransition] = useTransition();
@@ -141,6 +157,7 @@ export function ProductsManager({
     // Which BOM rows have their per-size override panel expanded. Index-
     // keyed so this resets naturally when the form is reopened.
     const [openOverrides, setOpenOverrides] = useState<Set<number>>(new Set());
+    const [showLogoPicker, setShowLogoPicker] = useState(false);
 
     /** Rebuild raw size text from a form's parsed sizes — used on open + voice merges. */
     const sizesTextFromForm = (s: ProductInput['sizes']) => ({
@@ -751,18 +768,130 @@ export function ProductsManager({
                             )}
 
                             <div className="border border-gray-200 dark:border-zinc-800 rounded-lg p-4 space-y-3">
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-center justify-between gap-2 flex-wrap">
                                     <label className="text-sm font-bold text-gray-700 dark:text-zinc-300">Insumos Requeridos (BOM)</label>
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            setForm({ ...form, bom: [...(form.bom || []), { name: '', qty: 0 }] })
-                                        }
-                                        className="text-xs bg-orange-50 dark:bg-orange-950/30 text-orange-600 dark:text-orange-400 px-3 py-1 rounded-lg font-bold hover:bg-orange-100 flex items-center gap-1"
-                                    >
-                                        <Plus size={14} /> Agregar insumo
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setShowLogoPicker((s) => !s);
+                                            }}
+                                            className="text-xs bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 px-3 py-1 rounded-lg font-bold hover:bg-rose-100 dark:hover:bg-rose-950/50 flex items-center gap-1"
+                                        >
+                                            <Sticker size={14} /> Agregar logo
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setForm({ ...form, bom: [...(form.bom || []), { name: '', qty: 0 }] })
+                                            }
+                                            className="text-xs bg-orange-50 dark:bg-orange-950/30 text-orange-600 dark:text-orange-400 px-3 py-1 rounded-lg font-bold hover:bg-orange-100 flex items-center gap-1"
+                                        >
+                                            <Plus size={14} /> Agregar insumo
+                                        </button>
+                                    </div>
                                 </div>
+                                {showLogoPicker && (() => {
+                                    const selectedCompanies = new Set(form.companyIds || []);
+                                    const alreadyPicked = new Set(
+                                        (form.bom || [])
+                                            .map((b) => b.logoId)
+                                            .filter((id): id is string => !!id)
+                                    );
+                                    // If no company is selected yet we show all active
+                                    // logos as a fallback. Otherwise restrict to logos
+                                    // assigned to any selected company.
+                                    const available = logos.filter((l) => {
+                                        if (!l.isActive) return false;
+                                        if (alreadyPicked.has(l.id)) return false;
+                                        if (selectedCompanies.size === 0) return true;
+                                        return l.companyIds.some((c) => selectedCompanies.has(c));
+                                    });
+                                    return (
+                                        <div className="bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 rounded-lg p-3">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <p className="text-xs font-bold text-rose-700 dark:text-rose-300">
+                                                    Elegí un logo para agregar al BOM
+                                                </p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowLogoPicker(false)}
+                                                    className="text-rose-400 hover:text-rose-600"
+                                                    aria-label="Cerrar selector"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
+                                            {available.length === 0 ? (
+                                                <p className="text-xs text-gray-500 dark:text-zinc-400 italic">
+                                                    {logos.length === 0
+                                                        ? 'No hay logos creados. Crealos en la pestaña "Logos".'
+                                                        : selectedCompanies.size === 0
+                                                          ? 'No hay logos disponibles.'
+                                                          : 'Ninguno de los logos disponibles está asignado a las empresas seleccionadas.'}
+                                                </p>
+                                            ) : (
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                                                    {available.map((l) => (
+                                                        <button
+                                                            key={l.id}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setForm((prev) => ({
+                                                                    ...prev,
+                                                                    bom: [
+                                                                        ...(prev.bom || []),
+                                                                        {
+                                                                            name: l.name,
+                                                                            qty: 1,
+                                                                            logoId: l.id,
+                                                                            logoImageUrl: l.imageUrl,
+                                                                            logoCategory: l.category
+                                                                        }
+                                                                    ]
+                                                                }));
+                                                                setShowLogoPicker(false);
+                                                            }}
+                                                            className="flex items-center gap-2 p-2 bg-white dark:bg-zinc-900 rounded-lg border border-rose-200 dark:border-rose-900/40 hover:border-rose-400 hover:shadow-sm transition-all text-left"
+                                                        >
+                                                            {l.imageUrl ? (
+                                                                // eslint-disable-next-line @next/next/no-img-element
+                                                                <img
+                                                                    src={l.imageUrl}
+                                                                    alt={l.name}
+                                                                    className="w-10 h-10 object-contain bg-white border border-gray-100 dark:border-zinc-800 rounded shrink-0"
+                                                                />
+                                                            ) : (
+                                                                <div className="w-10 h-10 rounded bg-gray-100 dark:bg-zinc-800 flex items-center justify-center shrink-0">
+                                                                    <ImageIcon size={14} className="text-gray-300 dark:text-zinc-600" />
+                                                                </div>
+                                                            )}
+                                                            <div className="min-w-0 flex-1">
+                                                                <div className="text-sm font-bold text-gray-900 dark:text-zinc-100 truncate">
+                                                                    {l.name}
+                                                                </div>
+                                                                <div
+                                                                    className={`inline-flex items-center gap-1 text-[10px] font-bold mt-0.5 px-1.5 py-0.5 rounded-full ${
+                                                                        l.category === 'bordado'
+                                                                            ? 'bg-rose-100 dark:bg-rose-950/50 text-rose-800 dark:text-rose-300'
+                                                                            : 'bg-pink-100 dark:bg-pink-950/50 text-pink-800 dark:text-pink-300'
+                                                                    }`}
+                                                                >
+                                                                    {l.category === 'bordado' ? (
+                                                                        <Sparkles size={10} />
+                                                                    ) : (
+                                                                        <Printer size={10} />
+                                                                    )}
+                                                                    {l.category === 'bordado' ? 'Bordado' : 'Impresión'}
+                                                                </div>
+                                                            </div>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
                                 {(form.bom || []).length === 0 && (
                                     <p className="text-xs text-gray-400 dark:text-zinc-500 italic">Sin insumos configurados.</p>
                                 )}
@@ -796,15 +925,51 @@ export function ProductsManager({
                                             className="space-y-2 border-b border-gray-100 dark:border-zinc-800 pb-3 last:border-b-0 last:pb-0"
                                         >
                                             <div className="flex items-center gap-2">
-                                                <input
-                                                    type="text"
-                                                    value={item.name}
-                                                    onChange={(e) =>
-                                                        updateBom({ ...item, name: e.target.value })
-                                                    }
-                                                    placeholder="Nombre del insumo"
-                                                    className="flex-1 p-2 border rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none"
-                                                />
+                                                {item.logoId ? (
+                                                    <div className="flex-1 flex items-center gap-2 p-1.5 pl-2 border border-rose-200 dark:border-rose-900/40 bg-rose-50/40 dark:bg-rose-950/20 rounded-lg min-w-0">
+                                                        {item.logoImageUrl ? (
+                                                            // eslint-disable-next-line @next/next/no-img-element
+                                                            <img
+                                                                src={item.logoImageUrl}
+                                                                alt={item.name}
+                                                                className="w-8 h-8 object-contain bg-white border border-gray-100 dark:border-zinc-800 rounded shrink-0"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-8 h-8 rounded bg-gray-100 dark:bg-zinc-800 flex items-center justify-center shrink-0">
+                                                                <Sticker size={12} className="text-gray-400" />
+                                                            </div>
+                                                        )}
+                                                        <span className="font-bold text-sm text-gray-900 dark:text-zinc-100 truncate">
+                                                            {item.name}
+                                                        </span>
+                                                        {item.logoCategory && (
+                                                            <span
+                                                                className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
+                                                                    item.logoCategory === 'bordado'
+                                                                        ? 'bg-rose-100 dark:bg-rose-950/50 text-rose-800 dark:text-rose-300'
+                                                                        : 'bg-pink-100 dark:bg-pink-950/50 text-pink-800 dark:text-pink-300'
+                                                                }`}
+                                                            >
+                                                                {item.logoCategory === 'bordado' ? (
+                                                                    <Sparkles size={10} />
+                                                                ) : (
+                                                                    <Printer size={10} />
+                                                                )}
+                                                                {item.logoCategory === 'bordado' ? 'Bordado' : 'Impresión'}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <input
+                                                        type="text"
+                                                        value={item.name}
+                                                        onChange={(e) =>
+                                                            updateBom({ ...item, name: e.target.value })
+                                                        }
+                                                        placeholder="Nombre del insumo"
+                                                        className="flex-1 p-2 border rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                                                    />
+                                                )}
                                                 <DecimalInput
                                                     value={item.qty}
                                                     onChange={(qty) =>

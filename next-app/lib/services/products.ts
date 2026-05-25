@@ -13,6 +13,16 @@ export interface BomItem {
     // Used for extra-large shirts where fabric / interlining / zipper
     // consumption is higher than the base SKU.
     qtyBySize?: Record<string, number>;
+    // Optional logo linkage. When `logoId` is set, this BOM row
+    // represents a logo applied to the product rather than a generic
+    // insumo. `logoImageUrl` and `logoCategory` are snapshots from the
+    // logos catalog at the time of save so the boards can render the
+    // image and route by category without an extra join. `name` mirrors
+    // the logo's display name and is read-only in the UI when logoId
+    // is present.
+    logoId?: string;
+    logoImageUrl?: string;
+    logoCategory?: 'bordado' | 'impresion';
 }
 
 /** Normalize a size label for case-insensitive override lookups. */

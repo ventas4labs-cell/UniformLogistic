@@ -131,7 +131,7 @@ function StageCell({
             onClick={handleClick}
             disabled={disabled}
             title={tooltip}
-            className={`group relative flex flex-col items-center gap-1 px-2 py-2 rounded-lg text-[11px] font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+            className={`group relative flex flex-col items-center gap-1 px-1.5 py-2 min-w-0 rounded-lg text-[11px] font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                 isDone
                     ? 'bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-950/60'
                     : 'bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-zinc-400 hover:bg-orange-100 dark:hover:bg-orange-950/40 hover:text-orange-700 dark:hover:text-orange-300'
@@ -150,7 +150,7 @@ function StageCell({
                     <Check size={12} strokeWidth={3} />
                 ) : null}
             </span>
-            <span className="uppercase tracking-wide">{STAGE_LABELS[stage]}</span>
+            <span className="uppercase tracking-wide truncate max-w-full">{STAGE_LABELS[stage]}</span>
         </button>
     );
 }

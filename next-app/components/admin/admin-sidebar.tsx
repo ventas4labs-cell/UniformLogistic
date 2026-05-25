@@ -20,7 +20,11 @@ import {
     ChevronRight,
     Scissors,
     Factory,
-    Printer
+    Printer,
+    Sparkles,
+    PackageCheck,
+    PenTool,
+    Sticker
 } from 'lucide-react';
 import { signOutAction } from '@/app/login/actions';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -34,6 +38,7 @@ const TABS: Tab[] = [
     { href: '/admin/cuentas',        label: 'Cuentas',        icon: <Wallet size={20} /> },
     { href: '/admin/companies',      label: 'Empresas',       icon: <Building2 size={20} /> },
     { href: '/admin/products',       label: 'Productos',      icon: <Package size={20} /> },
+    { href: '/admin/logos',          label: 'Logos',          icon: <Sticker size={20} /> },
     { href: '/admin/catalog',        label: 'Catálogo',       icon: <Layers size={20} /> },
     { href: '/admin/users',          label: 'Usuarios',       icon: <Users size={20} /> },
     { href: '/admin/facturacion',    label: 'Facturación',    icon: <Receipt size={20} /> }
@@ -43,7 +48,10 @@ const OPERATIONS_TABS: Tab[] = [
     { href: '/admin/operador',  label: 'Bodega',    icon: <Package size={16} /> },
     { href: '/admin/corte',     label: 'Corte',     icon: <Scissors size={16} /> },
     { href: '/admin/maquila',   label: 'Maquila',   icon: <Factory size={16} /> },
-    { href: '/admin/impresion', label: 'Impresión', icon: <Printer size={16} /> }
+    { href: '/admin/impresion', label: 'Impresión', icon: <Printer size={16} /> },
+    { href: '/admin/bordado',   label: 'Bordado',   icon: <Sparkles size={16} /> },
+    { href: '/admin/empaque',   label: 'Empaque',   icon: <PackageCheck size={16} /> },
+    { href: '/admin/ploter',    label: 'Ploter',    icon: <PenTool size={16} /> }
 ];
 
 export function AdminSidebar() {

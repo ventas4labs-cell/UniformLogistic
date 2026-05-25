@@ -1,6 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-export type Stage = 'bodega' | 'corte' | 'maquila' | 'impresion' | 'empaque';
+export type Stage =
+    | 'bodega'
+    | 'corte'
+    | 'maquila'
+    | 'impresion'
+    | 'bordado'
+    | 'empaque'
+    | 'ploter';
 
 export interface StageNotification {
     id: string;

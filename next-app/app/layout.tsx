@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { cookies } from "next/headers";
 import "./globals.css";
 
 // Inter is loaded as the cross-platform fallback. On Apple devices the CSS
@@ -16,35 +17,29 @@ export const metadata: Metadata = {
   description: "Sistema de pedidos de uniformes para empresas en Costa Rica",
 };
 
-// Pre-hydration script: applies the user's saved theme (or the OS preference)
-// to <html> BEFORE React paints, so there's no light/dark flash on first load.
-// Kept tiny and inline because it must run synchronously in <head>.
-const noFlashScript = `
-(function() {
-  try {
-    var saved = localStorage.getItem('theme');
-    var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    var theme = saved || (prefersDark ? 'dark' : 'light');
-    if (theme === 'dark') document.documentElement.classList.add('dark');
-    document.documentElement.style.colorScheme = theme;
-  } catch (_) {}
-})();
-`.trim();
-
-export default function RootLayout({
+// Read the user's saved theme from the `theme` cookie and apply the
+// `dark` class to <html> at SSR time. No client-side script required —
+// the markup ships with the right class so there's no flash, and React
+// 19 doesn't complain about an inline <script> in the tree.
+//
+// ThemeToggle writes the cookie (and a localStorage mirror for legacy
+// clients). First-time visitors without a cookie default to light;
+// they can flip via the toggle and the choice persists for a year.
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const themeCookie = cookieStore.get("theme")?.value;
+  const isDark = themeCookie === "dark";
   return (
     <html
       lang="es"
-      className={`${inter.variable} h-full antialiased`}
+      className={`${inter.variable} h-full antialiased${isDark ? " dark" : ""}`}
+      style={{ colorScheme: isDark ? "dark" : "light" }}
       suppressHydrationWarning
     >
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: noFlashScript }} />
-      </head>
       <body className="min-h-full flex flex-col bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans transition-colors">
         {children}
       </body>

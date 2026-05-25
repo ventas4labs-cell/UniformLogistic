@@ -36,6 +36,7 @@ export async function reportMissingInsumoAction(
     });
 
     revalidatePath('/admin/operador');
+    revalidatePath('/admin/maquila');
     revalidatePath('/admin/orders');
 }
 
@@ -53,4 +54,5 @@ export async function toggleInsumoCompleteAction(
         await unmarkInsumoComplete(supabase, orderId, insumoName);
     }
     revalidatePath('/admin/operador');
+    revalidatePath('/admin/maquila');
 }

@@ -7,15 +7,36 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 // others. /admin/orders shows a per-order 4-cell strip aggregating
 // these completions.
 
-export type StageKey = 'bodega' | 'corte' | 'maquila' | 'impresion';
+export type StageKey =
+    | 'bodega'
+    | 'corte'
+    | 'maquila'
+    | 'impresion'
+    | 'bordado'
+    | 'empaque'
+    | 'ploter';
 
-export const STAGE_ORDER: StageKey[] = ['bodega', 'corte', 'maquila', 'impresion'];
+// Display / completion order. The pipeline is parallel — every order
+// is visible on every board from creation — but this array drives the
+// left-to-right rendering of the completion strip and control panel.
+export const STAGE_ORDER: StageKey[] = [
+    'bodega',
+    'corte',
+    'maquila',
+    'impresion',
+    'bordado',
+    'empaque',
+    'ploter'
+];
 
 export const STAGE_LABELS: Record<StageKey, string> = {
     bodega: 'Bodega',
     corte: 'Corte',
     maquila: 'Maquila',
-    impresion: 'Impresión'
+    impresion: 'Impresión',
+    bordado: 'Bordado',
+    empaque: 'Empaque',
+    ploter: 'Ploter'
 };
 
 export interface StageCompletion {
