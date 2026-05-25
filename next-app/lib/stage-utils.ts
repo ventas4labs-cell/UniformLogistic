@@ -1,4 +1,5 @@
 import type { CartItem, Order } from '@/lib/types';
+import { extractSizeLabel, resolveBomQty } from '@/lib/services/products';
 
 // Stage-board helpers shared across /admin/operador (bodega), /admin/corte,
 // /admin/maquila, /admin/impresion. Extracted from operator-board so the
@@ -18,9 +19,15 @@ export function aggregateInsumos(items: CartItem[]): InsumoSummary[] {
     const map = new Map<string, number>();
     for (const item of items) {
         if (!item.bom) continue;
+        // Per-size BOM overrides (qtyBySize) let XXL+ pieces consume
+        // more material than the base SKU. resolveBomQty falls back to
+        // b.qty when no override matches the line's size.
+        const sizeLabel = extractSizeLabel(item.selection.size);
         for (const b of item.bom) {
+            const perUnit = resolveBomQty(b, sizeLabel);
+            if (perUnit <= 0) continue;
             const key = b.name.trim().toLowerCase();
-            map.set(key, (map.get(key) || 0) + b.qty * item.quantity);
+            map.set(key, (map.get(key) || 0) + perUnit * item.quantity);
         }
     }
     return Array.from(map.entries())

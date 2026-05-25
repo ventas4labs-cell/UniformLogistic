@@ -321,6 +321,19 @@ function OrderCard({
                             ))}
                         </div>
 
+                        {insumos.length === 0 && (
+                            <div className="pt-2">
+                                <h4 className="text-xs font-bold text-gray-500 dark:text-zinc-500 uppercase tracking-wide mb-1.5">
+                                    Insumos necesarios
+                                </h4>
+                                <p className="text-xs text-gray-500 dark:text-zinc-500 italic px-3 py-2 rounded-lg bg-gray-50 dark:bg-zinc-800/50">
+                                    {order.items.some((i) => i.bom && i.bom.length > 0)
+                                        ? 'Las cantidades configuradas para los insumos son cero.'
+                                        : 'Sin insumos configurados en los productos de este pedido. Editá el producto en Admin → Productos para agregar BOM.'}
+                                </p>
+                            </div>
+                        )}
+
                         {insumos.length > 0 && (
                             <>
                                 <h4 className="text-xs font-bold text-purple-700 dark:text-purple-300 uppercase tracking-wide pt-2">

@@ -104,6 +104,22 @@ export const createOrder = async (
         .in('product_code', uniqueCodes);
     const codeToUuid = new Map((productRows || []).map((r) => [r.product_code, r.id]));
 
+    // Reject phantom codes. Otherwise we'd insert order_items with
+    // product_id=null, which silently breaks the downstream JOIN that
+    // resolves BOM / fabric / type for the operator boards and the
+    // INSUMOS table in the PDF. (Order #6 hit this: a stale cart held
+    // "ULPS-CS001" while the live product code was "ULPS-CH001",
+    // and the resulting order showed no insumos for 30 pieces of
+    // Chaleco Seguridad.)
+    const missing = uniqueCodes.filter((c) => !codeToUuid.has(c));
+    if (missing.length > 0) {
+        await supabase.from('orders').delete().eq('id', order.id);
+        throw new Error(
+            `Productos no encontrados en el catálogo: ${missing.join(', ')}. ` +
+                `Refrescá el catálogo y volvé a armar el pedido.`
+        );
+    }
+
     const itemRows = cart.map((item) => ({
         order_id: order.id,
         product_code: item.productId,
@@ -228,6 +244,65 @@ const mapRowToOrder = (row: RawOrderRow): Order => {
     };
 };
 
+/**
+ * Recover product data (BOM, fabric, type, cabys, image) for order items
+ * whose FK to `products` is null but whose `product_code` still matches
+ * a live product. This happens when:
+ *  - An older order was inserted with product_id=null (pre-validation
+ *    days, e.g. order #6's "ULPS-CS001" → "ULPS-CH001" code drift).
+ *  - A product was deleted and re-created with the same code.
+ *
+ * Without this fallback, the operator board shows zero insumos for the
+ * order even when the BOM is configured on the matching product.
+ */
+const hydrateOrphanItems = async (
+    supabase: SupabaseClient,
+    orders: Order[]
+): Promise<void> => {
+    const orphanCodes = new Set<string>();
+    for (const o of orders) {
+        for (const i of o.items) {
+            if (!i.bom && !i.productType && !i.fabricType && i.productId) {
+                orphanCodes.add(i.productId);
+            }
+        }
+    }
+    if (orphanCodes.size === 0) return;
+
+    const { data } = await supabase
+        .from('products')
+        .select('product_code, product_type, fabric_type, bom_json, codigo_cabys, image_url')
+        .in('product_code', Array.from(orphanCodes));
+    if (!data) return;
+
+    const byCode = new Map(
+        data.map((r) => [
+            r.product_code,
+            r as {
+                product_code: string;
+                product_type: 'shirt' | 'pant' | null;
+                fabric_type: string | null;
+                bom_json: { name: string; qty: number }[] | null;
+                codigo_cabys: string | null;
+                image_url: string | null;
+            }
+        ])
+    );
+
+    for (const o of orders) {
+        for (const i of o.items) {
+            if (i.bom || i.productType || i.fabricType) continue;
+            const hit = byCode.get(i.productId);
+            if (!hit) continue;
+            i.productType = hit.product_type || undefined;
+            i.fabricType = hit.fabric_type || undefined;
+            i.bom = hit.bom_json || undefined;
+            i.codigoCabys = hit.codigo_cabys || undefined;
+            i.imageUrl = hit.image_url || undefined;
+        }
+    }
+};
+
 export const fetchUserOrders = async (
     supabase: SupabaseClient,
     userId: string
@@ -239,7 +314,9 @@ export const fetchUserOrders = async (
         .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return ((data || []) as unknown as RawOrderRow[]).map(mapRowToOrder);
+    const orders = ((data || []) as unknown as RawOrderRow[]).map(mapRowToOrder);
+    await hydrateOrphanItems(supabase, orders);
+    return orders;
 };
 
 export const fetchAllOrders = async (
@@ -251,7 +328,9 @@ export const fetchAllOrders = async (
         .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return ((data || []) as unknown as RawOrderRow[]).map(mapRowToOrder);
+    const orders = ((data || []) as unknown as RawOrderRow[]).map(mapRowToOrder);
+    await hydrateOrphanItems(supabase, orders);
+    return orders;
 };
 
 export const updateOrderStatus = async (
