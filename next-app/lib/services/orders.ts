@@ -228,6 +228,7 @@ const mapRowToOrder = (row: RawOrderRow): Order => {
         items: (row.items || []).map((it) => {
             const product = pickOne(it.product);
             return {
+                uuid: it.id,
                 productId: it.product_code,
                 productName: it.product_name,
                 selection: { size: it.size },

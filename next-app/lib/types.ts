@@ -33,6 +33,12 @@ export interface CartItem {
     bom?: { name: string; qty: number }[];
     codigoCabys?: string;
     imageUrl?: string;
+    /**
+     * order_items.id — only populated for items that came back from
+     * the DB (Order rows). Customer-side cart items don't have an id
+     * yet because the order hasn't been persisted.
+     */
+    uuid?: string;
 }
 
 export interface Order {
