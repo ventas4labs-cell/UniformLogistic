@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     Factory,
@@ -12,27 +12,33 @@ import {
     Package
 } from 'lucide-react';
 import type { Order } from '@/lib/types';
-import { ORDER_STATUS_OPTIONS, OrderStatus } from '@/lib/services/orders';
 import { aggregateInsumos, aggregateInsumosGlobal } from '@/lib/stage-utils';
-import { updateStageStatusAction } from '@/app/(admin)/admin/_stage-actions';
+import { StageCompleteToggle } from '@/components/admin/stage-complete-toggle';
+import { StageTabBar, type StageTab } from '@/components/admin/stage-tab-bar';
+
+type Tab = StageTab;
 
 function OrderCard({
     order,
-    onStatusChange,
-    isPending
+    isCompleted,
+    onLocalChange
 }: {
     order: Order;
-    onStatusChange: (uuid: string, status: OrderStatus) => void;
-    isPending: boolean;
+    isCompleted: boolean;
+    onLocalChange: (uuid: string, next: boolean) => void;
 }) {
     const [expanded, setExpanded] = useState(true);
-    const status = (order.status as OrderStatus) || 'maquila';
-    const statusOption = ORDER_STATUS_OPTIONS.find((s) => s.value === status);
     const insumos = aggregateInsumos(order.items);
     const totalPieces = order.items.reduce((s, i) => s + i.quantity, 0);
 
     return (
-        <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm border border-gray-200 dark:border-zinc-800 overflow-hidden">
+        <div
+            className={`bg-white dark:bg-zinc-900 rounded-xl shadow-sm border overflow-hidden ${
+                isCompleted
+                    ? 'border-green-200 dark:border-green-900/40'
+                    : 'border-gray-200 dark:border-zinc-800'
+            }`}
+        >
             <div className="p-4">
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -51,24 +57,12 @@ function OrderCard({
                             )}
                         </p>
                     </div>
-                    <select
-                        value={status}
-                        onChange={(e) =>
-                            order.uuid && onStatusChange(order.uuid, e.target.value as OrderStatus)
-                        }
-                        disabled={!order.uuid || isPending}
-                        className={`py-1 px-3 rounded-full text-xs font-bold border-none outline-none cursor-pointer shrink-0 ${statusOption?.color || 'bg-gray-100 text-gray-800'}`}
-                    >
-                        {ORDER_STATUS_OPTIONS.map((opt) => (
-                            <option
-                                key={opt.value}
-                                value={opt.value}
-                                className="bg-white dark:bg-zinc-900 text-gray-900 dark:text-zinc-100"
-                            >
-                                {opt.label}
-                            </option>
-                        ))}
-                    </select>
+                    <StageCompleteToggle
+                        orderUuid={order.uuid}
+                        stage="maquila"
+                        isCompleted={isCompleted}
+                        onLocalChange={onLocalChange}
+                    />
                 </div>
 
                 <div className="flex items-center gap-3 mt-3 flex-wrap">
@@ -168,32 +162,39 @@ function OrderCard({
     );
 }
 
-export function MaquilaBoard({ initialOrders }: { initialOrders: Order[] }) {
-    const [orders, setOrders] = useState<Order[]>(initialOrders);
+export function MaquilaBoard({
+    initialOrders,
+    initialCompletedOrderIds
+}: {
+    initialOrders: Order[];
+    initialCompletedOrderIds: string[];
+}) {
+    const [orders] = useState<Order[]>(initialOrders);
+    const [completed, setCompleted] = useState<Set<string>>(
+        () => new Set(initialCompletedOrderIds)
+    );
+    const [tab, setTab] = useState<Tab>('pending');
     const [searchTerm, setSearchTerm] = useState('');
-    const [pending, startTransition] = useTransition();
+    const [pending] = useTransition();
     const [showSummary, setShowSummary] = useState(false);
     const router = useRouter();
 
-    const handleUpdateStatus = (uuid: string, newStatus: OrderStatus) => {
-        if (newStatus !== 'maquila') {
-            setOrders((prev) => prev.filter((o) => o.uuid !== uuid));
-        } else {
-            setOrders((prev) =>
-                prev.map((o) => (o.uuid === uuid ? { ...o, status: newStatus } : o))
-            );
-        }
-        startTransition(async () => {
-            try {
-                await updateStageStatusAction(uuid, newStatus);
-            } catch {
-                alert('Error al actualizar estado');
-                router.refresh();
-            }
+    const handleLocalChange = (uuid: string, next: boolean) => {
+        setCompleted((prev) => {
+            const n = new Set(prev);
+            if (next) n.add(uuid);
+            else n.delete(uuid);
+            return n;
         });
     };
 
-    const filtered = orders.filter((o) => {
+    const tabFiltered = useMemo(() => {
+        if (tab === 'all') return orders;
+        if (tab === 'done') return orders.filter((o) => o.uuid && completed.has(o.uuid));
+        return orders.filter((o) => !(o.uuid && completed.has(o.uuid)));
+    }, [orders, completed, tab]);
+
+    const filtered = tabFiltered.filter((o) => {
         if (!searchTerm) return true;
         const term = searchTerm.toLowerCase();
         return (
@@ -202,6 +203,12 @@ export function MaquilaBoard({ initialOrders }: { initialOrders: Order[] }) {
             o.id?.toLowerCase().includes(term)
         );
     });
+
+    const counts = {
+        pending: orders.filter((o) => !(o.uuid && completed.has(o.uuid))).length,
+        done: orders.filter((o) => o.uuid && completed.has(o.uuid)).length,
+        all: orders.length
+    };
 
     const globalInsumos = aggregateInsumosGlobal(filtered);
 
@@ -214,7 +221,8 @@ export function MaquilaBoard({ initialOrders }: { initialOrders: Order[] }) {
                         Maquila
                     </h2>
                     <p className="text-gray-500 dark:text-zinc-400 text-sm">
-                        Pedidos en maquila: detalle de orden e insumos necesarios.
+                        Cada pedido aparece acá apenas se crea. Marcalo como
+                        completado cuando la maquila esté lista.
                     </p>
                 </div>
                 <button
@@ -224,6 +232,8 @@ export function MaquilaBoard({ initialOrders }: { initialOrders: Order[] }) {
                     <RefreshCw size={20} className={pending ? 'animate-spin' : ''} />
                 </button>
             </div>
+
+            <StageTabBar tab={tab} setTab={setTab} counts={counts} />
 
             <div className="bg-white dark:bg-zinc-900 p-3 rounded-xl shadow-sm mb-4">
                 <div className="relative w-full max-w-md">
@@ -275,9 +285,11 @@ export function MaquilaBoard({ initialOrders }: { initialOrders: Order[] }) {
 
             {filtered.length === 0 ? (
                 <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm p-12 text-center text-gray-500 dark:text-zinc-400">
-                    {orders.length === 0
-                        ? 'No hay pedidos en maquila.'
-                        : 'Ninguna orden coincide con la búsqueda.'}
+                    {tab === 'pending'
+                        ? 'No hay pedidos pendientes de maquila.'
+                        : tab === 'done'
+                            ? 'Todavía no se ha completado ningún pedido en maquila.'
+                            : 'No hay pedidos.'}
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -285,8 +297,8 @@ export function MaquilaBoard({ initialOrders }: { initialOrders: Order[] }) {
                         <OrderCard
                             key={order.uuid || order.id}
                             order={order}
-                            onStatusChange={handleUpdateStatus}
-                            isPending={pending}
+                            isCompleted={!!order.uuid && completed.has(order.uuid)}
+                            onLocalChange={handleLocalChange}
                         />
                     ))}
                 </div>
@@ -301,3 +313,4 @@ export function MaquilaBoard({ initialOrders }: { initialOrders: Order[] }) {
         </div>
     );
 }
+

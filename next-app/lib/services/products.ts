@@ -82,6 +82,8 @@ export interface AdminProduct extends Product {
     isActive: boolean;
     bom: BomItem[];
     codigoCabys: string;
+    /** UUIDs of companies the product is currently assigned to. */
+    companyIds: string[];
 }
 
 const genderToCategory = (gender: ProductRow['gender']): Product['category'] => {
@@ -90,7 +92,10 @@ const genderToCategory = (gender: ProductRow['gender']): Product['category'] => 
     return 'Unisex';
 };
 
-export const mapProductRow = (row: ProductRow): AdminProduct => ({
+export const mapProductRow = (
+    row: ProductRow,
+    companyIds: string[] = []
+): AdminProduct => ({
     id: row.product_code,
     uuid: row.id,
     name: row.name,
@@ -102,7 +107,8 @@ export const mapProductRow = (row: ProductRow): AdminProduct => ({
     fabricType: row.fabric_type || '',
     isActive: row.is_active !== false,
     bom: (row.bom_json as BomItem[]) || [],
-    codigoCabys: row.codigo_cabys || ''
+    codigoCabys: row.codigo_cabys || '',
+    companyIds
 });
 
 export const fetchCatalogForCompany = async (
@@ -169,21 +175,75 @@ export interface ProductInput {
     isActive?: boolean;
     bom?: BomItem[];
     codigoCabys?: string;
+    /**
+     * Companies to assign the product to. When provided, the
+     * company_products junction is reconciled to match — links are
+     * added/removed so the row set equals exactly these companyIds.
+     * Undefined means leave assignments untouched (back-compat).
+     */
+    companyIds?: string[];
 }
 
 const PRODUCT_SELECT =
     'id, product_code, name, description, image_url, product_type, gender, sizes_json, fabric_type, is_active, bom_json, codigo_cabys';
+
+interface ProductRowWithLinks extends ProductRow {
+    links: { company_id: string }[] | null;
+}
 
 export const fetchProducts = async (
     supabase: SupabaseClient
 ): Promise<AdminProduct[]> => {
     const { data, error } = await supabase
         .from('products')
-        .select(PRODUCT_SELECT)
+        .select(`${PRODUCT_SELECT}, links:company_products ( company_id )`)
         .order('product_type', { ascending: true })
         .order('name', { ascending: true });
     if (error) throw error;
-    return (data as ProductRow[]).map(mapProductRow);
+    return (data as unknown as ProductRowWithLinks[]).map((row) =>
+        mapProductRow(row, (row.links || []).map((l) => l.company_id))
+    );
+};
+
+/**
+ * Reconcile the company_products rows for a single product so they
+ * exactly equal `companyIds`. Adds the missing links, deletes the
+ * removed ones. Insert ignores duplicates (the unique constraint on
+ * (company_id, product_id) protects against races).
+ */
+const reconcileCompanyAssignments = async (
+    supabase: SupabaseClient,
+    productUuid: string,
+    companyIds: string[]
+): Promise<void> => {
+    const { data: existing, error: fetchErr } = await supabase
+        .from('company_products')
+        .select('company_id')
+        .eq('product_id', productUuid);
+    if (fetchErr) throw fetchErr;
+    const current = new Set((existing || []).map((r) => r.company_id as string));
+    const wanted = new Set(companyIds);
+    const toAdd = [...wanted].filter((id) => !current.has(id));
+    const toRemove = [...current].filter((id) => !wanted.has(id));
+
+    if (toAdd.length > 0) {
+        const { error } = await supabase.from('company_products').insert(
+            toAdd.map((company_id) => ({
+                company_id,
+                product_id: productUuid,
+                is_active: true
+            }))
+        );
+        if (error && !/duplicate/i.test(error.message)) throw error;
+    }
+    if (toRemove.length > 0) {
+        const { error } = await supabase
+            .from('company_products')
+            .delete()
+            .eq('product_id', productUuid)
+            .in('company_id', toRemove);
+        if (error) throw error;
+    }
 };
 
 export const createProduct = async (
@@ -208,7 +268,11 @@ export const createProduct = async (
         .select(PRODUCT_SELECT)
         .single();
     if (error) throw error;
-    return mapProductRow(data as ProductRow);
+    const row = data as ProductRow;
+    if (input.companyIds) {
+        await reconcileCompanyAssignments(supabase, row.id, input.companyIds);
+    }
+    return mapProductRow(row, input.companyIds || []);
 };
 
 export const updateProduct = async (
@@ -235,7 +299,10 @@ export const updateProduct = async (
         .select(PRODUCT_SELECT)
         .single();
     if (error) throw error;
-    return mapProductRow(data as ProductRow);
+    if (input.companyIds) {
+        await reconcileCompanyAssignments(supabase, uuid, input.companyIds);
+    }
+    return mapProductRow(data as ProductRow, input.companyIds);
 };
 
 export const deleteProduct = async (

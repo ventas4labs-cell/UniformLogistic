@@ -9,6 +9,11 @@ import {
     unacknowledgeStageNotification,
     type Stage
 } from '@/lib/services/stage-notifications';
+import {
+    markStageComplete,
+    unmarkStageComplete,
+    type StageKey
+} from '@/lib/services/stage-completions';
 
 // Stage-board status updates revalidate every stage page so an order
 // moving from corte → maquila disappears from one board and appears on
@@ -65,4 +70,32 @@ export async function unacknowledgeStageNotificationAction(notificationId: strin
     const supabase = await createClient();
     await unacknowledgeStageNotification(supabase, notificationId);
     revalidatePath('/admin/orders');
+}
+
+// ─── Per-stage completion (new parallel-stage workflow) ──────────────
+// Each operations board marks "this stage is done for this order"
+// independently of the others. /admin/orders aggregates the four
+// stages into a single completion strip per order.
+
+export async function markStageCompleteAction(
+    orderUuid: string,
+    stage: StageKey,
+    notes?: string
+) {
+    const supabase = await createClient();
+    const {
+        data: { user }
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error('No autenticado');
+    await markStageComplete(supabase, orderUuid, stage, user.id, notes);
+    for (const p of STAGE_PATHS) revalidatePath(p);
+}
+
+export async function unmarkStageCompleteAction(
+    orderUuid: string,
+    stage: StageKey
+) {
+    const supabase = await createClient();
+    await unmarkStageComplete(supabase, orderUuid, stage);
+    for (const p of STAGE_PATHS) revalidatePath(p);
 }

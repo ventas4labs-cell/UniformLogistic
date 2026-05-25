@@ -31,10 +31,11 @@ import {
     aggregateInsumosGlobal,
 } from '@/lib/stage-utils';
 import {
-    updateOrderStatusAction,
     reportMissingInsumoAction,
     toggleInsumoCompleteAction,
 } from '@/app/(admin)/admin/operador/actions';
+import { StageCompleteToggle } from '@/components/admin/stage-complete-toggle';
+import { StageTabBar, type StageTab } from '@/components/admin/stage-tab-bar';
 
 const completionKey = (orderId: string, insumoName: string) =>
     `${orderId}|${insumoName}`;
@@ -172,14 +173,14 @@ function ImagePreviewModal({
 
 function OrderCard({
     order,
-    onStatusChange,
-    isPending,
+    isCompleted,
+    onLocalCompletionChange,
     completedInsumos,
     onToggleInsumo,
 }: {
     order: Order;
-    onStatusChange: (uuid: string, status: OrderStatus) => void;
-    isPending: boolean;
+    isCompleted: boolean;
+    onLocalCompletionChange: (uuid: string, next: boolean) => void;
     completedInsumos: Set<string>;
     onToggleInsumo: (orderId: string, insumoName: string, completed: boolean) => void;
 }) {
@@ -187,13 +188,17 @@ function OrderCard({
     const [reportingInsumo, setReportingInsumo] = useState<string | null>(null);
     const [sentReports, setSentReports] = useState<Set<string>>(new Set());
     const [previewImage, setPreviewImage] = useState<{ src: string; alt: string } | null>(null);
-    const status = (order.status as OrderStatus) || 'pending';
-    const statusOption = ORDER_STATUS_OPTIONS.find((s) => s.value === status);
     const insumos = aggregateInsumos(order.items);
     const totalPieces = order.items.reduce((s, i) => s + i.quantity, 0);
 
     return (
-        <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm border border-gray-200 dark:border-zinc-800 overflow-hidden">
+        <div
+            className={`bg-white dark:bg-zinc-900 rounded-xl shadow-sm border overflow-hidden ${
+                isCompleted
+                    ? 'border-green-200 dark:border-green-900/40'
+                    : 'border-gray-200 dark:border-zinc-800'
+            }`}
+        >
             <div className="p-4">
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -212,24 +217,12 @@ function OrderCard({
                             )}
                         </p>
                     </div>
-                    <select
-                        value={status}
-                        onChange={(e) =>
-                            order.uuid && onStatusChange(order.uuid, e.target.value as OrderStatus)
-                        }
-                        disabled={!order.uuid || isPending}
-                        className={`py-1 px-3 rounded-full text-xs font-bold border-none outline-none cursor-pointer shrink-0 ${statusOption?.color || 'bg-gray-100 text-gray-800'}`}
-                    >
-                        {ORDER_STATUS_OPTIONS.map((opt) => (
-                            <option
-                                key={opt.value}
-                                value={opt.value}
-                                className="bg-white dark:bg-zinc-900 text-gray-900 dark:text-zinc-100"
-                            >
-                                {opt.label}
-                            </option>
-                        ))}
-                    </select>
+                    <StageCompleteToggle
+                        orderUuid={order.uuid}
+                        stage="bodega"
+                        isCompleted={isCompleted}
+                        onLocalChange={onLocalCompletionChange}
+                    />
                 </div>
 
                 <div className="flex items-center gap-3 mt-3">
@@ -444,31 +437,32 @@ function OrderCard({
 export function OperatorBoard({
     initialOrders,
     initialCompletions,
+    initialBodegaCompletedOrderIds = []
 }: {
     initialOrders: Order[];
     initialCompletions: InsumoCompletion[];
+    initialBodegaCompletedOrderIds?: string[];
 }) {
-    const [orders, setOrders] = useState<Order[]>(initialOrders);
+    const [orders] = useState<Order[]>(initialOrders);
     const [completedInsumos, setCompletedInsumos] = useState<Set<string>>(
         () => new Set(initialCompletions.map((c) => completionKey(c.orderId, c.insumoName)))
     );
+    const [bodegaCompleted, setBodegaCompleted] = useState<Set<string>>(
+        () => new Set(initialBodegaCompletedOrderIds)
+    );
+    const [tab, setTab] = useState<StageTab>('pending');
     const [searchTerm, setSearchTerm] = useState('');
     const [activeFilter, setActiveFilter] = useState<OrderStatus | 'all'>('all');
     const [showGlobalInsumos, setShowGlobalInsumos] = useState(false);
     const [pending, startTransition] = useTransition();
     const router = useRouter();
 
-    const handleUpdateStatus = (uuid: string, newStatus: OrderStatus) => {
-        setOrders((prev) =>
-            prev.map((o) => (o.uuid === uuid ? { ...o, status: newStatus } : o))
-        );
-        startTransition(async () => {
-            try {
-                await updateOrderStatusAction(uuid, newStatus);
-            } catch {
-                alert('Error al actualizar estado');
-                router.refresh();
-            }
+    const handleLocalCompletionChange = (uuid: string, next: boolean) => {
+        setBodegaCompleted((prev) => {
+            const n = new Set(prev);
+            if (next) n.add(uuid);
+            else n.delete(uuid);
+            return n;
         });
     };
 
@@ -499,7 +493,12 @@ export function OperatorBoard({
         });
     };
 
-    const filtered = orders.filter((o) => {
+    const tabFiltered = orders.filter((o) => {
+        if (tab === 'all') return true;
+        const done = !!o.uuid && bodegaCompleted.has(o.uuid);
+        return tab === 'done' ? done : !done;
+    });
+    const filtered = tabFiltered.filter((o) => {
         if (activeFilter !== 'all' && o.status !== activeFilter) return false;
         if (!searchTerm) return true;
         const term = searchTerm.toLowerCase();
@@ -509,6 +508,12 @@ export function OperatorBoard({
             o.id?.toLowerCase().includes(term)
         );
     });
+
+    const tabCounts = {
+        pending: orders.filter((o) => !(o.uuid && bodegaCompleted.has(o.uuid))).length,
+        done: orders.filter((o) => o.uuid && bodegaCompleted.has(o.uuid)).length,
+        all: orders.length
+    };
 
     const statusCounts = orders.reduce(
         (acc, o) => {
@@ -544,6 +549,8 @@ export function OperatorBoard({
                     <RefreshCw size={20} className={pending ? 'animate-spin' : ''} />
                 </button>
             </div>
+
+            <StageTabBar tab={tab} setTab={setTab} counts={tabCounts} />
 
             {/* Status filter chips */}
             <div className="flex flex-wrap gap-2 mb-4">
@@ -646,8 +653,8 @@ export function OperatorBoard({
                         <OrderCard
                             key={order.uuid || order.id}
                             order={order}
-                            onStatusChange={handleUpdateStatus}
-                            isPending={pending}
+                            isCompleted={!!order.uuid && bodegaCompleted.has(order.uuid)}
+                            onLocalCompletionChange={handleLocalCompletionChange}
                             completedInsumos={completedInsumos}
                             onToggleInsumo={handleToggleInsumo}
                         />

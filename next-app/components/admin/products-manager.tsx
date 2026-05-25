@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Edit2, Trash2, Loader2, X, Package, Upload, CheckCircle2, ImageIcon } from 'lucide-react';
 import type { AdminProduct, ProductInput, BomItem } from '@/lib/services/products';
+import type { Company } from '@/lib/services/companies';
 import {
     createProductAction,
     updateProductAction,
@@ -25,7 +26,8 @@ const emptyForm: ProductInput = {
     fabricType: '',
     isActive: true,
     bom: [],
-    codigoCabys: ''
+    codigoCabys: '',
+    companyIds: []
 };
 
 const parseList = (input: string): string[] =>
@@ -106,7 +108,13 @@ function DecimalInput({
     );
 }
 
-export function ProductsManager({ initialProducts }: { initialProducts: AdminProduct[] }) {
+export function ProductsManager({
+    initialProducts,
+    companies
+}: {
+    initialProducts: AdminProduct[];
+    companies: Company[];
+}) {
     const router = useRouter();
     const [pending, startTransition] = useTransition();
     const [editing, setEditing] = useState<AdminProduct | null>(null);
@@ -245,7 +253,8 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
             fabricType: p.fabricType,
             isActive: p.isActive,
             bom: p.bom || [],
-            codigoCabys: p.codigoCabys || ''
+            codigoCabys: p.codigoCabys || '',
+            companyIds: p.companyIds || []
         });
         setSizesText(sizesTextFromForm(p.sizes));
         // Auto-expand the override panel for any BOM line that already
@@ -627,6 +636,45 @@ export function ProductsManager({ initialProducts }: { initialProducts: AdminPro
                                         BCCR
                                     </a>
                                     .
+                                </p>
+                            </Field>
+
+                            <Field label="Empresas asignadas">
+                                {companies.length === 0 ? (
+                                    <p className="text-xs text-gray-500 dark:text-zinc-400 italic">
+                                        No hay empresas. Crea una en la pestaña &ldquo;Empresas&rdquo;.
+                                    </p>
+                                ) : (
+                                    <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 max-h-44 overflow-y-auto space-y-1">
+                                        {companies.map((c) => {
+                                            const checked = (form.companyIds || []).includes(c.id);
+                                            return (
+                                                <label
+                                                    key={c.id}
+                                                    className="flex items-center gap-2 text-sm text-gray-700 dark:text-zinc-300 px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-zinc-800 cursor-pointer"
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={checked}
+                                                        onChange={(e) => {
+                                                            const set = new Set(form.companyIds || []);
+                                                            if (e.target.checked) set.add(c.id);
+                                                            else set.delete(c.id);
+                                                            setForm({
+                                                                ...form,
+                                                                companyIds: Array.from(set)
+                                                            });
+                                                        }}
+                                                        className="w-4 h-4 accent-orange-600"
+                                                    />
+                                                    <span className="font-medium">{c.name}</span>
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                                <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
+                                    Solo las empresas seleccionadas verán este producto en su catálogo.
                                 </p>
                             </Field>
 

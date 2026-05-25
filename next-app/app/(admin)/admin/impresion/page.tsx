@@ -1,10 +1,19 @@
 import { createClient } from '@/utils/supabase/server';
 import { fetchAllOrders } from '@/lib/services/orders';
+import { fetchStageCompletions } from '@/lib/services/stage-completions';
 import { ImpresionBoard } from '@/components/admin/impresion-board';
 
 export default async function ImpresionPage() {
     const supabase = await createClient();
-    const all = await fetchAllOrders(supabase);
-    const orders = all.filter((o) => o.status === 'impresion');
-    return <ImpresionBoard initialOrders={orders} />;
+    const [all, completed] = await Promise.all([
+        fetchAllOrders(supabase),
+        fetchStageCompletions(supabase, 'impresion')
+    ]);
+    const orders = all.filter((o) => o.status !== 'cancelled');
+    return (
+        <ImpresionBoard
+            initialOrders={orders}
+            initialCompletedOrderIds={Array.from(completed)}
+        />
+    );
 }

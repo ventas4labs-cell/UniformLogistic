@@ -18,6 +18,8 @@ import {
     acknowledgeStageNotificationAction,
     unacknowledgeStageNotificationAction
 } from '@/app/(admin)/admin/_stage-actions';
+import { StageCompletionStrip } from '@/components/admin/stage-completion-strip';
+import type { StageKey } from '@/lib/services/stage-completions';
 import { FacturaModal } from '@/components/admin/factura-modal';
 import { OrderEditModal } from '@/components/admin/order-edit-modal';
 import { useRouter } from 'next/navigation';
@@ -26,12 +28,14 @@ export function OrdersTable({
     initialOrders,
     products,
     reports: initialReports,
-    stageNotifications: initialStageNotifications
+    stageNotifications: initialStageNotifications,
+    initialStageCompletions = []
 }: {
     initialOrders: Order[];
     products: AdminProduct[];
     reports: MissingInsumoReport[];
     stageNotifications: StageNotification[];
+    initialStageCompletions?: { orderId: string; stage: StageKey; completedAt: string }[];
 }) {
     const [orders, setOrders] = useState<Order[]>(initialOrders);
     const [reports, setReports] = useState<MissingInsumoReport[]>(initialReports);
@@ -63,6 +67,19 @@ export function OrdersTable({
         const arr = stageNotifsByOrder.get(n.orderId);
         if (arr) arr.push(n);
         else stageNotifsByOrder.set(n.orderId, [n]);
+    }
+
+    // order_id → Set<StageKey of completed stages>. Drives the per-card
+    // "Bodega · Corte · Maquila · Impresión" strip. Built once per
+    // render — initialStageCompletions changes only on page refresh.
+    const completedStagesByOrder = new Map<string, Set<StageKey>>();
+    for (const c of initialStageCompletions) {
+        let s = completedStagesByOrder.get(c.orderId);
+        if (!s) {
+            s = new Set();
+            completedStagesByOrder.set(c.orderId, s);
+        }
+        s.add(c.stage);
     }
 
     // Bell badge count combines unresolved missing-insumo reports +
@@ -377,6 +394,21 @@ export function OrdersTable({
                                                 PO: {order.purchaseOrder}
                                             </span>
                                         )}
+                                    </div>
+
+                                    {/* Stage completion strip — Bodega · Corte ·
+                                        Maquila · Impresión with per-stage ✓ marks.
+                                        Read-only here; stages mark themselves
+                                        complete from their own boards. */}
+                                    <div className="flex flex-wrap gap-1.5">
+                                        <StageCompletionStrip
+                                            completed={
+                                                (order.uuid &&
+                                                    completedStagesByOrder.get(order.uuid)) ||
+                                                new Set()
+                                            }
+                                            compact
+                                        />
                                     </div>
 
                                     {/* Notes */}
