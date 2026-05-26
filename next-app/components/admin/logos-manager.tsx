@@ -29,6 +29,7 @@ const emptyForm: LogoInput = {
     name: '',
     imageUrl: '',
     category: 'bordado',
+    size: '',
     notes: '',
     isActive: true,
     companyIds: []
@@ -102,6 +103,7 @@ export function LogosManager({
             name: l.name,
             imageUrl: l.imageUrl,
             category: l.category,
+            size: l.size,
             notes: l.notes,
             isActive: l.isActive,
             companyIds: l.companyIds || []
@@ -166,6 +168,7 @@ export function LogosManager({
                             <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400 w-16"></th>
                             <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Nombre</th>
                             <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Categoría</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Tamaño</th>
                             <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Empresas</th>
                             <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Estado</th>
                             <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400 text-right">Acciones</th>
@@ -174,7 +177,7 @@ export function LogosManager({
                     <tbody className="divide-y divide-gray-100 dark:divide-zinc-800">
                         {initialLogos.length === 0 ? (
                             <tr>
-                                <td colSpan={6} className="p-8 text-center text-gray-500 dark:text-zinc-400">
+                                <td colSpan={7} className="p-8 text-center text-gray-500 dark:text-zinc-400">
                                     <Sparkles size={32} className="mx-auto mb-2 opacity-30" />
                                     Sin logos registrados.
                                 </td>
@@ -215,6 +218,9 @@ export function LogosManager({
                                             {categoryIcon(l.category)}
                                             {LOGO_CATEGORY_LABELS[l.category]}
                                         </span>
+                                    </td>
+                                    <td className="p-4 text-gray-600 dark:text-zinc-400 text-sm font-mono">
+                                        {l.size || '—'}
                                     </td>
                                     <td className="p-4 text-gray-600 dark:text-zinc-400 text-sm">
                                         {l.companyIds.length === 0 ? (
@@ -334,6 +340,22 @@ export function LogosManager({
                                     </select>
                                 </Field>
                             </div>
+
+                            <Field label="Tamaño">
+                                <input
+                                    type="text"
+                                    value={form.size || ''}
+                                    onChange={(e) =>
+                                        setForm({ ...form, size: e.target.value })
+                                    }
+                                    placeholder='ej. 10 × 6 cm, 3" diámetro'
+                                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none"
+                                />
+                                <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
+                                    Tamaño físico del logo aplicado. Texto libre porque
+                                    los talleres usan distintas unidades y convenciones.
+                                </p>
+                            </Field>
 
                             <Field label="Imagen del logo">
                                 <label

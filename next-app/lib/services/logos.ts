@@ -14,6 +14,12 @@ export interface Logo {
     name: string;
     imageUrl: string;
     category: LogoCategory;
+    /**
+     * Free-text physical size (e.g. "10 × 6 cm", "3\" diámetro",
+     * "8 cm ancho"). Stored as text rather than width/height numbers
+     * because shops mix units and conventions.
+     */
+    size: string;
     notes: string;
     isActive: boolean;
     createdAt: string;
@@ -25,6 +31,7 @@ export interface LogoInput {
     name: string;
     imageUrl: string;
     category: LogoCategory;
+    size?: string;
     notes?: string;
     isActive?: boolean;
     /** Reconciled against company_logos on save when provided. */
@@ -36,6 +43,7 @@ interface LogoRow {
     name: string;
     image_url: string | null;
     category: LogoCategory;
+    size: string | null;
     notes: string | null;
     is_active: boolean | null;
     created_at: string;
@@ -50,13 +58,14 @@ const mapRow = (r: LogoRow, companyIds: string[] = []): Logo => ({
     name: r.name,
     imageUrl: r.image_url || '',
     category: r.category,
+    size: r.size || '',
     notes: r.notes || '',
     isActive: r.is_active !== false,
     createdAt: r.created_at,
     companyIds
 });
 
-const SELECT = 'id, name, image_url, category, notes, is_active, created_at';
+const SELECT = 'id, name, image_url, category, size, notes, is_active, created_at';
 
 export const fetchLogos = async (
     supabase: SupabaseClient
@@ -115,6 +124,7 @@ export const createLogo = async (
             name: input.name,
             image_url: input.imageUrl || null,
             category: input.category,
+            size: input.size?.trim() || null,
             notes: input.notes || null,
             is_active: input.isActive ?? true
         })
@@ -139,6 +149,7 @@ export const updateLogo = async (
             name: input.name,
             image_url: input.imageUrl || null,
             category: input.category,
+            size: input.size?.trim() || null,
             notes: input.notes || null,
             is_active: input.isActive ?? true
         })
