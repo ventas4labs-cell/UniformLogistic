@@ -2,22 +2,26 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Users, AlertCircle, Plus, X, KeyRound, Edit2 } from 'lucide-react';
+import { Loader2, Users, AlertCircle, Plus, X, KeyRound, Edit2, Trash2 } from 'lucide-react';
 import type { Company } from '@/lib/services/companies';
 import type { DirectoryUser } from '@/lib/services/companyUsers';
 import {
     assignUserAction,
     createUserAction,
     updateUserAction,
-    setUserPasswordAction
+    setUserPasswordAction,
+    deleteUserAction
 } from '@/app/(admin)/admin/users/actions';
 
 interface Props {
     initialUsers: DirectoryUser[];
     companies: Company[];
+    // Admin's own user id. Used to disable the delete button on the
+    // admin's own row so they can't lock themselves out.
+    currentUserId: string | null;
 }
 
-export function UsersManager({ initialUsers, companies }: Props) {
+export function UsersManager({ initialUsers, companies, currentUserId }: Props) {
     const router = useRouter();
     const [users, setUsers] = useState<DirectoryUser[]>(initialUsers);
     const [savingUserId, setSavingUserId] = useState<string | null>(null);
@@ -37,6 +41,34 @@ export function UsersManager({ initialUsers, companies }: Props) {
     const [newPassword, setNewPassword] = useState('');
     const [resetting, setResetting] = useState(false);
     const [resetError, setResetError] = useState<string | null>(null);
+
+    const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+
+    const handleDelete = (u: DirectoryUser) => {
+        if (u.userId === currentUserId) {
+            alert('No podés eliminar tu propia cuenta.');
+            return;
+        }
+        const labelParts = [u.fullName, u.email].filter(Boolean);
+        const label = labelParts.join(' · ') || 'este usuario';
+        const ok = confirm(
+            `¿Eliminar ${label}? Esta acción borra el acceso, los enlaces a la empresa y cualquier asignación de estación. No se puede deshacer.`
+        );
+        if (!ok) return;
+        setDeletingUserId(u.userId);
+        // Optimistic remove from the table.
+        setUsers((prev) => prev.filter((x) => x.userId !== u.userId));
+        startTransition(async () => {
+            const res = await deleteUserAction(u.userId);
+            setDeletingUserId(null);
+            if (res.error) {
+                alert(res.error);
+                router.refresh();
+            } else {
+                router.refresh();
+            }
+        });
+    };
 
     const handleAssign = (userId: string, companyId: string) => {
         setSavingUserId(userId);
@@ -218,6 +250,25 @@ export function UsersManager({ initialUsers, companies }: Props) {
                                                 title="Cambiar contraseña"
                                             >
                                                 <KeyRound size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(u)}
+                                                disabled={
+                                                    u.userId === currentUserId ||
+                                                    deletingUserId === u.userId
+                                                }
+                                                className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 dark:hover:text-red-400 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed"
+                                                title={
+                                                    u.userId === currentUserId
+                                                        ? 'No podés eliminar tu propia cuenta'
+                                                        : 'Eliminar usuario'
+                                                }
+                                            >
+                                                {deletingUserId === u.userId ? (
+                                                    <Loader2 size={16} className="animate-spin" />
+                                                ) : (
+                                                    <Trash2 size={16} />
+                                                )}
                                             </button>
                                         </div>
                                     </td>

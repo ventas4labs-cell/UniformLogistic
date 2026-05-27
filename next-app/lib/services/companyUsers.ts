@@ -109,3 +109,17 @@ export const setUserPassword = async (
     });
     if (error) throw error;
 };
+
+/**
+ * Permanently delete a customer-side user. The auth.users row goes
+ * via the service-role admin API; FK cascades from auth.users clean
+ * up company_users (and station_users + station_assignments if the
+ * user is also a station account).
+ */
+export const deleteUserAccount = async (
+    serviceSupabase: SupabaseClient,
+    userId: string
+): Promise<void> => {
+    const { error } = await serviceSupabase.auth.admin.deleteUser(userId);
+    if (error) throw error;
+};
