@@ -4,7 +4,21 @@ export type Gender = 'Men' | 'Women';
 export interface Product {
     id: string;
     name: string;
+    /**
+     * Size-shape hint. Drives the size UI (men/women lists for shirts,
+     * waist/inseam for pants) and the PDF section split. Stored as the
+     * tight enum on the DB; the human-readable label lives in
+     * `typeLabel`.
+     */
     type: ProductType;
+    /**
+     * Free-text product category shown in admin lists, the catalog
+     * card, and PDF section headers. Lets admin name things "Chaleco",
+     * "Gorra", "Polo", etc. without changing the underlying size-shape.
+     * Falls back to "Camisa" / "Pantalón" derived from `type` when
+     * empty (legacy rows).
+     */
+    typeLabel: string;
     image: string;
     description: string;
     category: 'Men' | 'Women' | 'Unisex';

@@ -78,6 +78,7 @@ export interface ProductRow {
     description: string | null;
     image_url: string | null;
     product_type: 'shirt' | 'pant';
+    type_label: string | null;
     gender: 'men' | 'women' | 'unisex';
     sizes_json: Product['sizes'] | null;
     fabric_type: string | null;
@@ -85,6 +86,12 @@ export interface ProductRow {
     bom_json: BomItem[] | null;
     codigo_cabys: string | null;
 }
+
+// Legacy rows pre-migration may have type_label = null. Derive a
+// sensible default from the size-shape enum so the UI never renders
+// an empty type pill.
+const defaultTypeLabel = (productType: 'shirt' | 'pant'): string =>
+    productType === 'shirt' ? 'Camisa' : 'Pantalón';
 
 export interface AdminProduct extends Product {
     uuid: string;
@@ -110,6 +117,7 @@ export const mapProductRow = (
     uuid: row.id,
     name: row.name,
     type: row.product_type as ProductType,
+    typeLabel: row.type_label?.trim() || defaultTypeLabel(row.product_type),
     image: row.image_url || '',
     description: row.description || '',
     category: genderToCategory(row.gender),
@@ -130,7 +138,7 @@ export const fetchCatalogForCompany = async (
         .select(`
             product:products (
                 id, product_code, name, description, image_url,
-                product_type, gender, sizes_json, fabric_type, is_active, bom_json, codigo_cabys
+                product_type, type_label, gender, sizes_json, fabric_type, is_active, bom_json, codigo_cabys
             )
         `)
         .eq('company_id', companyId)
@@ -179,6 +187,12 @@ export interface ProductInput {
     description: string;
     imageUrl: string;
     productType: ProductType;
+    /**
+     * Free-text "Tipo" the admin typed (e.g. "Chaleco", "Polo",
+     * "Pantalón cargo"). Optional — when blank, mapProductRow falls
+     * back to "Camisa" / "Pantalón" based on productType.
+     */
+    typeLabel?: string;
     gender: 'men' | 'women' | 'unisex';
     sizes: Product['sizes'];
     fabricType?: string;
@@ -195,7 +209,7 @@ export interface ProductInput {
 }
 
 const PRODUCT_SELECT =
-    'id, product_code, name, description, image_url, product_type, gender, sizes_json, fabric_type, is_active, bom_json, codigo_cabys';
+    'id, product_code, name, description, image_url, product_type, type_label, gender, sizes_json, fabric_type, is_active, bom_json, codigo_cabys';
 
 interface ProductRowWithLinks extends ProductRow {
     links: { company_id: string }[] | null;
@@ -268,6 +282,8 @@ export const createProduct = async (
             description: input.description,
             image_url: input.imageUrl || null,
             product_type: input.productType,
+            type_label:
+                input.typeLabel?.trim() || defaultTypeLabel(input.productType),
             gender: input.gender,
             sizes_json: input.sizes,
             fabric_type: input.fabricType || null,
@@ -298,6 +314,8 @@ export const updateProduct = async (
             description: input.description,
             image_url: input.imageUrl || null,
             product_type: input.productType,
+            type_label:
+                input.typeLabel?.trim() || defaultTypeLabel(input.productType),
             gender: input.gender,
             sizes_json: input.sizes,
             fabric_type: input.fabricType || null,

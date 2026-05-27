@@ -35,6 +35,7 @@ const emptyForm: ProductInput = {
     description: '',
     imageUrl: '',
     productType: 'shirt',
+    typeLabel: '',
     gender: 'unisex',
     sizes: { men: [], women: [], waist: [], inseam: [] },
     fabricType: '',
@@ -265,6 +266,7 @@ export function ProductsManager({
             description: p.description,
             imageUrl: p.image,
             productType: p.type,
+            typeLabel: p.typeLabel || '',
             gender: p.category === 'Men' ? 'men' : p.category === 'Women' ? 'women' : 'unisex',
             sizes: p.sizes,
             fabricType: p.fabricType,
@@ -391,7 +393,7 @@ export function ProductsManager({
                                         <span
                                             className={`text-xs font-bold px-2 py-1 rounded-full ${p.type === 'shirt' ? 'bg-blue-100 dark:bg-blue-950/50 text-blue-800 dark:text-blue-300' : 'bg-purple-100 dark:bg-purple-950/50 text-purple-800 dark:text-purple-300'}`}
                                         >
-                                            {p.type === 'shirt' ? 'Camisa' : 'Pantalón'}
+                                            {p.typeLabel || (p.type === 'shirt' ? 'Camisa' : 'Pantalón')}
                                         </span>
                                     </td>
                                     <td className="p-4 text-gray-600 dark:text-zinc-400 text-sm">{p.category}</td>
@@ -518,16 +520,37 @@ export function ProductsManager({
                             </Field>
                             <div className="grid grid-cols-3 gap-3">
                                 <Field label="Tipo *">
-                                    <select
-                                        value={form.productType}
+                                    <input
+                                        type="text"
+                                        value={form.typeLabel || ''}
                                         onChange={(e) =>
-                                            setForm({ ...form, productType: e.target.value as 'shirt' | 'pant' })
+                                            setForm({ ...form, typeLabel: e.target.value })
                                         }
+                                        placeholder="ej. Camisa, Chaleco, Polo, Pantalón cargo"
                                         className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none"
-                                    >
-                                        <option value="shirt">Camisa</option>
-                                        <option value="pant">Pantalón</option>
-                                    </select>
+                                        required
+                                    />
+                                    {/* Size-shape selector — drives whether the
+                                        Tallas section shows shirt-style (S, M,
+                                        L) or pant-style (cintura/inseam) inputs.
+                                        Hidden under a small label so it doesn't
+                                        compete with the free-text Tipo. */}
+                                    <label className="mt-1.5 flex items-center gap-2 text-[11px] text-gray-500 dark:text-zinc-500">
+                                        <span className="font-semibold">Tallaje:</span>
+                                        <select
+                                            value={form.productType}
+                                            onChange={(e) =>
+                                                setForm({
+                                                    ...form,
+                                                    productType: e.target.value as 'shirt' | 'pant'
+                                                })
+                                            }
+                                            className="bg-transparent border-b border-dotted border-gray-400 dark:border-zinc-600 outline-none focus:border-orange-500 px-0.5"
+                                        >
+                                            <option value="shirt">Camisa (S, M, L…)</option>
+                                            <option value="pant">Pantalón (cintura)</option>
+                                        </select>
+                                    </label>
                                 </Field>
                                 <Field label="Género *">
                                     <select
