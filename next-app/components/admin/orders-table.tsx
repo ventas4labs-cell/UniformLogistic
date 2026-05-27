@@ -504,6 +504,7 @@ export function OrdersTable({
                                     {order.uuid && stationUsers.length > 0 && (
                                         <OrderAssignmentsPanel
                                             orderUuid={order.uuid}
+                                            orderRef={order.id}
                                             stationUsers={stationUsers}
                                             assignedIds={
                                                 assignmentsByOrder.get(order.uuid) || new Set()
