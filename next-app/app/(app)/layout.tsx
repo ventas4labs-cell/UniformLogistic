@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/utils/supabase/server';
 import { CartProvider } from '@/components/cart-provider';
 import { TopNav } from '@/components/top-nav';
+import { fetchStationUser } from '@/lib/services/station-users';
 
 // Hard-coded admin gate — same value used in app/(app)/home/page.tsx and the
 // admin-route protection. Lives here too so the customer-shell TopNav can
@@ -15,6 +16,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     if (!user) redirect('/login');
 
     const isAdmin = (user.email || '').trim().toLowerCase() === ADMIN_EMAIL;
+
+    // External station users (corte / maquila / bordado / …) get the
+    // restricted /station shell — they shouldn't see the customer
+    // catalog or any other company data. Admin is exempted.
+    if (!isAdmin) {
+        const station = await fetchStationUser(supabase, user.id);
+        if (station) redirect('/station');
+    }
 
     return (
         <CartProvider>

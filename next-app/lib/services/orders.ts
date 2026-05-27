@@ -334,6 +334,27 @@ export const fetchAllOrders = async (
     return orders;
 };
 
+/**
+ * Load a specific set of orders by uuid. Used by the station shell to
+ * load only the orders assigned to the logged-in station user (the
+ * id list comes from station_assignments).
+ */
+export const fetchOrdersByIds = async (
+    supabase: SupabaseClient,
+    orderIds: string[]
+): Promise<Order[]> => {
+    if (orderIds.length === 0) return [];
+    const { data, error } = await supabase
+        .from('orders')
+        .select(NESTED_SELECT)
+        .in('id', orderIds)
+        .order('created_at', { ascending: false });
+    if (error) throw error;
+    const orders = ((data || []) as unknown as RawOrderRow[]).map(mapRowToOrder);
+    await hydrateOrphanItems(supabase, orders);
+    return orders;
+};
+
 export const updateOrderStatus = async (
     supabase: SupabaseClient,
     orderUuid: string,

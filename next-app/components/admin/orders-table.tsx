@@ -20,6 +20,9 @@ import {
 } from '@/app/(admin)/admin/_stage-actions';
 import { StageControlPanel } from '@/components/admin/stage-control-panel';
 import { STAGE_ORDER, type StageKey } from '@/lib/services/stage-completions';
+import { OrderAssignmentsPanel } from '@/components/admin/order-assignments-panel';
+import type { StationUser } from '@/lib/services/station-users';
+import type { StationAssignment } from '@/lib/services/station-assignments';
 import { FacturaModal } from '@/components/admin/factura-modal';
 import { OrderEditModal } from '@/components/admin/order-edit-modal';
 import { useRouter } from 'next/navigation';
@@ -29,13 +32,17 @@ export function OrdersTable({
     products,
     reports: initialReports,
     stageNotifications: initialStageNotifications,
-    initialStageCompletions = []
+    initialStageCompletions = [],
+    stationUsers = [],
+    initialAssignments = []
 }: {
     initialOrders: Order[];
     products: AdminProduct[];
     reports: MissingInsumoReport[];
     stageNotifications: StageNotification[];
     initialStageCompletions?: { orderId: string; stage: StageKey; completedAt: string }[];
+    stationUsers?: StationUser[];
+    initialAssignments?: StationAssignment[];
 }) {
     const [orders, setOrders] = useState<Order[]>(initialOrders);
     const [reports, setReports] = useState<MissingInsumoReport[]>(initialReports);
@@ -64,6 +71,36 @@ export function OrdersTable({
         }
         return m;
     });
+
+    // Per-order map of stationUserId → assignment. Mutable so the
+    // assignment panel can flip locally before the server action
+    // round-trips. Same pattern as completedAtByOrder above.
+    const [assignmentsByOrder, setAssignmentsByOrder] = useState<
+        Map<string, Set<string>>
+    >(() => {
+        const m = new Map<string, Set<string>>();
+        for (const a of initialAssignments) {
+            const cur = m.get(a.orderId) || new Set<string>();
+            cur.add(a.stationUserId);
+            m.set(a.orderId, cur);
+        }
+        return m;
+    });
+
+    const handleAssignmentChange = (
+        orderId: string,
+        stationUserId: string,
+        assigned: boolean
+    ) => {
+        setAssignmentsByOrder((prev) => {
+            const next = new Map(prev);
+            const cur = new Set(next.get(orderId) || []);
+            if (assigned) cur.add(stationUserId);
+            else cur.delete(stationUserId);
+            next.set(orderId, cur);
+            return next;
+        });
+    };
 
     const handleStageToggle = (
         uuid: string,
@@ -458,6 +495,22 @@ export function OrdersTable({
                                             onLocalToggle={handleStageToggle}
                                         />
                                     </div>
+
+                                    {/* Station-user assignments — collapsed by
+                                        default. Shows the list of external
+                                        stations (corte/maquila/bordado/…) the
+                                        admin has assigned this order to and
+                                        lets them add/remove. */}
+                                    {order.uuid && stationUsers.length > 0 && (
+                                        <OrderAssignmentsPanel
+                                            orderUuid={order.uuid}
+                                            stationUsers={stationUsers}
+                                            assignedIds={
+                                                assignmentsByOrder.get(order.uuid) || new Set()
+                                            }
+                                            onLocalChange={handleAssignmentChange}
+                                        />
+                                    )}
 
                                     {/* Notes */}
                                     {order.notes && (

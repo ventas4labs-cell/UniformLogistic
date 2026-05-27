@@ -14,6 +14,9 @@ import {
     unmarkStageComplete,
     type StageKey
 } from '@/lib/services/stage-completions';
+import { fetchStationUser } from '@/lib/services/station-users';
+import { isStationAssignedToOrder } from '@/lib/services/station-assignments';
+import { isAdminEmail } from '@/lib/admin-acting-company';
 
 // Stage-board status updates revalidate every stage page so an order
 // moving from corte → maquila disappears from one board and appears on
@@ -80,6 +83,27 @@ export async function unacknowledgeStageNotificationAction(notificationId: strin
 // independently of the others. /admin/orders aggregates the four
 // stages into a single completion strip per order.
 
+/**
+ * Returns true if the caller is allowed to mutate the (order, stage)
+ * completion. Admin can do anything. A station user can only toggle
+ * the completion for THEIR assigned stage on orders THEY're assigned
+ * to. Anyone else is rejected.
+ */
+async function authorizeStageMutation(
+    supabase: Awaited<ReturnType<typeof createClient>>,
+    userId: string,
+    userEmail: string | null | undefined,
+    orderUuid: string,
+    stage: StageKey
+): Promise<boolean> {
+    if (isAdminEmail(userEmail)) return true;
+    const station = await fetchStationUser(supabase, userId);
+    if (!station) return false;
+    if (!station.isActive) return false;
+    if (station.stage !== stage) return false;
+    return isStationAssignedToOrder(supabase, userId, orderUuid);
+}
+
 export async function markStageCompleteAction(
     orderUuid: string,
     stage: StageKey,
@@ -90,8 +114,12 @@ export async function markStageCompleteAction(
         data: { user }
     } = await supabase.auth.getUser();
     if (!user) throw new Error('No autenticado');
+    if (!(await authorizeStageMutation(supabase, user.id, user.email, orderUuid, stage))) {
+        throw new Error('No autorizado para esta etapa de este pedido.');
+    }
     await markStageComplete(supabase, orderUuid, stage, user.id, notes);
     for (const p of STAGE_PATHS) revalidatePath(p);
+    revalidatePath('/station');
 }
 
 export async function unmarkStageCompleteAction(
@@ -99,6 +127,14 @@ export async function unmarkStageCompleteAction(
     stage: StageKey
 ) {
     const supabase = await createClient();
+    const {
+        data: { user }
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error('No autenticado');
+    if (!(await authorizeStageMutation(supabase, user.id, user.email, orderUuid, stage))) {
+        throw new Error('No autorizado para esta etapa de este pedido.');
+    }
     await unmarkStageComplete(supabase, orderUuid, stage);
     for (const p of STAGE_PATHS) revalidatePath(p);
+    revalidatePath('/station');
 }
