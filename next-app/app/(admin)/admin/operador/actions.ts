@@ -8,6 +8,7 @@ import {
     markInsumoComplete,
     unmarkInsumoComplete,
 } from '@/lib/services/insumo-completions';
+import { setInsumoPreparation } from '@/lib/services/insumo-preparations';
 
 export async function updateOrderStatusAction(orderUuid: string, status: OrderStatus) {
     const supabase = await createClient();
@@ -55,4 +56,16 @@ export async function toggleInsumoCompleteAction(
     }
     revalidatePath('/admin/operador');
     revalidatePath('/admin/maquila');
+}
+
+export async function setInsumoPreparationAction(
+    orderId: string,
+    insumoName: string,
+    qty: number
+) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No autenticado');
+    await setInsumoPreparation(supabase, orderId, insumoName, qty, user.id);
+    revalidatePath('/admin/operador');
 }

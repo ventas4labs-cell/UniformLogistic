@@ -32,10 +32,13 @@ import {
 } from '@/lib/stage-utils';
 import {
     reportMissingInsumoAction,
+    setInsumoPreparationAction,
     toggleInsumoCompleteAction,
 } from '@/app/(admin)/admin/operador/actions';
 import { StageCompleteToggle } from '@/components/admin/stage-complete-toggle';
 import { StageTabBar, type StageTab } from '@/components/admin/stage-tab-bar';
+import { InsumoPrepEditor } from '@/components/admin/insumo-prep-editor';
+import type { InsumoPreparation } from '@/lib/services/insumo-preparations';
 
 const completionKey = (orderId: string, insumoName: string) =>
     `${orderId}|${insumoName}`;
@@ -177,17 +180,26 @@ function OrderCard({
     onLocalCompletionChange,
     completedInsumos,
     onToggleInsumo,
+    preparations,
+    onLocalPrepChange,
+    onCommitPrep,
 }: {
     order: Order;
     isCompleted: boolean;
     onLocalCompletionChange: (uuid: string, next: boolean) => void;
     completedInsumos: Set<string>;
     onToggleInsumo: (orderId: string, insumoName: string, completed: boolean) => void;
+    preparations: Map<string, number>;
+    onLocalPrepChange: (orderId: string, insumoName: string, qty: number) => void;
+    onCommitPrep: (orderId: string, insumoName: string, qty: number) => Promise<void>;
 }) {
     const [expanded, setExpanded] = useState(false);
     const [reportingInsumo, setReportingInsumo] = useState<string | null>(null);
     const [sentReports, setSentReports] = useState<Set<string>>(new Set());
     const [previewImage, setPreviewImage] = useState<{ src: string; alt: string } | null>(null);
+    // Which insumo rows have their prep-editor disclosure open. Keyed
+    // by insumo name (unique within this card's insumo list).
+    const [prepOpen, setPrepOpen] = useState<Set<string>>(new Set());
     const insumos = aggregateInsumos(order.items);
     const totalPieces = order.items.reduce((s, i) => s + i.quantity, 0);
 
@@ -337,6 +349,12 @@ function OrderCard({
                                         const isCompleted =
                                             !!order.uuid &&
                                             completedInsumos.has(completionKey(order.uuid, ins.name));
+                                        const prepKey = `${order.uuid}|${ins.name}`;
+                                        const preparedQty = preparations.get(prepKey) || 0;
+                                        const isPrepOpen = prepOpen.has(ins.name);
+                                        const hasProgress = preparedQty > 0;
+                                        const isFullyPrepared =
+                                            preparedQty >= ins.totalQty && ins.totalQty > 0;
                                         return (
                                             <div key={ins.name}>
                                                 <div
@@ -356,15 +374,44 @@ function OrderCard({
                                                         {ins.name}
                                                     </span>
                                                     <div className="flex items-center gap-2 shrink-0 ml-2">
+                                                        {/* Qty pill — shows progress as "prep/total"
+                                                            when the operator has logged any prep. */}
                                                         <span
-                                                            className={`font-bold ${
+                                                            className={`font-bold tabular-nums ${
                                                                 isCompleted
                                                                     ? 'text-green-700 dark:text-green-300'
-                                                                    : 'text-purple-700 dark:text-purple-300'
+                                                                    : isFullyPrepared
+                                                                        ? 'text-green-700 dark:text-green-300'
+                                                                        : hasProgress
+                                                                            ? 'text-orange-600 dark:text-orange-400'
+                                                                            : 'text-purple-700 dark:text-purple-300'
                                                             }`}
                                                         >
-                                                            {ins.totalQty}
+                                                            {hasProgress
+                                                                ? `${Number.isInteger(preparedQty) ? preparedQty : preparedQty.toFixed(2)}/${ins.totalQty}`
+                                                                : ins.totalQty}
                                                         </span>
+                                                        {order.uuid && (
+                                                            <button
+                                                                onClick={() =>
+                                                                    setPrepOpen((prev) => {
+                                                                        const n = new Set(prev);
+                                                                        if (n.has(ins.name)) n.delete(ins.name);
+                                                                        else n.add(ins.name);
+                                                                        return n;
+                                                                    })
+                                                                }
+                                                                className="p-1 text-gray-400 dark:text-zinc-500 hover:text-orange-600 dark:hover:text-orange-400 transition-colors"
+                                                                title={isPrepOpen ? 'Cerrar preparación' : 'Registrar preparación'}
+                                                                aria-label="Preparación"
+                                                            >
+                                                                {isPrepOpen ? (
+                                                                    <ChevronUp size={14} />
+                                                                ) : (
+                                                                    <ChevronDown size={14} />
+                                                                )}
+                                                            </button>
+                                                        )}
                                                         {order.uuid && (
                                                             <button
                                                                 onClick={() =>
@@ -399,6 +446,16 @@ function OrderCard({
                                                         )}
                                                     </div>
                                                 </div>
+                                                {isPrepOpen && order.uuid && (
+                                                    <InsumoPrepEditor
+                                                        orderId={order.uuid}
+                                                        insumoName={ins.name}
+                                                        totalQty={ins.totalQty}
+                                                        preparedQty={preparedQty}
+                                                        onLocalChange={onLocalPrepChange}
+                                                        onCommit={onCommitPrep}
+                                                    />
+                                                )}
                                                 {reportingInsumo === ins.name && order.uuid && (
                                                     <ReportMissingForm
                                                         orderId={order.uuid}
@@ -437,13 +494,38 @@ function OrderCard({
 export function OperatorBoard({
     initialOrders,
     initialCompletions,
-    initialBodegaCompletedOrderIds = []
+    initialBodegaCompletedOrderIds = [],
+    initialPreparations = []
 }: {
     initialOrders: Order[];
     initialCompletions: InsumoCompletion[];
     initialBodegaCompletedOrderIds?: string[];
+    initialPreparations?: InsumoPreparation[];
 }) {
     const [orders] = useState<Order[]>(initialOrders);
+    const [preparations, setPreparations] = useState<Map<string, number>>(
+        () => new Map(initialPreparations.map((p) => [`${p.orderId}|${p.insumoName}`, p.preparedQty]))
+    );
+    const handleLocalPrepChange = (
+        orderId: string,
+        insumoName: string,
+        qty: number
+    ) => {
+        const key = `${orderId}|${insumoName}`;
+        setPreparations((prev) => {
+            const next = new Map(prev);
+            if (qty <= 0) next.delete(key);
+            else next.set(key, qty);
+            return next;
+        });
+    };
+    const handleCommitPrep = async (
+        orderId: string,
+        insumoName: string,
+        qty: number
+    ) => {
+        await setInsumoPreparationAction(orderId, insumoName, qty);
+    };
     const [completedInsumos, setCompletedInsumos] = useState<Set<string>>(
         () => new Set(initialCompletions.map((c) => completionKey(c.orderId, c.insumoName)))
     );
@@ -659,6 +741,9 @@ export function OperatorBoard({
                             onLocalCompletionChange={handleLocalCompletionChange}
                             completedInsumos={completedInsumos}
                             onToggleInsumo={handleToggleInsumo}
+                            preparations={preparations}
+                            onLocalPrepChange={handleLocalPrepChange}
+                            onCommitPrep={handleCommitPrep}
                         />
                     ))}
                 </div>
