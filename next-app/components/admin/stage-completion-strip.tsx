@@ -27,7 +27,10 @@ export function StageCompletionStrip({ completed, compact = false }: Props) {
     const allDone = done === total;
 
     return (
-        <div className="flex items-center gap-1.5" aria-label={`Etapas completadas: ${done} de ${total}`}>
+        <div
+            className="flex flex-wrap items-center gap-1.5"
+            aria-label={`Etapas completadas: ${done} de ${total}`}
+        >
             {STAGE_ORDER.map((stage) => {
                 const isDone = completed.has(stage);
                 return (
