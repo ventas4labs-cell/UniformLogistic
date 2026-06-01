@@ -112,6 +112,10 @@ export function OrdersTable({
     const [selectionMode, setSelectionMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+    // Search expands/collapses from an icon button in the header. Stays
+    // open as long as there's text or focus.
+    const [searchOpen, setSearchOpen] = useState(false);
+
     const enterSelectionMode = () => {
         setSelectedIds(new Set());
         setSelectionMode(true);
@@ -335,6 +339,58 @@ export function OrdersTable({
                     <p className="text-gray-500 dark:text-zinc-400 text-sm">Logística y control de producción.</p>
                 </div>
                 <div className="flex items-center gap-2">
+                    {/* Search: icon button by default; expands inline to a
+                        full input while focused or while there's text. */}
+                    {searchOpen || searchTerm ? (
+                        <div className="relative w-64">
+                            <Search
+                                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-zinc-500"
+                                size={16}
+                            />
+                            <input
+                                type="search"
+                                autoFocus
+                                placeholder="Buscar pedidos…"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onBlur={() => {
+                                    if (!searchTerm) setSearchOpen(false);
+                                }}
+                                className="w-full pl-9 pr-8 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 bg-white dark:bg-zinc-900 text-sm"
+                            />
+                            {searchTerm && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setSearchTerm('');
+                                        setSearchOpen(false);
+                                    }}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-gray-400 hover:text-gray-700 dark:hover:text-zinc-300"
+                                    aria-label="Limpiar búsqueda"
+                                >
+                                    <X size={14} />
+                                </button>
+                            )}
+                        </div>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => setSearchOpen(true)}
+                            className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"
+                            title="Buscar pedidos"
+                            aria-label="Buscar pedidos"
+                        >
+                            <Search size={18} />
+                        </button>
+                    )}
+                    <button
+                        onClick={() => router.refresh()}
+                        className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"
+                        title="Recargar"
+                        aria-label="Recargar"
+                    >
+                        <RefreshCw size={18} className={pending ? 'animate-spin' : ''} />
+                    </button>
                     {stationUsers.filter((s) => s.isActive).length > 0 && !selectionMode && (
                         <button
                             type="button"
@@ -361,25 +417,6 @@ export function OrdersTable({
                         + Nuevo Pedido
                     </Link>
                 </div>
-            </div>
-
-            <div className="bg-white dark:bg-zinc-900 p-4 rounded-xl shadow-sm mb-6 flex justify-between items-center">
-                <div className="relative w-full max-w-md">
-                    <Search className="absolute left-3 top-3 text-gray-400 dark:text-zinc-500" size={20} />
-                    <input
-                        type="text"
-                        placeholder="Buscar pedidos..."
-                        className="w-full pl-10 pr-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-orange-500"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </div>
-                <button
-                    onClick={() => router.refresh()}
-                    className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"
-                >
-                    <RefreshCw size={20} className={pending ? 'animate-spin' : ''} />
-                </button>
             </div>
 
             {/* Completion-bucket filter — replaces the old status-enum chips. */}
