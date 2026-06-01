@@ -153,6 +153,13 @@ export function OrdersTable({
     // it's a recovery action and shouldn't gate the admin.
     const [cancellingOrder, setCancellingOrder] = useState<Order | null>(null);
     const [cancelling, setCancelling] = useState(false);
+    // In-page PDF preview. `url` is a blob: URL held only while the
+    // modal is open; we URL.revokeObjectURL on close to release it.
+    const [previewPdf, setPreviewPdf] = useState<{ order: Order; url: string } | null>(null);
+    const closePreview = () => {
+        if (previewPdf) URL.revokeObjectURL(previewPdf.url);
+        setPreviewPdf(null);
+    };
     const [deleting, setDeleting] = useState(false);
     // Which order's notification popover is currently open.
     const [notifOrder, setNotifOrder] = useState<Order | null>(null);
@@ -263,7 +270,9 @@ export function OrdersTable({
         const pdf = generateAdminPDF(order);
         const blob = pdf.output('blob');
         const url = URL.createObjectURL(blob);
-        window.open(url, '_blank');
+        // If a previous preview was open, release its blob first.
+        if (previewPdf) URL.revokeObjectURL(previewPdf.url);
+        setPreviewPdf({ order, url });
     };
 
     const handleUpdateStatus = (uuid: string | undefined, newStatus: OrderStatus) => {
@@ -537,7 +546,7 @@ export function OrdersTable({
                         return (
                             <div
                                 key={order.uuid || order.id}
-                                className={`bg-white dark:bg-zinc-900 rounded-xl shadow-sm border transition-all overflow-hidden flex flex-col hover:shadow-md ${
+                                className={`group bg-white dark:bg-zinc-900 rounded-xl shadow-sm border transition-all overflow-hidden flex flex-col hover:shadow-md ${
                                     hasAlert
                                         ? 'border-red-300 dark:border-red-900/60 hover:border-red-400 dark:hover:border-red-700/80'
                                         : 'border-gray-200 dark:border-zinc-800 hover:border-orange-200 dark:hover:border-orange-900/60'
@@ -689,7 +698,11 @@ export function OrdersTable({
                                 </div>
 
                                 {/* Actions */}
-                                <div className="grid grid-cols-3 gap-1 p-2 border-t border-gray-100 dark:border-zinc-800 bg-gray-50/50 dark:bg-zinc-900/40">
+                                {/* Action row — hidden by default; expands on
+                                    hover (and stays open while any inner button
+                                    has focus). max-height + opacity transition so
+                                    the card height animates instead of jumping. */}
+                                <div className="grid grid-cols-3 gap-1 px-2 bg-gray-50/50 dark:bg-zinc-900/40 max-h-0 overflow-hidden opacity-0 group-hover:max-h-40 group-hover:opacity-100 group-hover:pt-2 group-hover:pb-2 group-hover:border-t group-hover:border-gray-100 dark:group-hover:border-zinc-800 group-focus-within:max-h-40 group-focus-within:opacity-100 group-focus-within:pt-2 group-focus-within:pb-2 group-focus-within:border-t group-focus-within:border-gray-100 dark:group-focus-within:border-zinc-800 transition-all duration-200">
                                     <button
                                         onClick={() => handlePreviewPdf(order)}
                                         className="flex items-center justify-center gap-1 text-xs font-bold text-gray-700 dark:text-zinc-300 hover:bg-orange-100 dark:hover:bg-orange-950/40 hover:text-orange-700 dark:hover:text-orange-300 py-2 rounded-lg transition-colors"
@@ -757,6 +770,58 @@ export function OrdersTable({
 
             {facturaOrder && (
                 <FacturaModal order={facturaOrder} onClose={() => setFacturaOrder(null)} />
+            )}
+
+            {previewPdf && (
+                <div
+                    className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6"
+                    onClick={closePreview}
+                >
+                    <div
+                        className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col overflow-hidden"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-gray-100 dark:border-zinc-800">
+                            <div className="min-w-0">
+                                <p className="font-mono text-sm font-bold text-orange-600 dark:text-orange-400">
+                                    {previewPdf.order.id}
+                                </p>
+                                <p className="text-xs text-gray-500 dark:text-zinc-400 truncate">
+                                    {previewPdf.order.companyName || '—'}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const a = document.createElement('a');
+                                        a.href = previewPdf.url;
+                                        a.download = `${previewPdf.order.id}.pdf`;
+                                        a.click();
+                                    }}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-950/40"
+                                    title="Descargar PDF"
+                                >
+                                    <Download size={14} /> PDF
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={closePreview}
+                                    className="p-1.5 rounded-lg text-gray-500 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-800"
+                                    aria-label="Cerrar"
+                                    title="Cerrar"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+                        </div>
+                        <iframe
+                            src={previewPdf.url}
+                            title={`Vista previa ${previewPdf.order.id}`}
+                            className="flex-1 w-full bg-gray-100 dark:bg-zinc-950"
+                        />
+                    </div>
+                </div>
             )}
 
             {editingOrder && (
