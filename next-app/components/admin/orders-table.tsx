@@ -148,6 +148,11 @@ export function OrdersTable({
     const [facturaOrder, setFacturaOrder] = useState<Order | null>(null);
     const [editingOrder, setEditingOrder] = useState<Order | null>(null);
     const [deletingOrder, setDeletingOrder] = useState<Order | null>(null);
+    // Confirmation modal for the top-right cancel X. Restoring (clicking
+    // the green Undo from a cancelled order) skips the confirmation —
+    // it's a recovery action and shouldn't gate the admin.
+    const [cancellingOrder, setCancellingOrder] = useState<Order | null>(null);
+    const [cancelling, setCancelling] = useState(false);
     const [deleting, setDeleting] = useState(false);
     // Which order's notification popover is currently open.
     const [notifOrder, setNotifOrder] = useState<Order | null>(null);
@@ -570,12 +575,15 @@ export function OrdersTable({
                                             </span>
                                             <button
                                                 type="button"
-                                                onClick={() =>
-                                                    handleUpdateStatus(
-                                                        order.uuid,
-                                                        isCancelled ? 'pending' : 'cancelled'
-                                                    )
-                                                }
+                                                onClick={() => {
+                                                    if (!order.uuid) return;
+                                                    if (isCancelled) {
+                                                        // Restoring is a recovery action — no confirm.
+                                                        handleUpdateStatus(order.uuid, 'pending');
+                                                    } else {
+                                                        setCancellingOrder(order);
+                                                    }
+                                                }}
                                                 disabled={!order.uuid || pending}
                                                 title={isCancelled ? 'Reactivar pedido' : 'Cancelar pedido'}
                                                 className={`p-1.5 rounded-full text-xs font-bold transition-colors disabled:opacity-50 ${
@@ -706,18 +714,10 @@ export function OrdersTable({
                                     <button
                                         onClick={() => setEditingOrder(order)}
                                         disabled={!order.uuid}
-                                        className="col-span-2 flex items-center justify-center gap-1 text-xs font-bold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-950/40 py-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                        className="col-span-3 flex items-center justify-center gap-1 text-xs font-bold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-950/40 py-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                         title="Editar orden"
                                     >
                                         <Pencil size={14} /> Editar
-                                    </button>
-                                    <button
-                                        onClick={() => setDeletingOrder(order)}
-                                        disabled={!order.uuid}
-                                        className="flex items-center justify-center gap-1 text-xs font-bold text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-950/40 py-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                                        title="Eliminar orden"
-                                    >
-                                        <Trash2 size={14} />
                                     </button>
                                 </div>
                             </div>
@@ -826,6 +826,62 @@ export function OrdersTable({
                             >
                                 {deleting && <Loader2 className="animate-spin" size={16} />}
                                 Eliminar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {cancellingOrder && (
+                <div
+                    className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                    onClick={() => !cancelling && setCancellingOrder(null)}
+                >
+                    <div
+                        className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-md p-6"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-zinc-100 mb-2">
+                            ¿Cancelar pedido {cancellingOrder.id}?
+                        </h3>
+                        <p className="text-sm text-gray-600 dark:text-zinc-400 mb-2">
+                            El pedido pasará a estado{' '}
+                            <span className="font-semibold">Cancelada</span>. Dejará
+                            de aparecer en los tableros de producción
+                            (Bodega, Corte, Maquila, …) y se ocultará para las
+                            estaciones externas asignadas.
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-zinc-500 mb-5 italic">
+                            Podés reactivarlo después con el botón de reactivar
+                            en la misma esquina del pedido cancelado.
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setCancellingOrder(null)}
+                                disabled={cancelling}
+                                className="flex-1 py-2.5 border border-gray-300 dark:border-zinc-700 rounded-lg font-bold text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800"
+                            >
+                                No, mantener
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    if (!cancellingOrder.uuid) return;
+                                    setCancelling(true);
+                                    try {
+                                        handleUpdateStatus(
+                                            cancellingOrder.uuid,
+                                            'cancelled'
+                                        );
+                                        setCancellingOrder(null);
+                                    } finally {
+                                        setCancelling(false);
+                                    }
+                                }}
+                                disabled={cancelling}
+                                className="flex-1 py-2.5 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 disabled:bg-gray-300 dark:disabled:bg-zinc-700 flex items-center justify-center gap-2"
+                            >
+                                {cancelling && <Loader2 className="animate-spin" size={16} />}
+                                Sí, cancelar pedido
                             </button>
                         </div>
                     </div>
