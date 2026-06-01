@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Building2, Plus, Edit2, Trash2, Loader2, X, Link2, Check } from 'lucide-react';
 import { Company, CompanyInput } from '@/lib/services/companies';
 import {
@@ -129,7 +130,14 @@ export function CompaniesManager({ initialCompanies }: { initialCompanies: Compa
                         ) : (
                             initialCompanies.map((c) => (
                                 <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-zinc-800">
-                                    <td className="p-4 font-bold text-gray-900 dark:text-zinc-100">{c.name}</td>
+                                    <td className="p-4">
+                                        <Link
+                                            href={`/admin/companies/${c.id}`}
+                                            className="font-bold text-gray-900 dark:text-zinc-100 hover:text-orange-600 dark:hover:text-orange-400 hover:underline"
+                                        >
+                                            {c.name}
+                                        </Link>
+                                    </td>
                                     <td className="p-4 font-mono text-sm text-gray-600 dark:text-zinc-400">{c.documentNumber}</td>
                                     <td className="p-4 text-gray-600 dark:text-zinc-400">{c.contactName || '—'}</td>
                                     <td className="p-4 text-gray-600 dark:text-zinc-400">{c.phone || '—'}</td>

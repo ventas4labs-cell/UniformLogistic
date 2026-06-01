@@ -334,6 +334,22 @@ export const fetchAllOrders = async (
     return orders;
 };
 
+/** All orders for one company, newest first. Used by the company detail page. */
+export const fetchOrdersForCompany = async (
+    supabase: SupabaseClient,
+    companyId: string
+): Promise<Order[]> => {
+    const { data, error } = await supabase
+        .from('orders')
+        .select(NESTED_SELECT)
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: false });
+    if (error) throw error;
+    const orders = ((data || []) as unknown as RawOrderRow[]).map(mapRowToOrder);
+    await hydrateOrphanItems(supabase, orders);
+    return orders;
+};
+
 /**
  * Load a specific set of orders by uuid. Used by the station shell to
  * load only the orders assigned to the logged-in station user (the

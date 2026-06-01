@@ -60,6 +60,19 @@ export const fetchCompanies = async (
     return (data as CompanyRow[]).map(mapRow);
 };
 
+export const fetchCompanyById = async (
+    supabase: SupabaseClient,
+    id: string
+): Promise<Company | null> => {
+    const { data, error } = await supabase
+        .from('companies')
+        .select(SELECT)
+        .eq('id', id)
+        .maybeSingle();
+    if (error) throw error;
+    return data ? mapRow(data as CompanyRow) : null;
+};
+
 export const createCompany = async (
     supabase: SupabaseClient,
     input: CompanyInput
