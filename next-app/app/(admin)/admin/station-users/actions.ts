@@ -140,3 +140,41 @@ export async function unassignStationFromOrderAction(
     revalidatePath('/station');
     return {};
 }
+
+/**
+ * Bulk-assign N orders to one station user. Skips any pair that
+ * already exists (returns the count of new vs. already-assigned).
+ * Called from the Pedidos multi-select flow.
+ */
+export async function bulkAssignStationToOrdersAction(
+    orderIds: string[],
+    stationUserId: string
+): Promise<{ error?: string; created?: number; existing?: number }> {
+    const { error: adminErr, adminId } = await requireAdmin();
+    if (adminErr) return { error: adminErr };
+    if (!stationUserId) return { error: 'Falta la estación.' };
+    if (!orderIds.length) return { error: 'No hay pedidos seleccionados.' };
+
+    const service = createServiceClient();
+    // Insert all pairs in one round-trip. The unique PK
+    // (order_id, station_user_id) prevents duplicates; we use
+    // upsert with ignoreDuplicates so the call doesn't fail when
+    // some pairs already exist (we just report the existing count).
+    const rows = orderIds.map((order_id) => ({
+        order_id,
+        station_user_id: stationUserId,
+        assigned_by: adminId
+    }));
+    const { data, error } = await service
+        .from('station_assignments')
+        .upsert(rows, { onConflict: 'order_id,station_user_id', ignoreDuplicates: true })
+        .select('order_id');
+    if (error) return { error: `No se pudo asignar: ${error.message}` };
+
+    const created = data?.length || 0;
+    const existing = orderIds.length - created;
+    revalidatePath('/admin/orders');
+    revalidatePath('/admin/station-users');
+    revalidatePath('/station');
+    return { created, existing };
+}

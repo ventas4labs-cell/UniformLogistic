@@ -23,6 +23,7 @@ import { STAGE_ORDER, type StageKey } from '@/lib/services/stage-completions';
 import { OrderAssignmentsPanel } from '@/components/admin/order-assignments-panel';
 import type { StationUser } from '@/lib/services/station-users';
 import type { StationAssignment } from '@/lib/services/station-assignments';
+import { BulkAssignBar } from '@/components/admin/bulk-assign-bar';
 import { FacturaModal } from '@/components/admin/factura-modal';
 import { OrderEditModal } from '@/components/admin/order-edit-modal';
 import { useRouter } from 'next/navigation';
@@ -100,6 +101,48 @@ export function OrdersTable({
             next.set(orderId, cur);
             return next;
         });
+    };
+
+    // ─── Bulk-assign mode ────────────────────────────────────────────
+    // When `selectionMode` is on, cards render with a checkbox in the
+    // top-left; tapping anywhere on the body toggles selection rather
+    // than navigating. A sticky bottom bar shows the count + a
+    // "Continuar" button that opens the station picker + confirm
+    // modal.
+    const [selectionMode, setSelectionMode] = useState(false);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+    const enterSelectionMode = () => {
+        setSelectedIds(new Set());
+        setSelectionMode(true);
+    };
+    const exitSelectionMode = () => {
+        setSelectionMode(false);
+        setSelectedIds(new Set());
+    };
+    const toggleSelected = (uuid: string) => {
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(uuid)) next.delete(uuid);
+            else next.add(uuid);
+            return next;
+        });
+    };
+    const handleBulkAssigned = (
+        orderIds: string[],
+        stationUserId: string
+    ) => {
+        // Reflect the new assignments in local state immediately.
+        setAssignmentsByOrder((prev) => {
+            const next = new Map(prev);
+            for (const id of orderIds) {
+                const cur = new Set(next.get(id) || []);
+                cur.add(stationUserId);
+                next.set(id, cur);
+            }
+            return next;
+        });
+        exitSelectionMode();
     };
 
     const handleStageToggle = (
@@ -285,18 +328,39 @@ export function OrdersTable({
     );
 
     return (
-        <div>
+        <div className={selectionMode ? 'pb-24' : ''}>
             <div className="flex justify-between items-center mb-6">
                 <div>
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-zinc-100">Pedidos</h2>
                     <p className="text-gray-500 dark:text-zinc-400 text-sm">Logística y control de producción.</p>
                 </div>
-                <Link
-                    href="/catalog"
-                    className="bg-orange-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-orange-700 shadow-md flex items-center gap-2"
-                >
-                    + Nuevo Pedido
-                </Link>
+                <div className="flex items-center gap-2">
+                    {stationUsers.filter((s) => s.isActive).length > 0 && !selectionMode && (
+                        <button
+                            type="button"
+                            onClick={enterSelectionMode}
+                            className="bg-white dark:bg-zinc-900 border border-orange-300 dark:border-orange-800 text-orange-700 dark:text-orange-300 px-4 py-2 rounded-lg font-bold hover:bg-orange-50 dark:hover:bg-orange-950/40 shadow-sm flex items-center gap-2"
+                            title="Seleccionar pedidos para asignar a una estación externa"
+                        >
+                            Asignar a estación externa
+                        </button>
+                    )}
+                    {selectionMode && (
+                        <button
+                            type="button"
+                            onClick={exitSelectionMode}
+                            className="bg-white dark:bg-zinc-900 border border-gray-300 dark:border-zinc-700 text-gray-700 dark:text-zinc-300 px-4 py-2 rounded-lg font-bold hover:bg-gray-50 dark:hover:bg-zinc-800 shadow-sm flex items-center gap-2"
+                        >
+                            Cancelar selección
+                        </button>
+                    )}
+                    <Link
+                        href="/catalog"
+                        className="bg-orange-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-orange-700 shadow-md flex items-center gap-2"
+                    >
+                        + Nuevo Pedido
+                    </Link>
+                </div>
             </div>
 
             <div className="bg-white dark:bg-zinc-900 p-4 rounded-xl shadow-sm mb-6 flex justify-between items-center">
@@ -370,16 +434,53 @@ export function OrdersTable({
                                     : bucket === 'cancelled'
                                         ? { label: 'Cancelada', color: 'bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300' }
                                         : { label: 'Sin iniciar', color: 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-300' };
+                        const isSelectable = selectionMode && !!order.uuid && !isCancelled;
+                        const isSelected = !!order.uuid && selectedIds.has(order.uuid);
                         return (
                             <div
                                 key={order.uuid || order.id}
-                                className={`bg-white dark:bg-zinc-900 rounded-xl shadow-sm border transition-all overflow-hidden flex flex-col hover:shadow-md ${
-                                    hasAlert
-                                        ? 'border-red-300 dark:border-red-900/60 hover:border-red-400 dark:hover:border-red-700/80'
-                                        : 'border-gray-200 dark:border-zinc-800 hover:border-orange-200 dark:hover:border-orange-900/60'
+                                onClick={
+                                    isSelectable
+                                        ? () => toggleSelected(order.uuid!)
+                                        : undefined
+                                }
+                                role={isSelectable ? 'button' : undefined}
+                                aria-pressed={isSelectable ? isSelected : undefined}
+                                className={`relative bg-white dark:bg-zinc-900 rounded-xl shadow-sm border transition-all overflow-hidden flex flex-col hover:shadow-md ${
+                                    isSelectable ? 'cursor-pointer select-none' : ''
+                                } ${
+                                    isSelected
+                                        ? 'border-orange-500 ring-2 ring-orange-300 dark:ring-orange-700/60 shadow-md'
+                                        : hasAlert
+                                            ? 'border-red-300 dark:border-red-900/60 hover:border-red-400 dark:hover:border-red-700/80'
+                                            : 'border-gray-200 dark:border-zinc-800 hover:border-orange-200 dark:hover:border-orange-900/60'
+                                } ${
+                                    selectionMode && !isSelectable ? 'opacity-50' : ''
                                 }`}
                             >
-                                <div className="p-4 flex-1 space-y-3">
+                                {selectionMode && (
+                                    <div className="absolute top-3 left-3 z-10">
+                                        <span
+                                            className={`flex items-center justify-center w-6 h-6 rounded-md border-2 transition-colors ${
+                                                isSelected
+                                                    ? 'bg-orange-600 border-orange-600 text-white'
+                                                    : 'bg-white dark:bg-zinc-900 border-gray-400 dark:border-zinc-600'
+                                            }`}
+                                            aria-hidden="true"
+                                        >
+                                            {isSelected && (
+                                                <CheckCircle2 size={14} strokeWidth={3} />
+                                            )}
+                                        </span>
+                                    </div>
+                                )}
+                                <div
+                                    className={`p-4 flex-1 space-y-3 ${
+                                        selectionMode
+                                            ? 'pl-12 pointer-events-none'
+                                            : ''
+                                    }`}
+                                >
                                     {/* Header: ID + bell + status */}
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex items-center gap-2">
@@ -522,7 +623,11 @@ export function OrdersTable({
                                 </div>
 
                                 {/* Actions */}
-                                <div className="grid grid-cols-3 gap-1 p-2 border-t border-gray-100 dark:border-zinc-800 bg-gray-50/50 dark:bg-zinc-900/40">
+                                <div
+                                    className={`grid grid-cols-3 gap-1 p-2 border-t border-gray-100 dark:border-zinc-800 bg-gray-50/50 dark:bg-zinc-900/40 ${
+                                        selectionMode ? 'pointer-events-none opacity-40' : ''
+                                    }`}
+                                >
                                     <button
                                         onClick={() => handlePreviewPdf(order)}
                                         className="flex items-center justify-center gap-1 text-xs font-bold text-gray-700 dark:text-zinc-300 hover:bg-orange-100 dark:hover:bg-orange-950/40 hover:text-orange-700 dark:hover:text-orange-300 py-2 rounded-lg transition-colors"
@@ -572,6 +677,18 @@ export function OrdersTable({
                     <Loader2 className="animate-spin" size={14} />
                     Actualizando...
                 </div>
+            )}
+
+            {selectionMode && (
+                <BulkAssignBar
+                    selectedOrderIds={Array.from(selectedIds)}
+                    selectedOrders={orders.filter(
+                        (o) => o.uuid && selectedIds.has(o.uuid)
+                    )}
+                    stationUsers={stationUsers}
+                    onCancel={exitSelectionMode}
+                    onAssigned={handleBulkAssigned}
+                />
             )}
 
             {notifOrder && (
