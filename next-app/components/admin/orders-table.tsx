@@ -116,6 +116,17 @@ export function OrdersTable({
     // open as long as there's text or focus.
     const [searchOpen, setSearchOpen] = useState(false);
 
+    // Filter popover (Estado + Empresa). Closed by default to keep the
+    // header tidy; opens to a panel below the title bar.
+    const [filterOpen, setFilterOpen] = useState(false);
+    const [companyFilter, setCompanyFilter] = useState<string>('all');
+
+    // Distinct company list, derived once per render from the visible
+    // orders. Sorted A→Z so the dropdown is scannable.
+    const distinctCompanies = Array.from(
+        new Set(orders.map((o) => o.companyName).filter(Boolean) as string[])
+    ).sort((a, b) => a.localeCompare(b));
+
     const enterSelectionMode = () => {
         setSelectedIds(new Set());
         setSelectionMode(true);
@@ -313,6 +324,7 @@ export function OrdersTable({
 
     const filtered = orders.filter((o) => {
         if (bucketFilter !== 'all' && bucketFor(o) !== bucketFilter) return false;
+        if (companyFilter !== 'all' && o.companyName !== companyFilter) return false;
         const term = searchTerm.toLowerCase();
         if (!term) return true;
         return (
@@ -384,6 +396,22 @@ export function OrdersTable({
                         </button>
                     )}
                     <button
+                        type="button"
+                        onClick={() => setFilterOpen((o) => !o)}
+                        className={`relative p-2 rounded-lg ${
+                            filterOpen || bucketFilter !== 'all' || companyFilter !== 'all'
+                                ? 'bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300'
+                                : 'text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700'
+                        }`}
+                        title="Filtros"
+                        aria-label="Filtros"
+                    >
+                        <Filter size={18} />
+                        {(bucketFilter !== 'all' || companyFilter !== 'all') && (
+                            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-orange-600 ring-2 ring-white dark:ring-zinc-950" />
+                        )}
+                    </button>
+                    <button
                         onClick={() => router.refresh()}
                         className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"
                         title="Recargar"
@@ -419,35 +447,127 @@ export function OrdersTable({
                 </div>
             </div>
 
-            {/* Completion-bucket filter — replaces the old status-enum chips. */}
-            <div className="flex flex-wrap gap-2 mb-4">
-                {(
-                    [
-                        { key: 'all', label: 'Todos', count: orders.length, color: 'bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900' },
-                        { key: 'pending', label: 'Sin iniciar', count: bucketCounts['pending'] || 0, color: 'bg-gray-200 dark:bg-zinc-800 text-gray-700 dark:text-zinc-300' },
-                        { key: 'in-progress', label: 'En proceso', count: bucketCounts['in-progress'] || 0, color: 'bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300' },
-                        { key: 'done', label: 'Listas', count: bucketCounts['done'] || 0, color: 'bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-300' },
-                        { key: 'cancelled', label: 'Canceladas', count: bucketCounts['cancelled'] || 0, color: 'bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300' }
-                    ] as const
-                ).map((b) => {
-                    if (b.key !== 'all' && b.count === 0) return null;
-                    const active = bucketFilter === b.key;
-                    return (
+            {/* Filter popover. The trigger icon lives in the header
+                action row (search / refresh / filter). When open the
+                panel renders here so it doesn't push the title row
+                around. Pills below summarize the active filters when
+                the panel is closed so admin still has a visual cue. */}
+            {filterOpen && (
+                <div className="mb-4 bg-white dark:bg-zinc-900 rounded-xl shadow-sm border border-gray-200 dark:border-zinc-800 p-4 space-y-4">
+                    <div>
+                        <h4 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-zinc-500 mb-2">
+                            Estado
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                            {(
+                                [
+                                    { key: 'all', label: 'Todos', count: orders.length, color: 'bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900' },
+                                    { key: 'pending', label: 'Sin iniciar', count: bucketCounts['pending'] || 0, color: 'bg-gray-200 dark:bg-zinc-800 text-gray-700 dark:text-zinc-300' },
+                                    { key: 'in-progress', label: 'En proceso', count: bucketCounts['in-progress'] || 0, color: 'bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300' },
+                                    { key: 'done', label: 'Listas', count: bucketCounts['done'] || 0, color: 'bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-300' },
+                                    { key: 'cancelled', label: 'Canceladas', count: bucketCounts['cancelled'] || 0, color: 'bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300' }
+                                ] as const
+                            ).map((b) => {
+                                if (b.key !== 'all' && b.count === 0) return null;
+                                const active = bucketFilter === b.key;
+                                return (
+                                    <button
+                                        key={b.key}
+                                        onClick={() => setBucketFilter(b.key)}
+                                        className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors flex items-center gap-1.5 ${
+                                            active
+                                                ? b.color + ' shadow-md'
+                                                : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-300 hover:bg-gray-200 dark:hover:bg-zinc-700'
+                                        }`}
+                                    >
+                                        {b.label} ({b.count})
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-zinc-500 mb-2">
+                            Empresa
+                        </h4>
+                        <div className="flex items-center gap-2">
+                            <select
+                                value={companyFilter}
+                                onChange={(e) => setCompanyFilter(e.target.value)}
+                                className="flex-1 max-w-md p-2 border border-gray-300 dark:border-zinc-700 rounded-lg text-sm bg-white dark:bg-zinc-900 focus:ring-2 focus:ring-orange-500 outline-none"
+                            >
+                                <option value="all">Todas las empresas ({distinctCompanies.length})</option>
+                                {distinctCompanies.map((name) => (
+                                    <option key={name} value={name}>
+                                        {name}
+                                    </option>
+                                ))}
+                            </select>
+                            {companyFilter !== 'all' && (
+                                <button
+                                    type="button"
+                                    onClick={() => setCompanyFilter('all')}
+                                    className="text-xs font-bold text-gray-500 dark:text-zinc-400 hover:text-orange-600 dark:hover:text-orange-400"
+                                >
+                                    Limpiar
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {(bucketFilter !== 'all' || companyFilter !== 'all') && (
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-zinc-800">
+                            <span className="text-xs text-gray-500 dark:text-zinc-500">
+                                {filtered.length} de {orders.length} pedidos
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setBucketFilter('all');
+                                    setCompanyFilter('all');
+                                }}
+                                className="text-xs font-bold text-orange-600 dark:text-orange-400 hover:underline"
+                            >
+                                Limpiar todos los filtros
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Active-filter summary shown when the popover is closed
+                so admin still sees which filters are in effect. */}
+            {!filterOpen && (bucketFilter !== 'all' || companyFilter !== 'all') && (
+                <div className="flex flex-wrap items-center gap-2 mb-4 text-xs">
+                    <span className="text-gray-500 dark:text-zinc-500 font-semibold">Filtros activos:</span>
+                    {bucketFilter !== 'all' && (
                         <button
-                            key={b.key}
-                            onClick={() => setBucketFilter(b.key)}
-                            className={`px-4 py-2 rounded-full text-xs font-bold transition-colors flex items-center gap-1.5 ${
-                                active
-                                    ? b.color + ' shadow-md'
-                                    : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-300 hover:bg-gray-200 dark:hover:bg-zinc-700'
-                            }`}
+                            type="button"
+                            onClick={() => setBucketFilter('all')}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 font-bold hover:bg-orange-200 dark:hover:bg-orange-950/60"
+                            title="Quitar filtro de estado"
                         >
-                            {b.key === 'all' && <Filter size={14} />}
-                            {b.label} ({b.count})
+                            {bucketFilter === 'pending' && 'Sin iniciar'}
+                            {bucketFilter === 'in-progress' && 'En proceso'}
+                            {bucketFilter === 'done' && 'Listas'}
+                            {bucketFilter === 'cancelled' && 'Canceladas'}
+                            <X size={11} />
                         </button>
-                    );
-                })}
-            </div>
+                    )}
+                    {companyFilter !== 'all' && (
+                        <button
+                            type="button"
+                            onClick={() => setCompanyFilter('all')}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 font-bold hover:bg-orange-200 dark:hover:bg-orange-950/60"
+                            title="Quitar filtro de empresa"
+                        >
+                            {companyFilter}
+                            <X size={11} />
+                        </button>
+                    )}
+                </div>
+            )}
 
             {/* Card grid */}
             {filtered.length === 0 ? (
