@@ -69,6 +69,7 @@ function OrderCard({
                     </div>
                     <StageCompleteToggle
                         orderUuid={order.uuid}
+                        orderRef={order.id}
                         stage="maquila"
                         isCompleted={isCompleted}
                         onLocalChange={onLocalChange}
