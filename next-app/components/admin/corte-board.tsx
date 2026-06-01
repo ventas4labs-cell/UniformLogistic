@@ -4,7 +4,6 @@ import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     Scissors,
-    Search,
     RefreshCw,
     Loader2,
     ChevronDown,
@@ -15,6 +14,7 @@ import type { Order } from '@/lib/types';
 import { aggregateCutLines, parseColor } from '@/lib/stage-utils';
 import { StageCompleteToggle } from '@/components/admin/stage-complete-toggle';
 import { StageTabBar, type StageTab } from '@/components/admin/stage-tab-bar';
+import { CollapsibleSearch } from '@/components/admin/collapsible-search';
 
 function CutSummary({ orders }: { orders: Order[] }) {
     const lines = useMemo(() => aggregateCutLines(orders), [orders]);
@@ -322,31 +322,24 @@ export function CorteBoard({
                         Pedidos en corte: planifica las tallas, telas, colores y cantidades.
                     </p>
                 </div>
-                <button
-                    onClick={() => router.refresh()}
-                    className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"
-                >
-                    <RefreshCw size={20} className={pending ? 'animate-spin' : ''} />
-                </button>
+                <div className="flex items-center gap-2">
+                    <CollapsibleSearch
+                        value={searchTerm}
+                        onChange={setSearchTerm}
+                        placeholder="Buscar por orden, empresa o cliente…"
+                    />
+                    <button
+                        onClick={() => router.refresh()}
+                        className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"
+                        title="Recargar"
+                        aria-label="Recargar"
+                    >
+                        <RefreshCw size={18} className={pending ? 'animate-spin' : ''} />
+                    </button>
+                </div>
             </div>
 
             <StageTabBar tab={tab} setTab={setTab} counts={counts} />
-
-            <div className="bg-white dark:bg-zinc-900 p-3 rounded-xl shadow-sm mb-4">
-                <div className="relative w-full max-w-md">
-                    <Search
-                        className="absolute left-3 top-2.5 text-gray-400 dark:text-zinc-500"
-                        size={18}
-                    />
-                    <input
-                        type="text"
-                        placeholder="Buscar por orden, empresa o cliente..."
-                        className="w-full pl-10 pr-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-yellow-500 text-sm"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </div>
-            </div>
 
             {orders.length > 0 && (
                 <div className="mb-4">

@@ -8,10 +8,10 @@ import {
     ChevronRight,
     Clock,
     Receipt,
-    Search,
     Wallet
 } from 'lucide-react';
 import type { CompanyInvoiceGroup, InvoiceRow } from '@/lib/services/invoices';
+import { CollapsibleSearch } from '@/components/admin/collapsible-search';
 
 const fmtCRC = (n: number) =>
     new Intl.NumberFormat('es-CR', {
@@ -200,19 +200,12 @@ export function AdminCuentasBoard({ groups }: { groups: CompanyInvoiceGroup[] })
 
             {/* Toolbar */}
             <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm p-3 mb-4 flex flex-col sm:flex-row gap-2 sm:items-center border border-gray-200 dark:border-zinc-800">
-                <div className="relative flex-1">
-                    <Search
-                        size={16}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-zinc-500"
-                    />
-                    <input
-                        type="text"
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Buscar empresa, factura o ORDEN-XXXXX…"
-                        className="w-full pl-9 pr-3 py-2 border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-gray-900 dark:text-zinc-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none"
-                    />
-                </div>
+                <CollapsibleSearch
+                    value={query}
+                    onChange={setQuery}
+                    placeholder="Buscar empresa, factura o ORDEN-XXXXX…"
+                    expandedClassName="w-full sm:flex-1"
+                />
                 <div className="flex gap-1">
                     {(['all', 'overdue', 'pending'] as Filter[]).map((f) => (
                         <button

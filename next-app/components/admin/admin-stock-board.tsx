@@ -7,11 +7,11 @@ import {
     ChevronRight,
     ImageIcon,
     PackageCheck,
-    Search,
     Warehouse
 } from 'lucide-react';
 import type { CompanyStockGroup, StockRow } from '@/lib/services/stock';
 import { VoiceStockDictate } from '@/components/admin/voice-stock-dictate';
+import { CollapsibleSearch } from '@/components/admin/collapsible-search';
 
 // Canonical shirt size order (anything not in this list sorts to the end).
 const SHIRT_SIZE_ORDER = [
@@ -244,19 +244,12 @@ export function AdminStockBoard({
 
             {/* Toolbar */}
             <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm p-3 mb-4 flex flex-col sm:flex-row gap-2 sm:items-center border border-gray-200 dark:border-zinc-800">
-                <div className="relative flex-1">
-                    <Search
-                        size={16}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-zinc-500"
-                    />
-                    <input
-                        type="text"
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Buscar empresa…"
-                        className="w-full pl-9 pr-3 py-2 border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-gray-900 dark:text-zinc-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none"
-                    />
-                </div>
+                <CollapsibleSearch
+                    value={query}
+                    onChange={setQuery}
+                    placeholder="Buscar empresa…"
+                    expandedClassName="w-full sm:flex-1"
+                />
                 <div className="flex gap-1">
                     {(['all', 'shirt', 'pant'] as TypeFilter[]).map((f) => (
                         <button

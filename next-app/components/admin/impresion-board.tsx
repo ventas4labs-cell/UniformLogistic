@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Printer, Search, RefreshCw } from 'lucide-react';
+import { Printer, RefreshCw } from 'lucide-react';
 import type { Order } from '@/lib/types';
 import { StageCompleteToggle } from '@/components/admin/stage-complete-toggle';
 import { StageTabBar, type StageTab } from '@/components/admin/stage-tab-bar';
+import { CollapsibleSearch } from '@/components/admin/collapsible-search';
 
 function OrderCard({
     order,
@@ -153,31 +154,24 @@ export function ImpresionBoard({
                         completado cuando la impresión esté lista.
                     </p>
                 </div>
-                <button
-                    onClick={() => router.refresh()}
-                    className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"
-                >
-                    <RefreshCw size={20} />
-                </button>
+                <div className="flex items-center gap-2">
+                    <CollapsibleSearch
+                        value={searchTerm}
+                        onChange={setSearchTerm}
+                        placeholder="Buscar por orden, empresa o cliente…"
+                    />
+                    <button
+                        onClick={() => router.refresh()}
+                        className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"
+                        title="Recargar"
+                        aria-label="Recargar"
+                    >
+                        <RefreshCw size={18} />
+                    </button>
+                </div>
             </div>
 
             <StageTabBar tab={tab} setTab={setTab} counts={counts} />
-
-            <div className="bg-white dark:bg-zinc-900 p-3 rounded-xl shadow-sm mb-4">
-                <div className="relative w-full max-w-md">
-                    <Search
-                        className="absolute left-3 top-2.5 text-gray-400 dark:text-zinc-500"
-                        size={18}
-                    />
-                    <input
-                        type="text"
-                        placeholder="Buscar por orden, empresa o cliente..."
-                        className="w-full pl-10 pr-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-pink-500 text-sm"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </div>
-            </div>
 
             {filtered.length === 0 ? (
                 <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm p-12 text-center text-gray-500 dark:text-zinc-400">
