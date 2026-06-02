@@ -3,13 +3,25 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Building2, Plus, Edit2, Trash2, Loader2, X, Link2, Check } from 'lucide-react';
+import { Building2, Plus, Edit2, Trash2, Loader2, X, Link2, Check, UserPlus } from 'lucide-react';
 import { Company, CompanyInput } from '@/lib/services/companies';
 import {
     createCompanyAction,
     updateCompanyAction,
     deleteCompanyAction
 } from '@/app/(admin)/admin/companies/actions';
+
+interface InitialUserForm {
+    email: string;
+    password: string;
+    fullName: string;
+}
+
+const emptyUserForm: InitialUserForm = {
+    email: '',
+    password: '',
+    fullName: ''
+};
 
 const emptyForm: CompanyInput = {
     name: '',
@@ -27,6 +39,10 @@ export function CompaniesManager({ initialCompanies }: { initialCompanies: Compa
     const [editing, setEditing] = useState<Company | null>(null);
     const [showForm, setShowForm] = useState(false);
     const [form, setForm] = useState<CompanyInput>(emptyForm);
+    // Companion user account created together with the empresa. Only
+    // shown on create; editing leaves user accounts to /admin/users.
+    const [userForm, setUserForm] = useState<InitialUserForm>(emptyUserForm);
+    const [createUser, setCreateUser] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -42,6 +58,8 @@ export function CompaniesManager({ initialCompanies }: { initialCompanies: Compa
     const startCreate = () => {
         setEditing(null);
         setForm(emptyForm);
+        setUserForm(emptyUserForm);
+        setCreateUser(true);
         setShowForm(true);
         setError(null);
     };
@@ -68,11 +86,25 @@ export function CompaniesManager({ initialCompanies }: { initialCompanies: Compa
         try {
             if (editing) {
                 await updateCompanyAction(editing.id, form);
+                setShowForm(false);
+                router.refresh();
             } else {
-                await createCompanyAction(form);
+                const initialUser =
+                    createUser && userForm.email.trim() && userForm.password.trim()
+                        ? {
+                              email: userForm.email,
+                              password: userForm.password,
+                              fullName: userForm.fullName
+                          }
+                        : undefined;
+                const res = await createCompanyAction(form, initialUser);
+                if (res.error) {
+                    setError(res.error);
+                    return;
+                }
+                setShowForm(false);
+                router.refresh();
             }
-            setShowForm(false);
-            router.refresh();
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Error al guardar');
         } finally {
@@ -252,6 +284,82 @@ export function CompaniesManager({ initialCompanies }: { initialCompanies: Compa
                                 />
                                 Empresa activa
                             </label>
+
+                            {/* Companion user account — only on create. The
+                                empresa and the customer-user account are
+                                created in one round-trip; if user creation
+                                fails the empresa is rolled back to avoid
+                                orphan rows. */}
+                            {!editing && (
+                                <div className="rounded-xl border border-orange-200 dark:border-orange-900/40 bg-orange-50/40 dark:bg-orange-950/20 p-4 space-y-3">
+                                    <label className="flex items-center gap-2 text-sm font-bold text-orange-700 dark:text-orange-300">
+                                        <input
+                                            type="checkbox"
+                                            checked={createUser}
+                                            onChange={(e) => setCreateUser(e.target.checked)}
+                                            className="w-4 h-4 text-orange-600 dark:text-orange-400 rounded"
+                                        />
+                                        <UserPlus size={16} />
+                                        Crear usuario para esta empresa
+                                    </label>
+                                    {createUser ? (
+                                        <>
+                                            <p className="text-xs text-gray-600 dark:text-zinc-400">
+                                                Se creará una cuenta de cliente vinculada a esta
+                                                empresa. El contacto podrá iniciar sesión con
+                                                este email para hacer pedidos.
+                                            </p>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                <Field label="Email del usuario *">
+                                                    <input
+                                                        required={createUser}
+                                                        type="email"
+                                                        autoComplete="off"
+                                                        value={userForm.email}
+                                                        onChange={(e) =>
+                                                            setUserForm({ ...userForm, email: e.target.value })
+                                                        }
+                                                        placeholder="contacto@empresa.com"
+                                                        className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none text-sm bg-white dark:bg-zinc-900"
+                                                    />
+                                                </Field>
+                                                <Field label="Contraseña inicial (≥ 8) *">
+                                                    <input
+                                                        required={createUser}
+                                                        type="text"
+                                                        autoComplete="new-password"
+                                                        minLength={8}
+                                                        value={userForm.password}
+                                                        onChange={(e) =>
+                                                            setUserForm({ ...userForm, password: e.target.value })
+                                                        }
+                                                        className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none text-sm bg-white dark:bg-zinc-900 font-mono"
+                                                    />
+                                                </Field>
+                                            </div>
+                                            <Field label="Nombre completo">
+                                                <input
+                                                    type="text"
+                                                    value={userForm.fullName}
+                                                    onChange={(e) =>
+                                                        setUserForm({ ...userForm, fullName: e.target.value })
+                                                    }
+                                                    placeholder={
+                                                        form.contactName ||
+                                                        'Se autocompleta con "Persona de contacto"'
+                                                    }
+                                                    className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none text-sm bg-white dark:bg-zinc-900"
+                                                />
+                                            </Field>
+                                        </>
+                                    ) : (
+                                        <p className="text-xs text-gray-500 dark:text-zinc-500 italic">
+                                            Podés crear y asignar el usuario después desde{' '}
+                                            <span className="font-semibold">Admin → Usuarios</span>.
+                                        </p>
+                                    )}
+                                </div>
+                            )}
                             {error && (
                                 <div className="bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 p-3 rounded-lg text-sm border border-red-100 dark:border-red-900/50">
                                     {error}
