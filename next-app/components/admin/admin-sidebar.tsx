@@ -33,6 +33,7 @@ type Tab = { href: string; label: string; icon: React.ReactNode };
 const TABS: Tab[] = [
     { href: '/admin/orders',         label: 'Pedidos',        icon: <ClipboardList size={20} /> },
     { href: '/admin/stock',          label: 'Stock',          icon: <Boxes size={20} /> },
+    { href: '/admin/materials',      label: 'Materiales',     icon: <Package size={20} /> },
     { href: '/admin/cuentas',        label: 'Cuentas',        icon: <Wallet size={20} /> },
     { href: '/admin/companies',      label: 'Empresas',       icon: <Building2 size={20} /> },
     { href: '/admin/products',       label: 'Productos',      icon: <Package size={20} /> },
