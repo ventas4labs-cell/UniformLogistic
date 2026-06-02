@@ -329,8 +329,8 @@ export function ProductsManager({
 
     return (
         <div>
-            <div className="flex justify-between items-center mb-6">
-                <div>
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
+                <div className="min-w-0">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-zinc-100">Productos</h2>
                     <p className="text-gray-500 dark:text-zinc-400 text-sm">
                         Catálogo maestro. Editá un producto y marcá las empresas
@@ -338,7 +338,7 @@ export function ProductsManager({
                         disponible.
                     </p>
                 </div>
-                <div className="flex items-center gap-2 flex-wrap justify-end">
+                <div className="flex items-center gap-2 flex-wrap sm:justify-end">
                     <VoiceProductDictate onPrefill={startCreateWithVoice} />
                     <button
                         onClick={startCreate}
@@ -349,8 +349,8 @@ export function ProductsManager({
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm overflow-hidden">
-                <table className="w-full text-left">
+            <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm overflow-x-auto">
+                <table className="w-full text-left min-w-[920px]">
                     <thead className="bg-gray-50 dark:bg-zinc-900/60 border-b border-gray-200 dark:border-zinc-800">
                         <tr>
                             <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400 w-16"></th>

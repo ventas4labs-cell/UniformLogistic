@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/utils/supabase/server';
-import { AdminSidebar } from '@/components/admin/admin-sidebar';
+import { AdminShell } from '@/components/admin/admin-shell';
 
 const ADMIN_EMAIL = 'ulogisticcr@gmail.com';
 
@@ -12,12 +12,5 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     const email = (user.email || '').trim().toLowerCase();
     if (email !== ADMIN_EMAIL) redirect('/home');
 
-    return (
-        <div className="flex min-h-screen bg-gray-100 dark:bg-zinc-950 transition-colors">
-            <AdminSidebar />
-            <main className="flex-1 ml-64 p-8">
-                <div className="max-w-6xl mx-auto">{children}</div>
-            </main>
-        </div>
-    );
+    return <AdminShell>{children}</AdminShell>;
 }

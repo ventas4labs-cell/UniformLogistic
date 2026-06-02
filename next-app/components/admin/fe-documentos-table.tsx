@@ -27,7 +27,7 @@ function formatMoney(n: number): string {
 
 export function FeDocumentosTable({ documentos }: { documentos: FeDocumentoRow[] }) {
     return (
-        <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm overflow-x-auto">
             <div className="p-6 border-b border-gray-100 dark:border-zinc-800">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-zinc-100">Documentos Emitidos</h3>
                 <p className="text-gray-500 dark:text-zinc-400 text-sm">
@@ -35,7 +35,7 @@ export function FeDocumentosTable({ documentos }: { documentos: FeDocumentoRow[]
                 </p>
             </div>
             <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
+                <table className="w-full text-left text-sm min-w-[820px]">
                     <thead className="bg-gray-50 dark:bg-zinc-900/60 border-b border-gray-200 dark:border-zinc-800">
                         <tr>
                             <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Fecha</th>

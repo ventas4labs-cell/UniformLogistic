@@ -127,13 +127,13 @@ export function StationUsersManager({
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm overflow-hidden border border-gray-200 dark:border-zinc-800">
+            <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm overflow-x-auto border border-gray-200 dark:border-zinc-800">
                 {users.length === 0 ? (
                     <div className="p-12 text-center text-gray-500 dark:text-zinc-400">
                         Aún no hay estaciones registradas.
                     </div>
                 ) : (
-                    <table className="w-full text-sm">
+                    <table className="w-full text-sm min-w-[680px]">
                         <thead className="bg-gray-50 dark:bg-zinc-900/60">
                             <tr>
                                 <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-zinc-400 text-xs uppercase">Nombre</th>

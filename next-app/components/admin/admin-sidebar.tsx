@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
     LogOut,
+    X,
     ClipboardList,
     Building2,
     Package,
@@ -51,7 +52,12 @@ const OPERATIONS_TABS: Tab[] = [
     { href: '/admin/ploter',    label: 'Ploter',    icon: <PenTool size={16} /> }
 ];
 
-export function AdminSidebar() {
+interface SidebarProps {
+    mobileOpen?: boolean;
+    onMobileClose?: () => void;
+}
+
+export function AdminSidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}) {
     const pathname = usePathname();
     const operationsActive = OPERATIONS_TABS.some(
         (t) => pathname === t.href || pathname?.startsWith(t.href + '/')
@@ -64,10 +70,29 @@ export function AdminSidebar() {
     }, [operationsActive]);
 
     return (
-        <aside className="w-64 bg-gray-900 text-white flex flex-col fixed inset-y-0 left-0 z-30">
-            <div className="p-6 border-b border-white/10">
-                <h1 className="text-lg font-extrabold tracking-tight">Uniform Logistic</h1>
-                <p className="text-xs text-gray-400 mt-1">Panel de Administración</p>
+        <aside
+            className={`w-64 bg-gray-900 text-white flex flex-col fixed inset-y-0 left-0 z-30 transition-transform duration-200 ${
+                mobileOpen
+                    ? 'translate-x-0'
+                    : '-translate-x-full lg:translate-x-0'
+            }`}
+            aria-hidden={!mobileOpen ? undefined : false}
+        >
+            <div className="p-6 border-b border-white/10 flex items-start justify-between gap-2">
+                <div>
+                    <h1 className="text-lg font-extrabold tracking-tight">Uniform Logistic</h1>
+                    <p className="text-xs text-gray-400 mt-1">Panel de Administración</p>
+                </div>
+                {onMobileClose && (
+                    <button
+                        type="button"
+                        onClick={onMobileClose}
+                        aria-label="Cerrar menú"
+                        className="lg:hidden -m-2 p-2 rounded-lg text-gray-300 hover:bg-white/10 shrink-0"
+                    >
+                        <X size={20} />
+                    </button>
+                )}
             </div>
 
             <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">

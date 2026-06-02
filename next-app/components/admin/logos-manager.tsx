@@ -161,8 +161,8 @@ export function LogosManager({
                 </button>
             </div>
 
-            <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm overflow-hidden">
-                <table className="w-full text-left">
+            <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm overflow-x-auto">
+                <table className="w-full text-left min-w-[700px]">
                     <thead className="bg-gray-50 dark:bg-zinc-900/60 border-b border-gray-200 dark:border-zinc-800">
                         <tr>
                             <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400 w-16"></th>
