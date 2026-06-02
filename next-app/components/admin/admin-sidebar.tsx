@@ -8,13 +8,11 @@ import {
     ClipboardList,
     Building2,
     Package,
-    Layers,
     Users,
     ArrowLeft,
     Receipt,
     Boxes,
     Wallet,
-    ShoppingCart,
     HardHat,
     ChevronDown,
     ChevronRight,
@@ -33,13 +31,11 @@ type Tab = { href: string; label: string; icon: React.ReactNode };
 
 const TABS: Tab[] = [
     { href: '/admin/orders',         label: 'Pedidos',        icon: <ClipboardList size={20} /> },
-    { href: '/catalog',              label: 'Hacer pedido',   icon: <ShoppingCart size={20} /> },
     { href: '/admin/stock',          label: 'Stock',          icon: <Boxes size={20} /> },
     { href: '/admin/cuentas',        label: 'Cuentas',        icon: <Wallet size={20} /> },
     { href: '/admin/companies',      label: 'Empresas',       icon: <Building2 size={20} /> },
     { href: '/admin/products',       label: 'Productos',      icon: <Package size={20} /> },
     { href: '/admin/logos',          label: 'Logos',          icon: <Sticker size={20} /> },
-    { href: '/admin/catalog',        label: 'Catálogo',       icon: <Layers size={20} /> },
     { href: '/admin/users',          label: 'Usuarios',       icon: <Users size={20} /> },
     { href: '/admin/station-users',  label: 'Estaciones',     icon: <HardHat size={20} /> },
     { href: '/admin/facturacion',    label: 'Facturación',    icon: <Receipt size={20} /> }

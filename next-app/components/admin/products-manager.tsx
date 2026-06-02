@@ -333,7 +333,9 @@ export function ProductsManager({
                 <div>
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-zinc-100">Productos</h2>
                     <p className="text-gray-500 dark:text-zinc-400 text-sm">
-                        Catálogo maestro. Asígnalos a empresas en la pestaña &ldquo;Catálogo&rdquo;.
+                        Catálogo maestro. Editá un producto y marcá las empresas
+                        en &ldquo;Empresas asignadas&rdquo; para hacérselo
+                        disponible.
                     </p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap justify-end">
@@ -358,6 +360,7 @@ export function ProductsManager({
                             <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Género</th>
                             <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Tela</th>
                             <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">CABYS</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Empresas</th>
                             <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Estado</th>
                             <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400 text-right">Acciones</th>
                         </tr>
@@ -365,7 +368,7 @@ export function ProductsManager({
                     <tbody className="divide-y divide-gray-100 dark:divide-zinc-800">
                         {initialProducts.length === 0 ? (
                             <tr>
-                                <td colSpan={9} className="p-8 text-center text-gray-500 dark:text-zinc-400">
+                                <td colSpan={10} className="p-8 text-center text-gray-500 dark:text-zinc-400">
                                     <Package size={32} className="mx-auto mb-2 opacity-30" />
                                     Sin productos registrados.
                                 </td>
@@ -408,6 +411,34 @@ export function ProductsManager({
                                                 Sin CABYS
                                             </span>
                                         )}
+                                    </td>
+                                    <td className="p-4">
+                                        {(() => {
+                                            const n = p.companyIds?.length || 0;
+                                            // Click the chip → opens the edit modal scrolled to
+                                            // the "Empresas asignadas" section so admin can
+                                            // toggle assignments without a separate tab.
+                                            return (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => startEdit(p)}
+                                                    title={
+                                                        n === 0
+                                                            ? 'Sin asignar a ninguna empresa — clic para asignar'
+                                                            : `${n} empresa${n === 1 ? '' : 's'} asignada${n === 1 ? '' : 's'} — clic para editar`
+                                                    }
+                                                    className={`text-xs font-bold px-2 py-1 rounded-full transition-colors ${
+                                                        n === 0
+                                                            ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-950/50'
+                                                            : 'bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-950/60'
+                                                    }`}
+                                                >
+                                                    {n === 0
+                                                        ? 'Sin empresas'
+                                                        : `${n} empresa${n === 1 ? '' : 's'}`}
+                                                </button>
+                                            );
+                                        })()}
                                     </td>
                                     <td className="p-4">
                                         <span

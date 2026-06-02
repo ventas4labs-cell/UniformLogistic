@@ -579,8 +579,10 @@ function ReviewTable({
                         ))}
                     </ul>
                     <p className="text-[11px] text-zinc-500 dark:text-zinc-500 mt-1">
-                        Si estos productos deberían estar disponibles para esta empresa, asignalos en{' '}
-                        <span className="font-mono">/admin/catalog</span>.
+                        Si estos productos deberían estar disponibles para esta empresa,
+                        editá el producto en{' '}
+                        <span className="font-mono">/admin/products</span> y marcá la
+                        empresa en &ldquo;Empresas asignadas&rdquo;.
                     </p>
                 </div>
             )}

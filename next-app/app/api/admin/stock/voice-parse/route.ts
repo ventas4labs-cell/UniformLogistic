@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
             commands: [],
             unmatched: [],
             warning:
-                'Esta empresa no tiene productos asignados. Asignalos en /admin/catalog antes de dictar stock.'
+                'Esta empresa no tiene productos asignados. Editá los productos en /admin/products y marcá esta empresa en "Empresas asignadas" antes de dictar stock.'
         });
     }
 
