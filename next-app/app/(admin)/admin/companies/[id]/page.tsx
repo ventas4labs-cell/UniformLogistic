@@ -13,7 +13,9 @@ import { createClient } from '@/utils/supabase/server';
 import { fetchCompanyById } from '@/lib/services/companies';
 import { fetchOrdersForCompany } from '@/lib/services/orders';
 import { fetchStageCompletionsForOrders } from '@/lib/services/stage-completions';
+import { fetchCatalogForCompany } from '@/lib/services/companyCatalog';
 import { CompanyDetail } from '@/components/admin/company-detail';
+import { CompanyProductsPanel } from '@/components/admin/company-products-panel';
 
 export default async function CompanyDetailPage({
     params
@@ -25,7 +27,10 @@ export default async function CompanyDetailPage({
     const company = await fetchCompanyById(supabase, id);
     if (!company) notFound();
 
-    const orders = await fetchOrdersForCompany(supabase, company.id);
+    const [orders, allProducts] = await Promise.all([
+        fetchOrdersForCompany(supabase, company.id),
+        fetchCatalogForCompany(supabase, company.id)
+    ]);
     const orderIds = orders.map((o) => o.uuid).filter((x): x is string => !!x);
     const completions = await fetchStageCompletionsForOrders(supabase, orderIds);
     const completionsList = Array.from(completions.entries()).flatMap(
@@ -103,6 +108,23 @@ export default async function CompanyDetailPage({
                     />
                 </div>
             </header>
+
+            <div className="mb-6">
+                <CompanyProductsPanel
+                    companyId={company.id}
+                    initialProducts={allProducts.map((p) => ({
+                        uuid: p.uuid,
+                        id: p.id,
+                        name: p.name,
+                        typeLabel: p.typeLabel,
+                        image: p.image,
+                        category: p.category,
+                        fabricType: p.fabricType,
+                        isAssigned: p.isAssigned,
+                        isActive: p.isActive
+                    }))}
+                />
+            </div>
 
             <CompanyDetail
                 companyName={company.name}
