@@ -207,6 +207,14 @@ export function SimpleStageBoard({
                         onChange={setSearchTerm}
                         placeholder="Buscar por orden, empresa o cliente…"
                     />
+                    <StageBoardFilters
+                        orders={orders}
+                        counts={counts}
+                        tab={tab}
+                        setTab={setTab}
+                        companyFilter={companyFilter}
+                        setCompanyFilter={setCompanyFilter}
+                    />
                     <button
                         onClick={() => router.refresh()}
                         className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"
@@ -217,15 +225,6 @@ export function SimpleStageBoard({
                     </button>
                 </div>
             </div>
-
-            <StageBoardFilters
-                orders={orders}
-                counts={counts}
-                tab={tab}
-                setTab={setTab}
-                companyFilter={companyFilter}
-                setCompanyFilter={setCompanyFilter}
-            />
 
             {filtered.length === 0 ? (
                 <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm p-12 text-center text-gray-500 dark:text-zinc-400">

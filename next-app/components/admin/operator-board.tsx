@@ -8,14 +8,7 @@ import {
     ChevronDown,
     ChevronUp,
     Package,
-    Scissors,
-    Factory,
-    Printer,
-    PackageCheck,
     CheckCircle2,
-    Clock,
-    XCircle,
-    Filter,
     AlertTriangle,
     X,
     Send,
@@ -23,7 +16,6 @@ import {
     Check,
 } from 'lucide-react';
 import type { Order } from '@/lib/types';
-import { ORDER_STATUS_OPTIONS, OrderStatus } from '@/lib/services/orders';
 import type { InsumoCompletion } from '@/lib/services/insumo-completions';
 import {
     aggregateInsumos,
@@ -43,17 +35,6 @@ import type { InsumoPreparation } from '@/lib/services/insumo-preparations';
 
 const completionKey = (orderId: string, insumoName: string) =>
     `${orderId}|${insumoName}`;
-
-const STATUS_ICONS: Record<string, React.ReactNode> = {
-    pending: <Clock size={16} />,
-    bodega: <Package size={16} />,
-    corte: <Scissors size={16} />,
-    maquila: <Factory size={16} />,
-    impresion: <Printer size={16} />,
-    empaque: <PackageCheck size={16} />,
-    completed: <CheckCircle2 size={16} />,
-    cancelled: <XCircle size={16} />,
-};
 
 function ReportMissingForm({
     orderId,
@@ -537,7 +518,6 @@ export function OperatorBoard({
     const [tab, setTab] = useState<StageTab>('pending');
     const [searchTerm, setSearchTerm] = useState('');
     const [companyFilter, setCompanyFilter] = useState<string>('all');
-    const [activeFilter, setActiveFilter] = useState<OrderStatus | 'all'>('all');
     const [showGlobalInsumos, setShowGlobalInsumos] = useState(false);
     const [pending, startTransition] = useTransition();
     const router = useRouter();
@@ -584,7 +564,6 @@ export function OperatorBoard({
         return tab === 'done' ? done : !done;
     });
     const filtered = tabFiltered.filter((o) => {
-        if (activeFilter !== 'all' && o.status !== activeFilter) return false;
         if (companyFilter !== 'all' && o.companyName !== companyFilter) return false;
         if (!searchTerm) return true;
         const term = searchTerm.toLowerCase();
@@ -601,21 +580,12 @@ export function OperatorBoard({
         all: orders.length
     };
 
-    const statusCounts = orders.reduce(
-        (acc, o) => {
-            const s = (o.status as OrderStatus) || 'pending';
-            acc[s] = (acc[s] || 0) + 1;
-            return acc;
-        },
-        {} as Record<string, number>
-    );
-
+    // Pre-completion orders for the global insumo summary — exclude
+    // completed/cancelled since they don't need insumos prepared.
     const activeOrders = filtered.filter(
         (o) => o.status !== 'completed' && o.status !== 'cancelled'
     );
-    const globalInsumos = aggregateInsumosGlobal(
-        activeFilter === 'all' ? activeOrders : filtered
-    );
+    const globalInsumos = aggregateInsumosGlobal(activeOrders);
 
     return (
         <div>
@@ -634,6 +604,14 @@ export function OperatorBoard({
                         onChange={setSearchTerm}
                         placeholder="Buscar por orden, empresa o cliente…"
                     />
+                    <StageBoardFilters
+                        orders={orders}
+                        counts={tabCounts}
+                        tab={tab}
+                        setTab={setTab}
+                        companyFilter={companyFilter}
+                        setCompanyFilter={setCompanyFilter}
+                    />
                     <button
                         onClick={() => router.refresh()}
                         className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"
@@ -643,53 +621,6 @@ export function OperatorBoard({
                         <RefreshCw size={18} className={pending ? 'animate-spin' : ''} />
                     </button>
                 </div>
-            </div>
-
-            <StageBoardFilters
-                orders={orders}
-                counts={tabCounts}
-                tab={tab}
-                setTab={setTab}
-                companyFilter={companyFilter}
-                setCompanyFilter={setCompanyFilter}
-            />
-
-            {/* Status filter chips */}
-            <div className="flex flex-wrap gap-2 mb-4">
-                <button
-                    onClick={() => setActiveFilter('all')}
-                    className={`px-4 py-2 rounded-full text-xs font-bold transition-colors flex items-center gap-1.5 ${
-                        activeFilter === 'all'
-                            ? 'bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-md'
-                            : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-300 hover:bg-gray-200 dark:hover:bg-zinc-700'
-                    }`}
-                >
-                    <Filter size={14} />
-                    Todos ({orders.length})
-                </button>
-                {ORDER_STATUS_OPTIONS.map((opt) => {
-                    const count = statusCounts[opt.value] || 0;
-                    if (count === 0) return null;
-                    return (
-                        <button
-                            key={opt.value}
-                            onClick={() =>
-                                setActiveFilter(
-                                    activeFilter === opt.value ? 'all' : opt.value
-                                )
-                            }
-                            className={`px-4 py-2 rounded-full text-xs font-bold transition-colors flex items-center gap-1.5 ${
-                                activeFilter === opt.value
-                                    ? 'ring-2 ring-offset-1 ring-orange-500 dark:ring-offset-zinc-950 shadow-md ' +
-                                      opt.color
-                                    : opt.color + ' opacity-80 hover:opacity-100'
-                            }`}
-                        >
-                            {STATUS_ICONS[opt.value]}
-                            {opt.label} ({count})
-                        </button>
-                    );
-                })}
             </div>
 
             {/* Global insumo summary toggle */}
@@ -706,9 +637,7 @@ export function OperatorBoard({
                     {showGlobalInsumos && (
                         <div className="mt-2 bg-white dark:bg-zinc-900 rounded-xl shadow-sm border border-purple-200 dark:border-purple-900/50 p-4">
                             <h3 className="text-xs font-bold text-purple-700 dark:text-purple-300 uppercase tracking-wide mb-3">
-                                {activeFilter === 'all'
-                                    ? 'Insumos totales (pedidos activos)'
-                                    : `Insumos — ${ORDER_STATUS_OPTIONS.find((o) => o.value === activeFilter)?.label || ''}`}
+                                Insumos totales (pedidos activos)
                             </h3>
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                                 {globalInsumos.map((ins) => (

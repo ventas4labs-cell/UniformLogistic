@@ -1,13 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Filter, X } from 'lucide-react';
 import type { Order } from '@/lib/types';
 import type { StageTab } from '@/components/admin/stage-tab-bar';
 
 interface Props {
-    // Used to derive the empresa dropdown — every distinct company
-    // present in the board's order list shows up, sorted A→Z.
     orders: Order[];
     counts: { pending: number; done: number; all: number };
     tab: StageTab;
@@ -16,14 +14,9 @@ interface Props {
     setCompanyFilter: (c: string) => void;
 }
 
-// Shared filter UI for every stage board (Bodega, Corte, Maquila,
-// Impresión, Bordado, Empaque, Ploter). Same icon-and-popover shape
-// as /admin/orders so admin only learns one filter pattern.
-//
-// Closed → just a Filter icon button (with an orange dot when any
-// filter is non-default) and a compact "Filtros activos:" pill row
-// below summarizing what's on. Open → panel with Estado tabs +
-// Empresa dropdown.
+// Single icon button — slot it into a board's title-row action cluster
+// (next to search / refresh). The popover floats absolutely below the
+// button so it doesn't push the page around.
 export function StageBoardFilters({
     orders,
     counts,
@@ -33,6 +26,25 @@ export function StageBoardFilters({
     setCompanyFilter
 }: Props) {
     const [open, setOpen] = useState(false);
+    const wrapperRef = useRef<HTMLDivElement>(null);
+
+    // Click-outside / Escape closes the popover.
+    useEffect(() => {
+        if (!open) return;
+        const onClick = (e: MouseEvent) => {
+            if (!wrapperRef.current) return;
+            if (!wrapperRef.current.contains(e.target as Node)) setOpen(false);
+        };
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setOpen(false);
+        };
+        document.addEventListener('mousedown', onClick);
+        document.addEventListener('keydown', onKey);
+        return () => {
+            document.removeEventListener('mousedown', onClick);
+            document.removeEventListener('keydown', onKey);
+        };
+    }, [open]);
 
     const distinctCompanies = useMemo(
         () =>
@@ -47,40 +59,26 @@ export function StageBoardFilters({
     const filtersActive = tab !== 'pending' || companyFilter !== 'all';
 
     return (
-        <div className="mb-4">
-            <div className="flex items-center justify-between gap-2">
-                <button
-                    type="button"
-                    onClick={() => setOpen((o) => !o)}
-                    className={`relative inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-bold transition-colors ${
-                        open || filtersActive
-                            ? 'bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300'
-                            : 'bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 hover:bg-gray-200 dark:hover:bg-zinc-700'
-                    }`}
-                    title="Filtros"
-                    aria-label="Filtros"
-                >
-                    <Filter size={14} />
-                    Filtros
-                    {filtersActive && (
-                        <span className="ml-1 w-2 h-2 rounded-full bg-orange-600" />
-                    )}
-                </button>
-
-                {/* Pending-count summary on the right so admin still
-                    sees how many orders the default view captures
-                    without expanding the panel. */}
-                <span className="text-xs text-gray-500 dark:text-zinc-500">
-                    {tab === 'pending'
-                        ? `${counts.pending} pendiente${counts.pending === 1 ? '' : 's'}`
-                        : tab === 'done'
-                            ? `${counts.done} completado${counts.done === 1 ? '' : 's'}`
-                            : `${counts.all} pedido${counts.all === 1 ? '' : 's'}`}
-                </span>
-            </div>
+        <div ref={wrapperRef} className="relative">
+            <button
+                type="button"
+                onClick={() => setOpen((o) => !o)}
+                className={`relative p-2 rounded-lg ${
+                    open || filtersActive
+                        ? 'bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300'
+                        : 'text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700'
+                }`}
+                title="Filtros"
+                aria-label="Filtros"
+            >
+                <Filter size={18} />
+                {filtersActive && (
+                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-orange-600 ring-2 ring-white dark:ring-zinc-950" />
+                )}
+            </button>
 
             {open && (
-                <div className="mt-2 bg-white dark:bg-zinc-900 rounded-xl shadow-sm border border-gray-200 dark:border-zinc-800 p-4 space-y-4">
+                <div className="absolute right-0 top-full mt-2 z-30 w-80 bg-white dark:bg-zinc-900 rounded-xl shadow-2xl border border-gray-200 dark:border-zinc-800 p-4 space-y-4">
                     <div>
                         <h4 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-zinc-500 mb-2">
                             Estado
@@ -120,10 +118,10 @@ export function StageBoardFilters({
                             <select
                                 value={companyFilter}
                                 onChange={(e) => setCompanyFilter(e.target.value)}
-                                className="flex-1 max-w-md p-2 border border-gray-300 dark:border-zinc-700 rounded-lg text-sm bg-white dark:bg-zinc-900 focus:ring-2 focus:ring-orange-500 outline-none"
+                                className="flex-1 p-2 border border-gray-300 dark:border-zinc-700 rounded-lg text-sm bg-white dark:bg-zinc-900 focus:ring-2 focus:ring-orange-500 outline-none"
                             >
                                 <option value="all">
-                                    Todas las empresas ({distinctCompanies.length})
+                                    Todas ({distinctCompanies.length})
                                 </option>
                                 {distinctCompanies.map((name) => (
                                     <option key={name} value={name}>
@@ -166,35 +164,46 @@ export function StageBoardFilters({
                     )}
                 </div>
             )}
+        </div>
+    );
+}
 
-            {!open && filtersActive && (
-                <div className="flex flex-wrap items-center gap-2 mt-2 text-xs">
-                    <span className="text-gray-500 dark:text-zinc-500 font-semibold">
-                        Filtros activos:
-                    </span>
-                    {tab !== 'pending' && (
-                        <button
-                            type="button"
-                            onClick={() => setTab('pending')}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 font-bold hover:bg-orange-200 dark:hover:bg-orange-950/60"
-                            title="Volver a Pendientes"
-                        >
-                            {tab === 'done' ? 'Completados' : 'Todos'}
-                            <X size={11} />
-                        </button>
-                    )}
-                    {companyFilter !== 'all' && (
-                        <button
-                            type="button"
-                            onClick={() => setCompanyFilter('all')}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 font-bold hover:bg-orange-200 dark:hover:bg-orange-950/60"
-                            title="Quitar filtro de empresa"
-                        >
-                            {companyFilter}
-                            <X size={11} />
-                        </button>
-                    )}
-                </div>
+// Optional active-filter pill row to render below the title bar when
+// the popover is closed. Keeps admin aware of which filters are on
+// without expanding the popover. Boards can opt in if they have room.
+export function StageBoardActiveFilterPills({
+    tab,
+    setTab,
+    companyFilter,
+    setCompanyFilter
+}: Pick<Props, 'tab' | 'setTab' | 'companyFilter' | 'setCompanyFilter'>) {
+    if (tab === 'pending' && companyFilter === 'all') return null;
+    return (
+        <div className="flex flex-wrap items-center gap-2 mb-4 text-xs">
+            <span className="text-gray-500 dark:text-zinc-500 font-semibold">
+                Filtros activos:
+            </span>
+            {tab !== 'pending' && (
+                <button
+                    type="button"
+                    onClick={() => setTab('pending')}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 font-bold hover:bg-orange-200 dark:hover:bg-orange-950/60"
+                    title="Volver a Pendientes"
+                >
+                    {tab === 'done' ? 'Completados' : 'Todos'}
+                    <X size={11} />
+                </button>
+            )}
+            {companyFilter !== 'all' && (
+                <button
+                    type="button"
+                    onClick={() => setCompanyFilter('all')}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 font-bold hover:bg-orange-200 dark:hover:bg-orange-950/60"
+                    title="Quitar filtro de empresa"
+                >
+                    {companyFilter}
+                    <X size={11} />
+                </button>
             )}
         </div>
     );

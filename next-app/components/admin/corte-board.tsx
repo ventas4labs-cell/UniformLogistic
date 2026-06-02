@@ -332,6 +332,14 @@ export function CorteBoard({
                         onChange={setSearchTerm}
                         placeholder="Buscar por orden, empresa o cliente…"
                     />
+                    <StageBoardFilters
+                        orders={orders}
+                        counts={counts}
+                        tab={tab}
+                        setTab={setTab}
+                        companyFilter={companyFilter}
+                        setCompanyFilter={setCompanyFilter}
+                    />
                     <button
                         onClick={() => router.refresh()}
                         className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"
@@ -342,15 +350,6 @@ export function CorteBoard({
                     </button>
                 </div>
             </div>
-
-            <StageBoardFilters
-                orders={orders}
-                counts={counts}
-                tab={tab}
-                setTab={setTab}
-                companyFilter={companyFilter}
-                setCompanyFilter={setCompanyFilter}
-            />
 
             {orders.length > 0 && (
                 <div className="mb-4">
