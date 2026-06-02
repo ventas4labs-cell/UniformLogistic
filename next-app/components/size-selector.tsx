@@ -94,34 +94,48 @@ export function SizeSelector({ product, onAdd, onCancel }: Props) {
     const renderQtyInput = (size: string | number) => {
         const key = String(size);
         const qty = quantities[key] || 0;
+        const hasQty = qty > 0;
         return (
             <div
                 key={key}
-                className="flex flex-col items-center p-3 bg-zinc-50 rounded-xl border border-zinc-100"
+                className={`flex flex-col items-center p-3 rounded-xl border transition-colors ${
+                    hasQty
+                        ? 'bg-orange-50 border-orange-300 dark:bg-orange-950/30 dark:border-orange-800'
+                        : 'bg-zinc-50 border-zinc-200 dark:bg-zinc-800/40 dark:border-zinc-700'
+                }`}
             >
-                <span className="text-zinc-900 font-bold mb-2">{size}</span>
-                <div className="flex items-center gap-1">
+                {/* Size label — display face + extrabold so the letter
+                    pops on a glance, even at 2XL/3XL widths. */}
+                <span className="font-display text-2xl font-extrabold text-zinc-900 dark:text-zinc-100 leading-none mb-2">
+                    {size}
+                </span>
+                <div className="flex items-center gap-1.5">
                     <button
                         onClick={() => updateQuantity(key, -1)}
-                        className="w-8 h-8 flex items-center justify-center bg-white rounded-lg shadow-sm text-zinc-400 hover:text-orange-600 active:scale-95 transition-all"
+                        className="w-9 h-9 flex items-center justify-center bg-white dark:bg-zinc-900 rounded-lg shadow-sm border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-orange-50 hover:text-orange-600 dark:hover:bg-orange-950/40 dark:hover:text-orange-400 active:scale-95 transition-all"
                         aria-label="Disminuir"
                     >
-                        <Minus size={16} />
+                        <Minus size={18} strokeWidth={2.5} />
                     </button>
                     <input
                         type="number"
                         min="0"
+                        inputMode="numeric"
                         value={qty === 0 ? '' : qty}
                         onChange={(e) => handleInputChange(key, e.target.value)}
-                        className="w-12 text-center bg-transparent font-semibold outline-none border-b border-transparent focus:border-orange-500 transition-colors appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        className={`w-12 text-center bg-transparent text-xl font-extrabold tabular-nums outline-none border-b-2 transition-colors appearance-none placeholder:text-zinc-400 dark:placeholder:text-zinc-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
+                            hasQty
+                                ? 'text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700 focus:border-orange-500'
+                                : 'text-zinc-900 dark:text-zinc-100 border-transparent focus:border-orange-500'
+                        }`}
                         placeholder="0"
                     />
                     <button
                         onClick={() => updateQuantity(key, 1)}
-                        className="w-8 h-8 flex items-center justify-center bg-white rounded-lg shadow-sm text-zinc-400 hover:text-orange-600 active:scale-95 transition-all"
+                        className="w-9 h-9 flex items-center justify-center bg-white dark:bg-zinc-900 rounded-lg shadow-sm border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-orange-50 hover:text-orange-600 dark:hover:bg-orange-950/40 dark:hover:text-orange-400 active:scale-95 transition-all"
                         aria-label="Aumentar"
                     >
-                        <Plus size={16} />
+                        <Plus size={18} strokeWidth={2.5} />
                     </button>
                 </div>
             </div>
@@ -130,19 +144,19 @@ export function SizeSelector({ product, onAdd, onCancel }: Props) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4">
-            <div className="bg-white w-full max-w-2xl rounded-t-2xl sm:rounded-2xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto flex flex-col">
+            <div className="bg-white dark:bg-zinc-900 w-full max-w-2xl rounded-t-2xl sm:rounded-2xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto flex flex-col">
                 <div className="flex justify-between items-center mb-6">
                     <div>
-                        <h3 className="text-xl font-bold text-zinc-900">
+                        <h3 className="text-xl font-extrabold text-zinc-900 dark:text-zinc-100">
                             Seleccionar Tallas
                         </h3>
-                        <p className="text-sm text-zinc-500">
+                        <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
                             Ingresa la cantidad para cada talla
                         </p>
                     </div>
                     <button
                         onClick={onCancel}
-                        className="text-zinc-400 hover:text-zinc-600 text-2xl"
+                        className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 text-2xl"
                         aria-label="Cerrar"
                     >
                         &times;
@@ -153,16 +167,16 @@ export function SizeSelector({ product, onAdd, onCancel }: Props) {
                     {isShirt && (
                         <div className="space-y-6">
                             {hasMen && hasWomen && (
-                                <div className="flex p-1 bg-zinc-100 rounded-lg max-w-sm mx-auto">
+                                <div className="flex p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg max-w-sm mx-auto">
                                     <button
                                         onClick={() => setSelectedGender('Men')}
-                                        className={`flex-1 py-2 rounded-md text-sm font-semibold transition-all ${selectedGender === 'Men' ? 'bg-white shadow text-orange-600' : 'text-zinc-500'}`}
+                                        className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${selectedGender === 'Men' ? 'bg-white dark:bg-zinc-900 shadow text-orange-600 dark:text-orange-400' : 'text-zinc-600 dark:text-zinc-300'}`}
                                     >
                                         Hombre
                                     </button>
                                     <button
                                         onClick={() => setSelectedGender('Women')}
-                                        className={`flex-1 py-2 rounded-md text-sm font-semibold transition-all ${selectedGender === 'Women' ? 'bg-white shadow text-orange-600' : 'text-zinc-500'}`}
+                                        className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${selectedGender === 'Women' ? 'bg-white dark:bg-zinc-900 shadow text-orange-600 dark:text-orange-400' : 'text-zinc-600 dark:text-zinc-300'}`}
                                     >
                                         Mujer
                                     </button>
@@ -181,7 +195,7 @@ export function SizeSelector({ product, onAdd, onCancel }: Props) {
 
                     {!isShirt && (
                         <div className="space-y-6">
-                            <h4 className="font-semibold text-zinc-700">Cintura</h4>
+                            <h4 className="font-bold text-zinc-900 dark:text-zinc-100">Cintura</h4>
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                                 {product.sizes.waist?.map((w) => renderQtyInput(w))}
                             </div>
@@ -189,15 +203,15 @@ export function SizeSelector({ product, onAdd, onCancel }: Props) {
                     )}
                 </div>
 
-                <div className="mt-6 pt-4 border-t border-zinc-100">
+                <div className="mt-6 pt-4 border-t border-zinc-100 dark:border-zinc-800">
                     <button
                         disabled={totalItems === 0}
                         onClick={handleSubmit}
-                        className={`w-full py-4 rounded-xl font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2 ${totalItems > 0 ? 'bg-orange-600 hover:bg-orange-700' : 'bg-zinc-300 cursor-not-allowed'}`}
+                        className={`w-full py-4 rounded-xl font-extrabold text-white text-base shadow-lg transition-all flex items-center justify-center gap-2 ${totalItems > 0 ? 'bg-orange-600 hover:bg-orange-700' : 'bg-zinc-300 dark:bg-zinc-700 cursor-not-allowed'}`}
                     >
                         <span>Agregar al Pedido</span>
                         {totalItems > 0 && (
-                            <span className="bg-white/20 px-2 py-0.5 rounded-md text-sm">
+                            <span className="bg-white/20 px-2 py-0.5 rounded-md text-sm font-bold">
                                 {totalItems} artículos
                             </span>
                         )}
