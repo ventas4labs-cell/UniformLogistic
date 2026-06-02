@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Printer, RefreshCw } from 'lucide-react';
 import type { Order } from '@/lib/types';
 import { StageCompleteToggle } from '@/components/admin/stage-complete-toggle';
-import { StageTabBar, type StageTab } from '@/components/admin/stage-tab-bar';
+import type { StageTab } from '@/components/admin/stage-tab-bar';
+import { StageBoardFilters } from '@/components/admin/stage-board-filters';
 import { CollapsibleSearch } from '@/components/admin/collapsible-search';
 
 function OrderCard({
@@ -109,6 +110,7 @@ export function ImpresionBoard({
     );
     const [tab, setTab] = useState<StageTab>('pending');
     const [searchTerm, setSearchTerm] = useState('');
+    const [companyFilter, setCompanyFilter] = useState<string>('all');
     const router = useRouter();
 
     const handleLocalChange = (uuid: string, next: boolean) => {
@@ -127,6 +129,7 @@ export function ImpresionBoard({
     }, [orders, completed, tab]);
 
     const filtered = tabFiltered.filter((o) => {
+        if (companyFilter !== 'all' && o.companyName !== companyFilter) return false;
         if (!searchTerm) return true;
         const term = searchTerm.toLowerCase();
         return (
@@ -172,7 +175,14 @@ export function ImpresionBoard({
                 </div>
             </div>
 
-            <StageTabBar tab={tab} setTab={setTab} counts={counts} />
+            <StageBoardFilters
+                orders={orders}
+                counts={counts}
+                tab={tab}
+                setTab={setTab}
+                companyFilter={companyFilter}
+                setCompanyFilter={setCompanyFilter}
+            />
 
             {filtered.length === 0 ? (
                 <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm p-12 text-center text-gray-500 dark:text-zinc-400">

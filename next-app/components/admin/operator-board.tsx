@@ -35,7 +35,8 @@ import {
     toggleInsumoCompleteAction,
 } from '@/app/(admin)/admin/operador/actions';
 import { StageCompleteToggle } from '@/components/admin/stage-complete-toggle';
-import { StageTabBar, type StageTab } from '@/components/admin/stage-tab-bar';
+import type { StageTab } from '@/components/admin/stage-tab-bar';
+import { StageBoardFilters } from '@/components/admin/stage-board-filters';
 import { CollapsibleSearch } from '@/components/admin/collapsible-search';
 import { InsumoPrepEditor } from '@/components/admin/insumo-prep-editor';
 import type { InsumoPreparation } from '@/lib/services/insumo-preparations';
@@ -535,6 +536,7 @@ export function OperatorBoard({
     );
     const [tab, setTab] = useState<StageTab>('pending');
     const [searchTerm, setSearchTerm] = useState('');
+    const [companyFilter, setCompanyFilter] = useState<string>('all');
     const [activeFilter, setActiveFilter] = useState<OrderStatus | 'all'>('all');
     const [showGlobalInsumos, setShowGlobalInsumos] = useState(false);
     const [pending, startTransition] = useTransition();
@@ -583,6 +585,7 @@ export function OperatorBoard({
     });
     const filtered = tabFiltered.filter((o) => {
         if (activeFilter !== 'all' && o.status !== activeFilter) return false;
+        if (companyFilter !== 'all' && o.companyName !== companyFilter) return false;
         if (!searchTerm) return true;
         const term = searchTerm.toLowerCase();
         return (
@@ -642,7 +645,14 @@ export function OperatorBoard({
                 </div>
             </div>
 
-            <StageTabBar tab={tab} setTab={setTab} counts={tabCounts} />
+            <StageBoardFilters
+                orders={orders}
+                counts={tabCounts}
+                tab={tab}
+                setTab={setTab}
+                companyFilter={companyFilter}
+                setCompanyFilter={setCompanyFilter}
+            />
 
             {/* Status filter chips */}
             <div className="flex flex-wrap gap-2 mb-4">

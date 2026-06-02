@@ -14,8 +14,9 @@ import type { Order } from '@/lib/types';
 import type { InsumoCompletion } from '@/lib/services/insumo-completions';
 import { aggregateInsumos, aggregateInsumosGlobal } from '@/lib/stage-utils';
 import { StageCompleteToggle } from '@/components/admin/stage-complete-toggle';
-import { StageTabBar, type StageTab } from '@/components/admin/stage-tab-bar';
+import type { StageTab } from '@/components/admin/stage-tab-bar';
 import { CollapsibleSearch } from '@/components/admin/collapsible-search';
+import { StageBoardFilters } from '@/components/admin/stage-board-filters';
 import {
     InsumoRow,
     completionKey,
@@ -203,6 +204,7 @@ export function MaquilaBoard({
     const handleToggleInsumo = useToggleInsumoCompletion(setCompletedInsumos);
     const [tab, setTab] = useState<Tab>('pending');
     const [searchTerm, setSearchTerm] = useState('');
+    const [companyFilter, setCompanyFilter] = useState<string>('all');
     const [pending] = useTransition();
     const [showSummary, setShowSummary] = useState(false);
     const router = useRouter();
@@ -223,6 +225,7 @@ export function MaquilaBoard({
     }, [orders, completed, tab]);
 
     const filtered = tabFiltered.filter((o) => {
+        if (companyFilter !== 'all' && o.companyName !== companyFilter) return false;
         if (!searchTerm) return true;
         const term = searchTerm.toLowerCase();
         return (
@@ -270,7 +273,14 @@ export function MaquilaBoard({
                 </div>
             </div>
 
-            <StageTabBar tab={tab} setTab={setTab} counts={counts} />
+            <StageBoardFilters
+                orders={orders}
+                counts={counts}
+                tab={tab}
+                setTab={setTab}
+                companyFilter={companyFilter}
+                setCompanyFilter={setCompanyFilter}
+            />
 
             {globalInsumos.length > 0 && (
                 <div className="mb-4">
