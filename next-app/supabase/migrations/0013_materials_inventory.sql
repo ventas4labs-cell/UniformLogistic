@@ -70,11 +70,25 @@ do $$ begin
     end if;
 end $$;
 
--- Seed from existing product BOMs.
+-- Seed from existing product BOMs. Skip labor/service entries
+-- ("Servicio Corte", "Servicio de Maquila", bare "Bordado",
+-- "Sublimación", "DTF", …) — those are production steps, not
+-- materials. Canonical exclusion list mirrored in migration 0014.
 insert into materials (name, unit, current_qty)
 select trim(b->>'name') as name, 'unidad', 0
 from products p
 cross join jsonb_array_elements(p.bom_json) b
 where b->>'name' is not null
   and trim(b->>'name') <> ''
+  and lower(trim(b->>'name')) not like 'servicio %'
+  and lower(trim(b->>'name')) not like 'servicio_%'
+  and lower(trim(b->>'name')) not in (
+        'servicio',
+        'corte',
+        'bordado',
+        'sublimación',
+        'sublimacion',
+        'sublimado',
+        'dtf'
+      )
 on conflict (lower(trim(name))) do nothing;
