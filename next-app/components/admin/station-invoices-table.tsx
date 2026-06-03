@@ -11,9 +11,13 @@ interface Props {
     initialInvoices: StationInvoice[];
 }
 
+// UI maps the schema's status enum onto the accounts-payable workflow
+// admin actually runs: "pending" means we haven't paid yet, "approved"
+// means we've paid, "rejected" means we're not going to. (Schema names
+// were generic; only the labels matter to the user.)
 const STATUS_LABEL: Record<StationInvoiceStatus, string> = {
-    pending: 'Pendiente',
-    approved: 'Aprobada',
+    pending: 'Por pagar',
+    approved: 'Pagada',
     rejected: 'Rechazada'
 };
 
@@ -59,10 +63,12 @@ export function StationInvoicesTable({ initialInvoices }: Props) {
                 <div>
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-zinc-100 flex items-center gap-2">
                         <Receipt size={24} className="text-orange-600 dark:text-orange-400" />
-                        Facturas de estaciones
+                        Facturas a pagar
                     </h2>
                     <p className="text-gray-500 dark:text-zinc-400 text-sm">
-                        Facturas enviadas por contratistas externos desde sus estaciones.
+                        Facturas que las estaciones nos envían para que les paguemos
+                        sus servicios. No tiene relación con la facturación a clientes
+                        (Hacienda).
                     </p>
                 </div>
             </div>
@@ -71,8 +77,8 @@ export function StationInvoicesTable({ initialInvoices }: Props) {
                 {(
                     [
                         ['all', 'Todas'],
-                        ['pending', 'Pendientes'],
-                        ['approved', 'Aprobadas'],
+                        ['pending', 'Por pagar'],
+                        ['approved', 'Pagadas'],
                         ['rejected', 'Rechazadas']
                     ] as [StationInvoiceStatus | 'all', string][]
                 ).map(([key, label]) => (

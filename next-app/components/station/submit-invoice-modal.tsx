@@ -119,9 +119,10 @@ export function SubmitInvoiceModal({ onClose }: Props) {
                                     legible.
                                 </p>
                                 <p className="text-sm text-amber-800 dark:text-amber-300">
-                                    Asegurate de que el monto, número de factura y datos
-                                    del emisor se lean claramente. Las fotos borrosas o
-                                    cortadas serán rechazadas.
+                                    Necesitamos leer claramente el monto, número de
+                                    factura y datos del emisor para poder procesar el
+                                    pago. Si la foto está borrosa o cortada te la
+                                    pediremos de nuevo.
                                 </p>
                             </div>
                         </div>
@@ -289,8 +290,8 @@ export function SubmitInvoiceModal({ onClose }: Props) {
                                 Factura enviada
                             </p>
                             <p className="text-sm text-gray-500 dark:text-zinc-400 mt-1">
-                                El administrador la revisará y te confirmará si fue
-                                aprobada.
+                                Recibimos tu factura. Te pagaremos el monto
+                                correspondiente según los términos acordados.
                             </p>
                         </div>
                         <button
