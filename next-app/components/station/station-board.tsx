@@ -2,13 +2,14 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { HardHat, LogOut, RefreshCw, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { HardHat, LogOut, RefreshCw, Search, ChevronDown, ChevronUp, Receipt } from 'lucide-react';
 import type { Order } from '@/lib/types';
 import { signOutAction } from '@/app/login/actions';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { StageCompleteToggle } from '@/components/admin/stage-complete-toggle';
 import { StageTabBar, type StageTab } from '@/components/admin/stage-tab-bar';
 import type { StageKey } from '@/lib/services/stage-completions';
+import { SubmitInvoiceModal } from '@/components/station/submit-invoice-modal';
 
 interface StationInfo {
     id: string;
@@ -35,6 +36,7 @@ export function StationBoard({ station, initialOrders, initialCompletedOrderIds 
     );
     const [tab, setTab] = useState<StageTab>('pending');
     const [searchTerm, setSearchTerm] = useState('');
+    const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
     const handleLocalChange = (uuid: string, next: boolean) => {
         setCompleted((prev) => {
@@ -83,6 +85,15 @@ export function StationBoard({ station, initialOrders, initialCompletedOrderIds 
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setShowInvoiceModal(true)}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-600 text-white text-sm font-bold hover:bg-orange-700 shadow-sm"
+                        title="Enviar factura al administrador"
+                    >
+                        <Receipt size={16} />
+                        <span className="hidden sm:inline">Enviar factura</span>
+                    </button>
                     <ThemeToggle />
                     <button
                         onClick={() => router.refresh()}
@@ -103,6 +114,10 @@ export function StationBoard({ station, initialOrders, initialCompletedOrderIds 
                     </form>
                 </div>
             </header>
+
+            {showInvoiceModal && (
+                <SubmitInvoiceModal onClose={() => setShowInvoiceModal(false)} />
+            )}
 
             <StageTabBar tab={tab} setTab={setTab} counts={counts} />
 

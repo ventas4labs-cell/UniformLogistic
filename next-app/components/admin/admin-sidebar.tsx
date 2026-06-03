@@ -23,7 +23,8 @@ import {
     Sparkles,
     PackageCheck,
     PenTool,
-    Sticker
+    Sticker,
+    FileText
 } from 'lucide-react';
 import { signOutAction } from '@/app/login/actions';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -40,6 +41,7 @@ const TABS: Tab[] = [
     { href: '/admin/logos',          label: 'Logos',          icon: <Sticker size={20} /> },
     { href: '/admin/users',          label: 'Usuarios',       icon: <Users size={20} /> },
     { href: '/admin/station-users',  label: 'Estaciones',     icon: <HardHat size={20} /> },
+    { href: '/admin/station-invoices', label: 'Facturas estaciones', icon: <FileText size={20} /> },
     { href: '/admin/facturacion',    label: 'Facturación',    icon: <Receipt size={20} /> }
 ];
 
