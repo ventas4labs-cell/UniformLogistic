@@ -9,7 +9,6 @@ import {
     ClipboardList,
     Building2,
     Package,
-    Users,
     ArrowLeft,
     Receipt,
     Boxes,
@@ -39,7 +38,6 @@ const TABS: Tab[] = [
     { href: '/admin/companies',      label: 'Empresas',       icon: <Building2 size={20} /> },
     { href: '/admin/products',       label: 'Productos',      icon: <Package size={20} /> },
     { href: '/admin/logos',          label: 'Logos',          icon: <Sticker size={20} /> },
-    { href: '/admin/users',          label: 'Usuarios',       icon: <Users size={20} /> },
     { href: '/admin/station-users',  label: 'Estaciones',     icon: <HardHat size={20} /> },
     { href: '/admin/station-invoices', label: 'Facturas a pagar', icon: <FileText size={20} /> },
     { href: '/admin/facturacion',    label: 'Facturación',    icon: <Receipt size={20} /> }

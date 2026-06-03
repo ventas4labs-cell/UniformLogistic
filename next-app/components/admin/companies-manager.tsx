@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Building2, Plus, Edit2, Trash2, Loader2, X, Link2, Check, UserPlus } from 'lucide-react';
+import { Building2, Plus, Edit2, Trash2, Loader2, X, Link2, Check, UserPlus, Users } from 'lucide-react';
 import { Company, CompanyInput } from '@/lib/services/companies';
 import {
     createCompanyAction,
@@ -131,12 +131,25 @@ export function CompaniesManager({ initialCompanies }: { initialCompanies: Compa
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-zinc-100">Empresas</h2>
                     <p className="text-gray-500 dark:text-zinc-400 text-sm">Administra los clientes corporativos del sistema.</p>
                 </div>
-                <button
-                    onClick={startCreate}
-                    className="bg-orange-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-orange-700 shadow-md flex items-center gap-2"
-                >
-                    <Plus size={18} /> Nueva Empresa
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={startCreate}
+                        className="bg-orange-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-orange-700 shadow-md flex items-center gap-2"
+                    >
+                        <Plus size={18} /> Nueva Empresa
+                    </button>
+                    {/* Usuarios shortcut — the module used to be its own
+                        sidebar entry but lives more naturally next to the
+                        empresas they're associated with. */}
+                    <Link
+                        href="/admin/users"
+                        title="Usuarios"
+                        aria-label="Usuarios"
+                        className="p-2.5 rounded-lg border border-gray-200 dark:border-zinc-700 text-gray-600 dark:text-zinc-300 hover:bg-orange-50 dark:hover:bg-orange-950/30 hover:text-orange-700 dark:hover:text-orange-300 hover:border-orange-300 transition-colors"
+                    >
+                        <Users size={18} />
+                    </Link>
+                </div>
             </div>
 
             <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm overflow-x-auto">
