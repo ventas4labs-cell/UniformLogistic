@@ -3,55 +3,13 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import {
-    LogOut,
-    X,
-    Home,
-    ClipboardList,
-    Building2,
-    Package,
-    ArrowLeft,
-    Receipt,
-    Boxes,
-    Wallet,
-    HardHat,
-    Scissors,
-    Factory,
-    Printer,
-    Sparkles,
-    PackageCheck,
-    PenTool,
-    Sticker,
-    FileText
-} from 'lucide-react';
+import { LogOut, X, ArrowLeft } from 'lucide-react';
 import { signOutAction } from '@/app/login/actions';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { ADMIN_MODULES, type AdminModule } from '@/components/admin/admin-modules';
 
-type Tab = { href: string; label: string; icon: React.ReactNode };
-
-const MAIN_TABS: Tab[] = [
-    { href: '/admin/home',           label: 'Inicio',         icon: <Home size={22} /> },
-    { href: '/admin/orders',         label: 'Pedidos',        icon: <ClipboardList size={22} /> },
-    { href: '/admin/stock',          label: 'Stock',          icon: <Boxes size={22} /> },
-    { href: '/admin/materials',      label: 'Materiales',     icon: <Package size={22} /> },
-    { href: '/admin/cuentas',        label: 'Cuentas',        icon: <Wallet size={22} /> },
-    { href: '/admin/companies',      label: 'Empresas',       icon: <Building2 size={22} /> },
-    { href: '/admin/products',       label: 'Productos',      icon: <Package size={22} /> },
-    { href: '/admin/logos',          label: 'Logos',          icon: <Sticker size={22} /> },
-    { href: '/admin/station-users',  label: 'Estaciones',     icon: <HardHat size={22} /> },
-    { href: '/admin/station-invoices', label: 'Facturas a pagar', icon: <FileText size={22} /> },
-    { href: '/admin/facturacion',    label: 'Facturación',    icon: <Receipt size={22} /> }
-];
-
-const OPERATIONS_TABS: Tab[] = [
-    { href: '/admin/operador',  label: 'Bodega',    icon: <Package size={22} /> },
-    { href: '/admin/corte',     label: 'Corte',     icon: <Scissors size={22} /> },
-    { href: '/admin/maquila',   label: 'Maquila',   icon: <Factory size={22} /> },
-    { href: '/admin/impresion', label: 'Impresión', icon: <Printer size={22} /> },
-    { href: '/admin/bordado',   label: 'Bordado',   icon: <Sparkles size={22} /> },
-    { href: '/admin/empaque',   label: 'Empaque',   icon: <PackageCheck size={22} /> },
-    { href: '/admin/ploter',    label: 'Ploter',    icon: <PenTool size={22} /> }
-];
+const MAIN_TABS = ADMIN_MODULES.filter((m) => m.group === 'principal');
+const OPERATIONS_TABS = ADMIN_MODULES.filter((m) => m.group === 'operaciones');
 
 // Top-left logo button that doubles as the menu trigger. The square
 // shows the "UL" monogram at rest; on hover (or while the launcher is
@@ -219,7 +177,7 @@ function Section({
     onNavigate
 }: {
     title: string;
-    tabs: Tab[];
+    tabs: AdminModule[];
     pathname: string | null;
     onNavigate: () => void;
 }) {
@@ -232,6 +190,7 @@ function Section({
                 {tabs.map((t) => {
                     const active =
                         pathname === t.href || pathname?.startsWith(t.href + '/');
+                    const Icon = t.Icon;
                     return (
                         <Link
                             key={t.href}
@@ -251,7 +210,7 @@ function Section({
                                         : 'text-gray-500 dark:text-zinc-400'
                                 }
                             >
-                                {t.icon}
+                                <Icon size={22} />
                             </span>
                             <span className="text-[11px] font-semibold leading-tight">
                                 {t.label}

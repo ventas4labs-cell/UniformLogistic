@@ -13,6 +13,7 @@ import {
     Sticker,
     XCircle
 } from 'lucide-react';
+import { cookies } from 'next/headers';
 import { createClient } from '@/utils/supabase/server';
 import { fetchAllOrders } from '@/lib/services/orders';
 import {
@@ -24,6 +25,8 @@ import { fetchCompanies } from '@/lib/services/companies';
 import { fetchProducts } from '@/lib/services/products';
 import { fetchLogos } from '@/lib/services/logos';
 import { fetchAllStationInvoices } from '@/lib/services/station-invoices';
+import { FAST_ACTIONS_COOKIE, resolveFastActions } from '@/lib/admin-fast-actions';
+import { FastActionsConfig } from '@/components/admin/fast-actions-config';
 
 // Admin panel home — quick actions + at-a-glance statistics. Replaces
 // the old behavior where /admin redirected straight to /admin/orders
@@ -39,6 +42,11 @@ export default async function AdminHomePage() {
         fetchLogos(supabase),
         fetchAllStationInvoices(supabase)
     ]);
+
+    const cookieStore = await cookies();
+    const fastActions = resolveFastActions(
+        cookieStore.get(FAST_ACTIONS_COOKIE)?.value
+    );
 
     const orderIds = orders
         .map((o) => o.uuid)
@@ -229,6 +237,9 @@ export default async function AdminHomePage() {
                     />
                 </div>
             </section>
+
+            {/* ── Fast-action configuration ────────────────────────── */}
+            <FastActionsConfig initial={fastActions} />
         </div>
     );
 }
