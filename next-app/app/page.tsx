@@ -25,6 +25,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/utils/supabase/server';
+import { landingPath } from '@/lib/admin-acting-company';
 import {
     ArrowRight,
     Boxes,
@@ -49,7 +50,7 @@ export default async function Home() {
     const {
         data: { user }
     } = await supabase.auth.getUser();
-    if (user) redirect('/home');
+    if (user) redirect(landingPath(user.email));
 
     return (
         <main className="min-h-screen bg-white text-zinc-900">

@@ -25,6 +25,13 @@ const MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 export const isAdminEmail = (email: string | null | undefined): boolean =>
     (email || '').trim().toLowerCase() === ADMIN_EMAIL;
 
+// Post-login landing for a given user. Admin goes straight to the admin
+// panel home; everyone else to the customer warehouse dashboard. Used by
+// the sign-in action, the OAuth callback, and the root + /home guards so
+// the admin never lands on the customer-facing /home.
+export const landingPath = (email: string | null | undefined): string =>
+    isAdminEmail(email) ? '/admin/home' : '/home';
+
 export async function getActingCompanyId(): Promise<string | null> {
     const store = await cookies();
     return store.get(COOKIE_NAME)?.value || null;

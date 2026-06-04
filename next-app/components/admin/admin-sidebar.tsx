@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import {
     LogOut,
     X,
+    Home,
     ClipboardList,
     Building2,
     Package,
@@ -31,6 +32,7 @@ import { ThemeToggle } from '@/components/theme-toggle';
 type Tab = { href: string; label: string; icon: React.ReactNode };
 
 const TABS: Tab[] = [
+    { href: '/admin/home',           label: 'Inicio',         icon: <Home size={20} /> },
     { href: '/admin/orders',         label: 'Pedidos',        icon: <ClipboardList size={20} /> },
     { href: '/admin/stock',          label: 'Stock',          icon: <Boxes size={20} /> },
     { href: '/admin/materials',      label: 'Materiales',     icon: <Package size={20} /> },
@@ -97,8 +99,9 @@ export function AdminSidebar({ mobileOpen = false, onMobileClose }: SidebarProps
             </div>
 
             <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-                {/* Pedidos */}
+                {/* Inicio + Pedidos sit above the Operations group */}
                 <SidebarLink tab={TABS[0]} pathname={pathname} />
+                <SidebarLink tab={TABS[1]} pathname={pathname} />
 
                 {/* Operations expandable group */}
                 <button
@@ -138,7 +141,7 @@ export function AdminSidebar({ mobileOpen = false, onMobileClose }: SidebarProps
                 )}
 
                 {/* Everything else */}
-                {TABS.slice(1).map((t) => (
+                {TABS.slice(2).map((t) => (
                     <SidebarLink key={t.href} tab={t} pathname={pathname} />
                 ))}
             </nav>
@@ -150,12 +153,15 @@ export function AdminSidebar({ mobileOpen = false, onMobileClose }: SidebarProps
                     </span>
                     <ThemeToggle />
                 </div>
+                {/* Admin's /home redirects back to the panel, so point the
+                    "leave panel" link at the storefront the admin actually
+                    uses — the acting-as-company ordering catalog. */}
                 <Link
-                    href="/home"
+                    href="/catalog"
                     className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
                 >
                     <ArrowLeft size={18} />
-                    Volver a la App
+                    Ir a la tienda
                 </Link>
                 <form action={signOutAction}>
                     <button

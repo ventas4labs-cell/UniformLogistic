@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/utils/supabase/server';
+import { landingPath } from '@/lib/admin-acting-company';
 
 export interface AuthState {
     error?: string;
@@ -17,11 +18,11 @@ export async function signInAction(
     const password = String(formData.get('password') || '');
 
     const supabase = await createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { error: error.message };
 
     revalidatePath('/', 'layout');
-    redirect('/home');
+    redirect(landingPath(data.user?.email));
 }
 
 export async function signUpAction(

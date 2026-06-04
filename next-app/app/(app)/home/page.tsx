@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import {
     AlertTriangle,
     ArrowRight,
@@ -6,12 +7,12 @@ import {
     Factory,
     Inbox,
     LogOut,
-    Package,
     ShieldCheck,
     Truck,
     Wallet
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/server';
+import { isAdminEmail } from '@/lib/admin-acting-company';
 import { signOutAction } from '@/app/login/actions';
 import { fetchUserOrders } from '@/lib/services/orders';
 import { fetchStockForUser, summarizeStock } from '@/lib/services/stock';
@@ -22,8 +23,6 @@ import type { Order } from '@/lib/types';
 
 const fmtCRC = (n: number) =>
     new Intl.NumberFormat('es-CR', { style: 'currency', currency: 'CRC', maximumFractionDigits: 0 }).format(n);
-
-const ADMIN_EMAIL = 'ulogisticcr@gmail.com';
 
 const PRODUCTION_STATUSES = new Set(['pending', 'bodega', 'corte', 'maquila', 'impresion']);
 const READY_STATUSES = new Set(['empaque']);
@@ -64,7 +63,9 @@ export default async function HomePage() {
     } = await supabase.auth.getUser();
     if (!user) return null;
 
-    const isAdmin = (user.email || '').trim().toLowerCase() === ADMIN_EMAIL;
+    // The admin has their own panel home (/admin/home) — never show them
+    // the customer warehouse dashboard, even on a direct visit.
+    if (isAdminEmail(user.email)) redirect('/admin/home');
 
     const [allOrders, stockRows, invoices] = await Promise.all([
         fetchUserOrders(supabase, user.id),
@@ -311,18 +312,6 @@ export default async function HomePage() {
                 </section>
             )}
 
-            {isAdmin && (
-                <section className="border-t border-zinc-200 dark:border-zinc-800 pt-5">
-                    <Link
-                        href="/admin"
-                        className="inline-flex items-center gap-2 text-zinc-600 dark:text-zinc-400 hover:text-orange-600 dark:hover:text-orange-400 text-sm font-semibold"
-                    >
-                        <Package size={16} />
-                        Abrir panel administrador
-                        <ArrowRight size={14} />
-                    </Link>
-                </section>
-            )}
         </div>
     );
 }
