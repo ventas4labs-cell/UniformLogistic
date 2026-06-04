@@ -196,7 +196,7 @@ function OrderCard({
         setPdfLoading(true);
         try {
             const { generateAdminPDF } = await import('@/lib/pdf-service');
-            const pdf = generateAdminPDF(order, { stationNames });
+            const pdf = generateAdminPDF(order, { stationNames, bodega: true });
             const url = URL.createObjectURL(pdf.output('blob'));
             setPdfPreviewUrl((prev) => {
                 if (prev) URL.revokeObjectURL(prev);

@@ -296,6 +296,12 @@ export interface AdminPdfOptions {
     // "ESTACIÓN ASIGNADA" field under the dates. Used by the Bodega
     // export so the workshop knows who the order is going to.
     stationNames?: string[];
+    // Bodega mode: drop the whole customer-info block (cliente,
+    // contacto, dirección, teléfono, email, OC, fechas, estación) and
+    // jump straight from the header to the item grids. The order
+    // number stays (top-right of the header). The workshop only needs
+    // the pieces + insumos, not the client's contact details.
+    bodega?: boolean;
 }
 
 export const generateAdminPDF = (order: Order, opts: AdminPdfOptions = {}) => {
@@ -322,38 +328,50 @@ export const generateAdminPDF = (order: Order, opts: AdminPdfOptions = {}) => {
     doc.text(order.id, pageWidth - 14, 14, { align: 'right' });
 
     let y = 32;
-    const colW = (pageWidth - 28) / 2;
 
-    labeledField(doc, 14, y, colW - 4, 'CLIENTE', order.companyName || order.customerName || '');
-    labeledField(doc, 14 + colW, y, colW - 4, 'CONTACTO', order.customerName || '');
-    y += 11;
+    if (opts.bodega) {
+        // Bodega export: skip the customer-info block entirely. Just
+        // restate the order number under the header so the printed
+        // sheet is self-identifying, then go straight to the items.
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(13);
+        doc.setTextColor(0);
+        doc.text(order.id, 14, y);
+        y += 8;
+    } else {
+        const colW = (pageWidth - 28) / 2;
 
-    labeledField(doc, 14, y, pageWidth - 28, 'DIRECCIÓN', order.address || '');
-    y += 11;
+        labeledField(doc, 14, y, colW - 4, 'CLIENTE', order.companyName || order.customerName || '');
+        labeledField(doc, 14 + colW, y, colW - 4, 'CONTACTO', order.customerName || '');
+        y += 11;
 
-    const triW = (pageWidth - 28) / 3 - 2;
-    labeledField(doc, 14, y, triW, 'TELÉFONO', order.phone || '');
-    labeledField(doc, 14 + triW + 3, y, triW, 'EMAIL', order.email || '');
-    labeledField(doc, 14 + (triW + 3) * 2, y, triW, 'ORDEN DE COMPRA', order.purchaseOrder || '');
-    y += 11;
+        labeledField(doc, 14, y, pageWidth - 28, 'DIRECCIÓN', order.address || '');
+        y += 11;
 
-    const dateW = (pageWidth - 28) / 2 - 2;
-    const dateRecibido = order.dateCreated
-        ? new Date(order.dateCreated).toLocaleDateString()
-        : '';
-    labeledField(doc, 14, y, dateW, 'FECHA DE RECIBIDO', dateRecibido);
-    labeledField(doc, 14 + dateW + 4, y, dateW, 'FECHA DE ENTREGA', order.deliveryDate || '');
-    y += 11;
+        const triW = (pageWidth - 28) / 3 - 2;
+        labeledField(doc, 14, y, triW, 'TELÉFONO', order.phone || '');
+        labeledField(doc, 14 + triW + 3, y, triW, 'EMAIL', order.email || '');
+        labeledField(doc, 14 + (triW + 3) * 2, y, triW, 'ORDEN DE COMPRA', order.purchaseOrder || '');
+        y += 11;
 
-    // Order number (also shown top-right) + assigned external station,
-    // surfaced explicitly for the Bodega export.
-    const stationLabel =
-        opts.stationNames && opts.stationNames.length > 0
-            ? opts.stationNames.join(', ')
+        const dateW = (pageWidth - 28) / 2 - 2;
+        const dateRecibido = order.dateCreated
+            ? new Date(order.dateCreated).toLocaleDateString()
             : '';
-    labeledField(doc, 14, y, dateW, 'N.º DE ORDEN', order.id || '');
-    labeledField(doc, 14 + dateW + 4, y, dateW, 'ESTACIÓN ASIGNADA', stationLabel);
-    y += 12;
+        labeledField(doc, 14, y, dateW, 'FECHA DE RECIBIDO', dateRecibido);
+        labeledField(doc, 14 + dateW + 4, y, dateW, 'FECHA DE ENTREGA', order.deliveryDate || '');
+        y += 11;
+
+        // Order number (also shown top-right) + assigned external
+        // station, surfaced explicitly for the full sheet.
+        const stationLabel =
+            opts.stationNames && opts.stationNames.length > 0
+                ? opts.stationNames.join(', ')
+                : '';
+        labeledField(doc, 14, y, dateW, 'N.º DE ORDEN', order.id || '');
+        labeledField(doc, 14 + dateW + 4, y, dateW, 'ESTACIÓN ASIGNADA', stationLabel);
+        y += 12;
+    }
 
     const shirts = order.items.filter((i) => inferType(i) === 'shirt');
     const pants = order.items.filter((i) => inferType(i) === 'pant');
