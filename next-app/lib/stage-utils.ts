@@ -86,6 +86,32 @@ export function parseColor(name: string | undefined | null): string | undefined 
     return undefined;
 }
 
+// Shade modifiers that follow a color word ("azul oscuro", "verde
+// claro"). Captured into the label so the swatch can be darkened /
+// lightened and the cutter sees the exact shade.
+const SHADE_WORDS = new Set(['claro', 'clara', 'oscuro', 'oscura']);
+
+// Extract every color from a fabric/tela string. The tela convention
+// here is "<fabric> <color> / <fabric> <color>" — e.g.
+// "Army azul oscuro / Speed dry negro" → ["Azul oscuro", "Negro"].
+// Each "/"-separated segment is scanned independently so a two-fabric
+// garment surfaces both colors. Deduplicates while preserving order.
+export function parseColors(fabric: string | undefined | null): string[] {
+    if (!fabric) return [];
+    const out: string[] = [];
+    for (const segment of fabric.split('/')) {
+        const tokens = segment.toLowerCase().split(/[\s,\-]+/).filter(Boolean);
+        for (let i = 0; i < tokens.length; i++) {
+            if (!COLOR_WORDS.has(tokens[i])) continue;
+            let label = tokens[i].charAt(0).toUpperCase() + tokens[i].slice(1);
+            const next = tokens[i + 1];
+            if (next && SHADE_WORDS.has(next)) label += ' ' + next;
+            if (!out.includes(label)) out.push(label);
+        }
+    }
+    return out;
+}
+
 // Cut-list aggregation: groups items across all orders in the corte
 // stage by (fabric, color, size), summing quantities. The result is
 // what the cutting operator needs to see — how much of each fabric/
@@ -104,7 +130,10 @@ export function aggregateCutLines(orders: Order[]): CutLine[] {
     for (const order of orders) {
         for (const item of order.items) {
             const fabric = item.fabricType || '—';
-            const color = parseColor(item.productName) || '—';
+            // Colors come from the tela, not the product name. A tela
+            // with two fabric segments yields two colors, joined for
+            // the grouping key (e.g. "Azul oscuro / Negro").
+            const color = parseColors(item.fabricType).join(' / ') || '—';
             const size = item.selection.size || '—';
             const key = `${fabric}__${color}__${size}`;
             const existing = map.get(key);
