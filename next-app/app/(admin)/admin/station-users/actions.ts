@@ -1,9 +1,11 @@
 'use server';
 
+import { randomBytes } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { createClient, createServiceClient } from '@/utils/supabase/server';
 import {
     createStationUserRow,
+    setStationAccessToken,
     setStationUserActive
 } from '@/lib/services/station-users';
 import {
@@ -12,6 +14,19 @@ import {
 } from '@/lib/services/station-assignments';
 import { isAdminEmail } from '@/lib/admin-acting-company';
 import type { StageKey } from '@/lib/services/stage-completions';
+
+/**
+ * 32-byte URL-safe random token (no padding). Used as both the
+ * /s/<token> slug the station bookmarks and the auth.users password
+ * the /s route signs them in with.
+ */
+function generateAccessToken(): string {
+    return randomBytes(32)
+        .toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+}
 
 // ─── Admin-only station-user management ──────────────────────────────
 // Every action re-checks the admin email server-side before touching
@@ -29,31 +44,35 @@ async function requireAdmin() {
 
 export interface CreateStationUserInput {
     email: string;
-    password: string;
     displayName: string;
     stage: StageKey;
 }
 
+/**
+ * Create an external station account. Admin only supplies email +
+ * name + stage — no password. The server mints a random access token
+ * that doubles as the URL slug and the auth password, then returns
+ * the token so the modal can show the share URL.
+ */
 export async function createStationUserAction(
     input: CreateStationUserInput
-): Promise<{ error?: string; userId?: string }> {
+): Promise<{ error?: string; userId?: string; accessToken?: string }> {
     const { error: adminErr, adminId } = await requireAdmin();
     if (adminErr) return { error: adminErr };
 
-    if (!input.email.trim() || !input.password.trim() || !input.displayName.trim()) {
-        return { error: 'Email, contraseña y nombre son obligatorios.' };
-    }
-    if (input.password.length < 8) {
-        return { error: 'La contraseña debe tener al menos 8 caracteres.' };
+    if (!input.email.trim() || !input.displayName.trim()) {
+        return { error: 'Email y nombre son obligatorios.' };
     }
 
+    const accessToken = generateAccessToken();
     const service = createServiceClient();
 
-    // Create the auth user via admin API. email_confirm: true so they
-    // can log in immediately without an email round-trip.
+    // The access token doubles as the auth password — the /s/[token]
+    // route signs the station in via signInWithPassword using the
+    // token itself, so we don't need a separate admin-typed password.
     const { data: created, error: authErr } = await service.auth.admin.createUser({
         email: input.email.trim().toLowerCase(),
-        password: input.password,
+        password: accessToken,
         email_confirm: true,
         user_metadata: {
             full_name: input.displayName.trim(),
@@ -71,10 +90,10 @@ export async function createStationUserAction(
             email: input.email.trim().toLowerCase(),
             displayName: input.displayName.trim(),
             stage: input.stage,
+            accessToken,
             createdBy: adminId
         });
     } catch (err) {
-        // Roll back the auth user if we couldn't insert the station_users row.
         await service.auth.admin.deleteUser(created.user.id);
         const msg = err instanceof Error ? err.message : 'No se pudo registrar la estación.';
         return { error: msg };
@@ -82,7 +101,39 @@ export async function createStationUserAction(
 
     revalidatePath('/admin/station-users');
     revalidatePath('/admin/orders');
-    return { userId: created.user.id };
+    return { userId: created.user.id, accessToken };
+}
+
+/**
+ * Rotate the station's access token. Generates a new token, sets it
+ * as the auth password (so /s/[old-token] stops working), and stores
+ * it in station_users.access_token. Old bookmarks are invalidated.
+ */
+export async function regenerateStationAccessTokenAction(
+    userId: string
+): Promise<{ error?: string; accessToken?: string }> {
+    const { error: adminErr } = await requireAdmin();
+    if (adminErr) return { error: adminErr };
+
+    const newToken = generateAccessToken();
+    const service = createServiceClient();
+
+    const { error: authErr } = await service.auth.admin.updateUserById(userId, {
+        password: newToken
+    });
+    if (authErr) {
+        return { error: `No se pudo rotar el acceso: ${authErr.message}` };
+    }
+
+    try {
+        await setStationAccessToken(service, userId, newToken);
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : 'No se pudo guardar el token.';
+        return { error: msg };
+    }
+
+    revalidatePath('/admin/station-users');
+    return { accessToken: newToken };
 }
 
 export async function setStationUserActiveAction(

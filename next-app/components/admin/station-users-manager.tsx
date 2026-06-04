@@ -3,12 +3,15 @@
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
+    Check,
+    Copy,
     HardHat,
     Link2,
     Loader2,
     Plus,
     Power,
     PowerOff,
+    RefreshCcw,
     Trash2,
     X
 } from 'lucide-react';
@@ -18,8 +21,17 @@ import {
     assignStationToOrderAction,
     createStationUserAction,
     deleteStationUserAction,
+    regenerateStationAccessTokenAction,
     setStationUserActiveAction
 } from '@/app/(admin)/admin/station-users/actions';
+
+// Build the full share URL the station bookmarks. Server-rendered as
+// a relative path inside the table so the result hydrates with
+// window.location.origin once we're on the client.
+function buildStationUrl(token: string): string {
+    if (typeof window === 'undefined') return `/s/${token}`;
+    return `${window.location.origin}/s/${token}`;
+}
 
 export interface OrderSummary {
     uuid: string;
@@ -91,6 +103,59 @@ export function StationUsersManager({
         });
     };
 
+    // Copy-link UX: when admin taps Copy, flash a check on that row's
+    // button for 1.5s. Tracked by station id so multiple rows behave
+    // independently.
+    const [copiedId, setCopiedId] = useState<string | null>(null);
+    const handleCopy = async (u: StationUser) => {
+        const url = buildStationUrl(u.accessToken);
+        try {
+            await navigator.clipboard.writeText(url);
+            setCopiedId(u.id);
+            setTimeout(() => {
+                setCopiedId((prev) => (prev === u.id ? null : prev));
+            }, 1500);
+        } catch {
+            // Fallback for browsers that don't grant clipboard access.
+            prompt('Copia el link:', url);
+        }
+    };
+
+    const handleRegenerate = (u: StationUser) => {
+        if (
+            !confirm(
+                `Generar un link nuevo para "${u.displayName}"? El link viejo dejará de funcionar de inmediato — asegurate de compartir el nuevo con la estación.`
+            )
+        ) {
+            return;
+        }
+        startTransition(async () => {
+            const res = await regenerateStationAccessTokenAction(u.id);
+            if (res.error) {
+                alert(res.error);
+                return;
+            }
+            if (res.accessToken) {
+                setUsers((prev) =>
+                    prev.map((x) =>
+                        x.id === u.id ? { ...x, accessToken: res.accessToken! } : x
+                    )
+                );
+                // Auto-copy the new token so admin can paste it straight
+                // into wherever they share station credentials.
+                try {
+                    await navigator.clipboard.writeText(buildStationUrl(res.accessToken));
+                    setCopiedId(u.id);
+                    setTimeout(() => {
+                        setCopiedId((prev) => (prev === u.id ? null : prev));
+                    }, 1500);
+                } catch {
+                    /* clipboard unavailable — admin can copy via the button */
+                }
+            }
+        });
+    };
+
     return (
         <div>
             <div className="flex items-center justify-between mb-6">
@@ -133,12 +198,12 @@ export function StationUsersManager({
                         Aún no hay estaciones registradas.
                     </div>
                 ) : (
-                    <table className="w-full text-sm min-w-[680px]">
+                    <table className="w-full text-sm min-w-[800px]">
                         <thead className="bg-gray-50 dark:bg-zinc-900/60">
                             <tr>
                                 <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-zinc-400 text-xs uppercase">Nombre</th>
-                                <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-zinc-400 text-xs uppercase">Email</th>
                                 <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-zinc-400 text-xs uppercase">Etapa</th>
+                                <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-zinc-400 text-xs uppercase">Link de acceso</th>
                                 <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-zinc-400 text-xs uppercase">Estado</th>
                                 <th className="text-right px-4 py-3 font-semibold text-gray-600 dark:text-zinc-400 text-xs uppercase">Acciones</th>
                             </tr>
@@ -146,12 +211,41 @@ export function StationUsersManager({
                         <tbody className="divide-y divide-gray-100 dark:divide-zinc-800">
                             {users.map((u) => (
                                 <tr key={u.id} className={u.isActive ? '' : 'opacity-50'}>
-                                    <td className="px-4 py-3 font-bold text-gray-900 dark:text-zinc-100">{u.displayName}</td>
-                                    <td className="px-4 py-3 text-gray-700 dark:text-zinc-300 font-mono text-xs">{u.email}</td>
+                                    <td className="px-4 py-3">
+                                        <div className="font-bold text-gray-900 dark:text-zinc-100">
+                                            {u.displayName}
+                                        </div>
+                                        <div className="text-[11px] text-gray-500 dark:text-zinc-500 font-mono">
+                                            {u.email}
+                                        </div>
+                                    </td>
                                     <td className="px-4 py-3">
                                         <span className="px-2 py-1 rounded-full bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 text-xs font-bold">
                                             {STAGE_LABELS[u.stage] || u.stage}
                                         </span>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <div className="inline-flex items-center gap-1 bg-gray-100 dark:bg-zinc-800 rounded-lg overflow-hidden text-xs font-mono">
+                                            <code
+                                                className="px-2 py-1.5 text-gray-700 dark:text-zinc-300 truncate max-w-[180px]"
+                                                title={buildStationUrl(u.accessToken)}
+                                            >
+                                                /s/{u.accessToken.slice(0, 10)}…
+                                            </code>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleCopy(u)}
+                                                disabled={pending}
+                                                title="Copiar link completo"
+                                                className={`px-2 py-1.5 border-l border-gray-200 dark:border-zinc-700 transition-colors ${
+                                                    copiedId === u.id
+                                                        ? 'text-green-600 dark:text-green-400'
+                                                        : 'text-gray-500 hover:text-orange-600 dark:hover:text-orange-400'
+                                                }`}
+                                            >
+                                                {copiedId === u.id ? <Check size={12} /> : <Copy size={12} />}
+                                            </button>
+                                        </div>
                                     </td>
                                     <td className="px-4 py-3">
                                         <span
@@ -163,7 +257,16 @@ export function StationUsersManager({
                                         </span>
                                     </td>
                                     <td className="px-4 py-3 text-right">
-                                        <div className="inline-flex items-center gap-2">
+                                        <div className="inline-flex items-center gap-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRegenerate(u)}
+                                                disabled={pending}
+                                                title="Generar link nuevo (invalida el anterior)"
+                                                className="p-1.5 text-gray-400 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/40 rounded-lg"
+                                            >
+                                                <RefreshCcw size={14} />
+                                            </button>
                                             <button
                                                 type="button"
                                                 onClick={() => handleSetActive(u.id, !u.isActive)}
@@ -398,31 +501,51 @@ function CreateModal({
     onCreated: (u: StationUser) => void;
 }) {
     const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
     const [displayName, setDisplayName] = useState('');
     const [stage, setStage] = useState<StageKey>('corte');
     const [error, setError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
+    // Two-step modal — form first; on success we show the share URL
+    // so admin can copy it before closing.
+    const [createdShare, setCreatedShare] = useState<{
+        user: StationUser;
+        url: string;
+    } | null>(null);
+    const [copied, setCopied] = useState(false);
 
     const submit = async (e: React.FormEvent) => {
         e.preventDefault();
         setSaving(true);
         setError(null);
-        const res = await createStationUserAction({ email, password, displayName, stage });
+        const res = await createStationUserAction({ email, displayName, stage });
         setSaving(false);
         if (res.error) {
             setError(res.error);
             return;
         }
-        if (res.userId) {
-            onCreated({
+        if (res.userId && res.accessToken) {
+            const user: StationUser = {
                 id: res.userId,
                 email: email.trim().toLowerCase(),
                 displayName: displayName.trim(),
                 stage,
                 isActive: true,
-                createdAt: new Date().toISOString()
-            });
+                createdAt: new Date().toISOString(),
+                accessToken: res.accessToken
+            };
+            onCreated(user);
+            setCreatedShare({ user, url: buildStationUrl(res.accessToken) });
+        }
+    };
+
+    const copyShare = async () => {
+        if (!createdShare) return;
+        try {
+            await navigator.clipboard.writeText(createdShare.url);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+        } catch {
+            prompt('Copia el link:', createdShare.url);
         }
     };
 
@@ -430,7 +553,9 @@ function CreateModal({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
             <div className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-2xl shadow-2xl p-6">
                 <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Nueva estación</h3>
+                    <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
+                        {createdShare ? 'Estación creada' : 'Nueva estación'}
+                    </h3>
                     <button
                         type="button"
                         onClick={onClose}
@@ -440,77 +565,119 @@ function CreateModal({
                     </button>
                 </div>
 
-                <form onSubmit={submit} className="space-y-3">
-                    <Field label="Nombre de la estación">
-                        <input
-                            type="text"
-                            value={displayName}
-                            onChange={(e) => setDisplayName(e.target.value)}
-                            placeholder="ej. Maquila San José"
-                            className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-transparent"
-                            required
-                        />
-                    </Field>
-                    <Field label="Email">
-                        <input
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            placeholder="estacion@ejemplo.com"
-                            className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-transparent"
-                            required
-                            autoComplete="off"
-                        />
-                    </Field>
-                    <Field label="Contraseña inicial (≥ 8 caracteres)">
-                        <input
-                            type="text"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-transparent font-mono"
-                            required
-                            minLength={8}
-                            autoComplete="new-password"
-                        />
-                    </Field>
-                    <Field label="Etapa">
-                        <select
-                            value={stage}
-                            onChange={(e) => setStage(e.target.value as StageKey)}
-                            className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-zinc-900"
-                        >
-                            {STAGE_ORDER.map((s) => (
-                                <option key={s} value={s}>
-                                    {STAGE_LABELS[s]}
-                                </option>
-                            ))}
-                        </select>
-                    </Field>
-
-                    {error && (
-                        <div className="bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 p-3 rounded-lg text-sm border border-red-200 dark:border-red-900/50">
-                            {error}
+                {createdShare ? (
+                    <div className="space-y-4">
+                        <p className="text-sm text-gray-600 dark:text-zinc-400">
+                            <span className="font-bold text-gray-900 dark:text-zinc-100">
+                                {createdShare.user.displayName}
+                            </span>{' '}
+                            ya puede entrar. Compartí este link con la estación —
+                            es el único acceso que necesitan (no hay contraseña
+                            separada).
+                        </p>
+                        <div className="rounded-xl border border-orange-200 dark:border-orange-900/40 bg-orange-50/60 dark:bg-orange-950/20 p-3">
+                            <div className="text-[10px] font-bold uppercase tracking-wide text-orange-700 dark:text-orange-400 mb-1">
+                                Link de acceso
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <code className="flex-1 text-xs font-mono text-gray-700 dark:text-zinc-300 break-all">
+                                    {createdShare.url}
+                                </code>
+                                <button
+                                    type="button"
+                                    onClick={copyShare}
+                                    className={`p-2 rounded-lg shrink-0 ${
+                                        copied
+                                            ? 'bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-300'
+                                            : 'bg-orange-600 text-white hover:bg-orange-700'
+                                    }`}
+                                    title={copied ? 'Copiado' : 'Copiar link'}
+                                >
+                                    {copied ? <Check size={14} /> : <Copy size={14} />}
+                                </button>
+                            </div>
                         </div>
-                    )}
-
-                    <div className="flex justify-end gap-2 pt-2">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="px-4 py-2 text-sm font-semibold text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg"
-                        >
-                            Cancelar
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={saving}
-                            className="px-4 py-2 bg-orange-600 text-white rounded-lg font-bold hover:bg-orange-700 disabled:opacity-50 flex items-center gap-2"
-                        >
-                            {saving && <Loader2 size={14} className="animate-spin" />}
-                            Crear
-                        </button>
+                        <p className="text-[11px] text-gray-500 dark:text-zinc-500 italic">
+                            Podés regenerar el link en cualquier momento desde la
+                            tabla; el link viejo deja de funcionar al instante.
+                        </p>
+                        <div className="flex justify-end">
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="px-4 py-2 bg-orange-600 text-white rounded-lg font-bold hover:bg-orange-700 text-sm"
+                            >
+                                Listo
+                            </button>
+                        </div>
                     </div>
-                </form>
+                ) : (
+                    <form onSubmit={submit} className="space-y-3">
+                        <Field label="Nombre de la estación">
+                            <input
+                                type="text"
+                                value={displayName}
+                                onChange={(e) => setDisplayName(e.target.value)}
+                                placeholder="ej. Maquila San José"
+                                className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-transparent"
+                                required
+                            />
+                        </Field>
+                        <Field label="Email">
+                            <input
+                                type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                placeholder="estacion@ejemplo.com"
+                                className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-transparent"
+                                required
+                                autoComplete="off"
+                            />
+                        </Field>
+                        <Field label="Etapa">
+                            <select
+                                value={stage}
+                                onChange={(e) => setStage(e.target.value as StageKey)}
+                                className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-zinc-900"
+                            >
+                                {STAGE_ORDER.map((s) => (
+                                    <option key={s} value={s}>
+                                        {STAGE_LABELS[s]}
+                                    </option>
+                                ))}
+                            </select>
+                        </Field>
+                        <p className="text-[11px] text-gray-500 dark:text-zinc-500 italic">
+                            No se pide contraseña — el sistema genera un link
+                            único de acceso que la estación puede guardar como
+                            marcador.
+                        </p>
+
+                        {error && (
+                            <div className="bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 p-3 rounded-lg text-sm border border-red-200 dark:border-red-900/50">
+                                {error}
+                            </div>
+                        )}
+
+                        <div className="flex justify-end gap-2 pt-2">
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="px-4 py-2 text-sm font-semibold text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={saving}
+                                className="px-4 py-2 bg-orange-600 text-white rounded-lg font-bold hover:bg-orange-700 disabled:opacity-50 flex items-center gap-2"
+                            >
+                                {saving && <Loader2 size={14} className="animate-spin" />}
+                                Crear y generar link
+                            </button>
+                        </div>
+                    </form>
+                )}
             </div>
         </div>
     );
