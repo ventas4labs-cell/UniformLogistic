@@ -48,17 +48,29 @@ export function QuickCreateHost() {
     useEffect(() => {
         const onOpen = (e: Event) => {
             const next = (e as CustomEvent<QuickCreateKind>).detail;
-            if (next === 'product' || next === 'logo') setKind(next);
+            if (
+                next === 'product' ||
+                next === 'logo' ||
+                next === 'company' ||
+                next === 'station' ||
+                next === 'order'
+            ) {
+                setKind(next);
+            }
         };
         window.addEventListener(QUICK_CREATE_EVENT, onOpen);
         return () => window.removeEventListener(QUICK_CREATE_EVENT, onOpen);
     }, []);
 
-    // Fetch deps the first time a popup is requested; reuse afterward.
-    // State is only set inside the promise callbacks (never synchronously
-    // in the effect body) and a ref guards against a duplicate fetch.
+    // Only product / logo / order need the preloaded deps (companies,
+    // and logos for the product BOM). company / station need nothing.
+    const needsDeps = kind === 'product' || kind === 'logo' || kind === 'order';
+
+    // Fetch deps the first time a popup that needs them is requested;
+    // reuse afterward. State is only set inside the promise callbacks
+    // (never synchronously in the effect body); a ref guards duplicates.
     useEffect(() => {
-        if (kind === null || deps !== null || fetchingRef.current) return;
+        if (!needsDeps || deps !== null || fetchingRef.current) return;
         fetchingRef.current = true;
         let cancelled = false;
         fetchQuickCreateDepsAction()
@@ -75,13 +87,38 @@ export function QuickCreateHost() {
         return () => {
             cancelled = true;
         };
-    }, [kind, deps]);
+    }, [needsDeps, deps]);
 
     if (kind === null) return null;
 
     const close = () => setKind(null);
 
-    // Loading / error overlay while deps resolve.
+    // Company / station create modals need no preloaded data — render
+    // them straight away.
+    if (kind === 'company') {
+        return (
+            <CompaniesManager
+                embedded
+                autoOpenCreate
+                onClose={close}
+                initialCompanies={[]}
+            />
+        );
+    }
+
+    if (kind === 'station') {
+        return (
+            <StationUsersManager
+                embedded
+                onClose={close}
+                initialUsers={[]}
+                orderSummaries={[]}
+                initialAssignments={[]}
+            />
+        );
+    }
+
+    // Loading / error overlay while deps resolve (product / logo / order).
     if (!deps) {
         return (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
@@ -133,29 +170,6 @@ export function QuickCreateHost() {
                 onClose={close}
                 initialLogos={[]}
                 companies={deps.companies}
-            />
-        );
-    }
-
-    if (kind === 'company') {
-        return (
-            <CompaniesManager
-                embedded
-                autoOpenCreate
-                onClose={close}
-                initialCompanies={[]}
-            />
-        );
-    }
-
-    if (kind === 'station') {
-        return (
-            <StationUsersManager
-                embedded
-                onClose={close}
-                initialUsers={[]}
-                orderSummaries={[]}
-                initialAssignments={[]}
             />
         );
     }

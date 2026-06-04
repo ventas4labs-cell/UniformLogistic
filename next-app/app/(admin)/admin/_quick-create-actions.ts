@@ -31,9 +31,12 @@ async function requireAdmin() {
 
 export async function fetchQuickCreateDepsAction(): Promise<QuickCreateDeps> {
     const { supabase } = await requireAdmin();
+    // Companies are required; logos are best-effort so a logos-table
+    // hiccup can't block the product popup (the BOM logo picker just
+    // shows empty in that case).
     const [companies, logos] = await Promise.all([
         fetchCompanies(supabase),
-        fetchLogos(supabase)
+        fetchLogos(supabase).catch(() => [])
     ]);
     return { companies, logos };
 }
