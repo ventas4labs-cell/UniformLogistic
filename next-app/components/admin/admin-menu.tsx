@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
     LogOut,
     X,
@@ -62,6 +62,28 @@ export function AdminMenu() {
     const pathname = usePathname();
     const [open, setOpen] = useState(false);
 
+    // Hover open/close with a short close delay so moving the pointer
+    // across the small gap between the logo button and the panel — or
+    // briefly off an edge — doesn't dismiss the launcher.
+    const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const openNow = () => {
+        if (closeTimer.current) {
+            clearTimeout(closeTimer.current);
+            closeTimer.current = null;
+        }
+        setOpen(true);
+    };
+    const scheduleClose = () => {
+        if (closeTimer.current) clearTimeout(closeTimer.current);
+        closeTimer.current = setTimeout(() => setOpen(false), 180);
+    };
+    useEffect(
+        () => () => {
+            if (closeTimer.current) clearTimeout(closeTimer.current);
+        },
+        []
+    );
+
     // Close on route change so navigating from the launcher drops the
     // user on their destination instead of behind an open panel.
     useEffect(() => {
@@ -87,7 +109,9 @@ export function AdminMenu() {
         <div className="relative">
             <button
                 type="button"
-                onClick={() => setOpen((o) => !o)}
+                onClick={openNow}
+                onMouseEnter={openNow}
+                onMouseLeave={scheduleClose}
                 aria-label={open ? 'Cerrar menú' : 'Abrir menú'}
                 aria-expanded={open}
                 className="group relative w-11 h-11 rounded-xl bg-zinc-900 dark:bg-zinc-800 text-white shadow-md ring-1 ring-black/5 dark:ring-white/10 hover:ring-orange-500/40 transition-all active:scale-95"
@@ -129,6 +153,8 @@ export function AdminMenu() {
                     {/* Launcher panel */}
                     <div
                         role="menu"
+                        onMouseEnter={openNow}
+                        onMouseLeave={scheduleClose}
                         className="absolute left-0 top-full mt-2 z-50 w-[calc(100vw-2rem)] sm:w-[34rem] max-w-[34rem] max-h-[80vh] overflow-y-auto rounded-2xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl p-4"
                     >
                         <div className="flex items-center justify-between mb-3">
