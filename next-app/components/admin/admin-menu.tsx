@@ -61,6 +61,7 @@ const OPERATIONS_TABS: Tab[] = [
 export function AdminMenu() {
     const pathname = usePathname();
     const [open, setOpen] = useState(false);
+    const wrapperRef = useRef<HTMLDivElement>(null);
 
     // Hover open/close with a short close delay so moving the pointer
     // across the small gap between the logo button and the panel — or
@@ -84,29 +85,32 @@ export function AdminMenu() {
         []
     );
 
-    // Close on route change so navigating from the launcher drops the
-    // user on their destination instead of behind an open panel.
-    useEffect(() => {
-        setOpen(false);
-    }, [pathname]);
-
-    // Escape to close + lock body scroll while open.
+    // Close on Escape or a click/tap outside the menu. (No full-screen
+    // backdrop — it would overlay the trigger and steal the hover,
+    // closing the launcher the instant it opened.)
     useEffect(() => {
         if (!open) return;
         const onKey = (e: KeyboardEvent) => {
             if (e.key === 'Escape') setOpen(false);
         };
+        const onPointer = (e: Event) => {
+            const target = e.target as Node | null;
+            if (wrapperRef.current && target && !wrapperRef.current.contains(target)) {
+                setOpen(false);
+            }
+        };
         window.addEventListener('keydown', onKey);
-        const prevOverflow = document.body.style.overflow;
-        document.body.style.overflow = 'hidden';
+        document.addEventListener('mousedown', onPointer);
+        document.addEventListener('touchstart', onPointer);
         return () => {
             window.removeEventListener('keydown', onKey);
-            document.body.style.overflow = prevOverflow;
+            document.removeEventListener('mousedown', onPointer);
+            document.removeEventListener('touchstart', onPointer);
         };
     }, [open]);
 
     return (
-        <div className="relative">
+        <div className="relative" ref={wrapperRef}>
             <button
                 type="button"
                 onClick={openNow}
@@ -140,23 +144,14 @@ export function AdminMenu() {
                 </span>
             </button>
 
+            {/* Launcher panel — opens on hover or click, no backdrop */}
             {open && (
-                <>
-                    {/* Backdrop */}
-                    <button
-                        type="button"
-                        aria-label="Cerrar menú"
-                        onClick={() => setOpen(false)}
-                        className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
-                    />
-
-                    {/* Launcher panel */}
-                    <div
-                        role="menu"
-                        onMouseEnter={openNow}
-                        onMouseLeave={scheduleClose}
-                        className="absolute left-0 top-full mt-2 z-50 w-[calc(100vw-2rem)] sm:w-[34rem] max-w-[34rem] max-h-[80vh] overflow-y-auto rounded-2xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl p-4"
-                    >
+                <div
+                    role="menu"
+                    onMouseEnter={openNow}
+                    onMouseLeave={scheduleClose}
+                    className="absolute left-0 top-full mt-2 z-50 w-[calc(100vw-2rem)] sm:w-[34rem] max-w-[34rem] max-h-[80vh] overflow-y-auto rounded-2xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl p-4"
+                >
                         <div className="flex items-center justify-between mb-3">
                             <div>
                                 <p className="text-sm font-extrabold text-gray-900 dark:text-zinc-100">
@@ -176,17 +171,24 @@ export function AdminMenu() {
                             </button>
                         </div>
 
-                        <Section title="Principal" tabs={MAIN_TABS} pathname={pathname} />
+                        <Section
+                            title="Principal"
+                            tabs={MAIN_TABS}
+                            pathname={pathname}
+                            onNavigate={() => setOpen(false)}
+                        />
                         <Section
                             title="Operaciones"
                             tabs={OPERATIONS_TABS}
                             pathname={pathname}
+                            onNavigate={() => setOpen(false)}
                         />
 
                         <div className="mt-4 pt-3 border-t border-gray-100 dark:border-zinc-800 flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2">
                                 <Link
                                     href="/catalog"
+                                    onClick={() => setOpen(false)}
                                     className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800"
                                 >
                                     <ArrowLeft size={16} />
@@ -204,8 +206,7 @@ export function AdminMenu() {
                             </div>
                             <ThemeToggle />
                         </div>
-                    </div>
-                </>
+                </div>
             )}
         </div>
     );
@@ -214,11 +215,13 @@ export function AdminMenu() {
 function Section({
     title,
     tabs,
-    pathname
+    pathname,
+    onNavigate
 }: {
     title: string;
     tabs: Tab[];
     pathname: string | null;
+    onNavigate: () => void;
 }) {
     return (
         <div className="mb-3 last:mb-0">
@@ -234,6 +237,7 @@ function Section({
                             key={t.href}
                             href={t.href}
                             role="menuitem"
+                            onClick={onNavigate}
                             className={`flex flex-col items-center justify-center gap-1.5 rounded-xl px-2 py-3 text-center transition-colors ${
                                 active
                                     ? 'bg-orange-600 text-white shadow-sm'
