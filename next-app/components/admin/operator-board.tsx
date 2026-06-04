@@ -14,6 +14,7 @@ import {
     Send,
     ImageIcon,
     Check,
+    FileDown,
 } from 'lucide-react';
 import type { Order } from '@/lib/types';
 import type { InsumoCompletion } from '@/lib/services/insumo-completions';
@@ -165,6 +166,7 @@ function OrderCard({
     preparations,
     onLocalPrepChange,
     onCommitPrep,
+    stationNames,
 }: {
     order: Order;
     isCompleted: boolean;
@@ -174,16 +176,29 @@ function OrderCard({
     preparations: Map<string, number>;
     onLocalPrepChange: (orderId: string, insumoName: string, qty: number) => void;
     onCommitPrep: (orderId: string, insumoName: string, qty: number) => Promise<void>;
+    stationNames: string[];
 }) {
     const [expanded, setExpanded] = useState(false);
     const [reportingInsumo, setReportingInsumo] = useState<string | null>(null);
     const [sentReports, setSentReports] = useState<Set<string>>(new Set());
     const [previewImage, setPreviewImage] = useState<{ src: string; alt: string } | null>(null);
+    const [pdfLoading, setPdfLoading] = useState(false);
     // Which insumo rows have their prep-editor disclosure open. Keyed
     // by insumo name (unique within this card's insumo list).
     const [prepOpen, setPrepOpen] = useState<Set<string>>(new Set());
     const insumos = aggregateInsumos(order.items);
     const totalPieces = order.items.reduce((s, i) => s + i.quantity, 0);
+
+    const handleGeneratePdf = async () => {
+        setPdfLoading(true);
+        try {
+            const { generateAdminPDF } = await import('@/lib/pdf-service');
+            const pdf = generateAdminPDF(order, { stationNames });
+            pdf.save(`${order.id}.pdf`);
+        } finally {
+            setPdfLoading(false);
+        }
+    };
 
     return (
         <div
@@ -211,14 +226,36 @@ function OrderCard({
                             )}
                         </p>
                     </div>
-                    <StageCompleteToggle
-                        orderUuid={order.uuid}
-                        orderRef={order.id}
-                        stage="bodega"
-                        isCompleted={isCompleted}
-                        onLocalChange={onLocalCompletionChange}
-                    />
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                        <StageCompleteToggle
+                            orderUuid={order.uuid}
+                            orderRef={order.id}
+                            stage="bodega"
+                            isCompleted={isCompleted}
+                            onLocalChange={onLocalCompletionChange}
+                        />
+                        <button
+                            type="button"
+                            onClick={handleGeneratePdf}
+                            disabled={pdfLoading}
+                            title="Generar PDF de bodega"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold text-gray-600 dark:text-zinc-300 bg-gray-100 dark:bg-zinc-800 hover:bg-orange-100 dark:hover:bg-orange-950/40 hover:text-orange-700 dark:hover:text-orange-300 transition-colors disabled:opacity-50"
+                        >
+                            {pdfLoading ? (
+                                <Loader2 size={12} className="animate-spin" />
+                            ) : (
+                                <FileDown size={12} />
+                            )}
+                            PDF
+                        </button>
+                    </div>
                 </div>
+                {stationNames.length > 0 && (
+                    <p className="text-[11px] text-gray-500 dark:text-zinc-400 mt-2">
+                        <span className="font-bold">Estación:</span>{' '}
+                        {stationNames.join(', ')}
+                    </p>
+                )}
 
                 <div className="flex items-center gap-3 mt-3">
                     <span className="bg-orange-100 dark:bg-orange-950/50 text-orange-800 dark:text-orange-300 text-xs font-bold px-2 py-1 rounded-full">
@@ -478,12 +515,16 @@ export function OperatorBoard({
     initialOrders,
     initialCompletions,
     initialBodegaCompletedOrderIds = [],
-    initialPreparations = []
+    initialPreparations = [],
+    stationNamesByOrder = {}
 }: {
     initialOrders: Order[];
     initialCompletions: InsumoCompletion[];
     initialBodegaCompletedOrderIds?: string[];
     initialPreparations?: InsumoPreparation[];
+    // orderId → assigned external station name(s). Rendered on the
+    // card + included in the Bodega PDF export.
+    stationNamesByOrder?: Record<string, string[]>;
 }) {
     const [orders] = useState<Order[]>(initialOrders);
     const [preparations, setPreparations] = useState<Map<string, number>>(
@@ -679,6 +720,9 @@ export function OperatorBoard({
                             preparations={preparations}
                             onLocalPrepChange={handleLocalPrepChange}
                             onCommitPrep={handleCommitPrep}
+                            stationNames={
+                                (order.uuid && stationNamesByOrder[order.uuid]) || []
+                            }
                         />
                     ))}
                 </div>
