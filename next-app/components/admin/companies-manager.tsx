@@ -33,12 +33,29 @@ const emptyForm: CompanyInput = {
     isActive: true
 };
 
-export function CompaniesManager({ initialCompanies }: { initialCompanies: Company[] }) {
+export function CompaniesManager({
+    initialCompanies,
+    embedded = false,
+    autoOpenCreate = false,
+    onClose
+}: {
+    initialCompanies: Company[];
+    // Embedded mode renders ONLY the create/edit modal (no list/header)
+    // so it can be summoned as a popup from the fast actions.
+    embedded?: boolean;
+    autoOpenCreate?: boolean;
+    onClose?: () => void;
+}) {
     const router = useRouter();
     const [pending, startTransition] = useTransition();
     const [editing, setEditing] = useState<Company | null>(null);
-    const [showForm, setShowForm] = useState(false);
+    const [showForm, setShowForm] = useState(autoOpenCreate);
     const [form, setForm] = useState<CompanyInput>(emptyForm);
+
+    const closeForm = () => {
+        setShowForm(false);
+        onClose?.();
+    };
     // Companion user account created together with the empresa. Only
     // shown on create; editing leaves user accounts to /admin/users.
     const [userForm, setUserForm] = useState<InitialUserForm>(emptyUserForm);
@@ -88,6 +105,7 @@ export function CompaniesManager({ initialCompanies }: { initialCompanies: Compa
                 await updateCompanyAction(editing.id, form);
                 setShowForm(false);
                 router.refresh();
+                onClose?.();
             } else {
                 const initialUser =
                     createUser && userForm.email.trim() && userForm.password.trim()
@@ -104,6 +122,7 @@ export function CompaniesManager({ initialCompanies }: { initialCompanies: Compa
                 }
                 setShowForm(false);
                 router.refresh();
+                onClose?.();
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Error al guardar');
@@ -126,6 +145,7 @@ export function CompaniesManager({ initialCompanies }: { initialCompanies: Compa
 
     return (
         <div>
+            {!embedded && (
             <div className="flex justify-between items-center mb-6">
                 <div>
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-zinc-100">Empresas</h2>
@@ -151,7 +171,9 @@ export function CompaniesManager({ initialCompanies }: { initialCompanies: Compa
                     </Link>
                 </div>
             </div>
+            )}
 
+            {!embedded && (
             <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm overflow-x-auto">
                 <table className="w-full text-left min-w-[760px]">
                     <thead className="bg-gray-50 dark:bg-zinc-900/60 border-b border-gray-200 dark:border-zinc-800">
@@ -225,13 +247,14 @@ export function CompaniesManager({ initialCompanies }: { initialCompanies: Compa
                     </tbody>
                 </table>
             </div>
+            )}
 
             {showForm && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
                         <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-zinc-800">
                             <h3 className="text-xl font-bold">{editing ? 'Editar Empresa' : 'Nueva Empresa'}</h3>
-                            <button onClick={() => setShowForm(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg">
+                            <button onClick={closeForm} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg">
                                 <X size={20} />
                             </button>
                         </div>
@@ -381,7 +404,7 @@ export function CompaniesManager({ initialCompanies }: { initialCompanies: Compa
                             <div className="flex gap-3 pt-2">
                                 <button
                                     type="button"
-                                    onClick={() => setShowForm(false)}
+                                    onClick={closeForm}
                                     className="flex-1 py-3 border border-gray-300 dark:border-zinc-700 rounded-lg font-bold text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800"
                                 >
                                     Cancelar

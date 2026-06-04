@@ -3,7 +3,7 @@
 // the admin shell — without each surface having to own modal state or
 // the (heavy) form component.
 
-export type QuickCreateKind = 'product' | 'logo';
+export type QuickCreateKind = 'product' | 'logo' | 'company' | 'station' | 'order';
 
 export const QUICK_CREATE_EVENT = 'ul:quick-create';
 

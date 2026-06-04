@@ -23,6 +23,18 @@ const LogosManager = dynamic(
     () => import('@/components/admin/logos-manager').then((m) => m.LogosManager),
     { ssr: false }
 );
+const CompaniesManager = dynamic(
+    () => import('@/components/admin/companies-manager').then((m) => m.CompaniesManager),
+    { ssr: false }
+);
+const StationUsersManager = dynamic(
+    () => import('@/components/admin/station-users-manager').then((m) => m.StationUsersManager),
+    { ssr: false }
+);
+const OrderQuickCreate = dynamic(
+    () => import('@/components/admin/order-quick-create').then((m) => m.OrderQuickCreate),
+    { ssr: false }
+);
 
 // Mounted once in the admin shell. Listens for QUICK_CREATE_EVENT, lazily
 // fetches the form dependencies (companies, logos) once, then renders the
@@ -113,13 +125,40 @@ export function QuickCreateHost() {
         );
     }
 
-    return (
-        <LogosManager
-            embedded
-            autoOpenCreate
-            onClose={close}
-            initialLogos={[]}
-            companies={deps.companies}
-        />
-    );
+    if (kind === 'logo') {
+        return (
+            <LogosManager
+                embedded
+                autoOpenCreate
+                onClose={close}
+                initialLogos={[]}
+                companies={deps.companies}
+            />
+        );
+    }
+
+    if (kind === 'company') {
+        return (
+            <CompaniesManager
+                embedded
+                autoOpenCreate
+                onClose={close}
+                initialCompanies={[]}
+            />
+        );
+    }
+
+    if (kind === 'station') {
+        return (
+            <StationUsersManager
+                embedded
+                onClose={close}
+                initialUsers={[]}
+                orderSummaries={[]}
+                initialAssignments={[]}
+            />
+        );
+    }
+
+    return <OrderQuickCreate companies={deps.companies} onClose={close} />;
 }

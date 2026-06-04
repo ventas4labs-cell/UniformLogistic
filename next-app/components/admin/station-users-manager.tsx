@@ -54,12 +54,18 @@ interface ManagerProps {
     initialUsers: StationUser[];
     orderSummaries: OrderSummary[];
     initialAssignments: { orderId: string; stationUserId: string }[];
+    // Embedded mode renders ONLY the create modal so a new station can be
+    // created as a popup from the fast actions, without the list/assign UI.
+    embedded?: boolean;
+    onClose?: () => void;
 }
 
 export function StationUsersManager({
     initialUsers,
     orderSummaries,
-    initialAssignments
+    initialAssignments,
+    embedded = false,
+    onClose
 }: ManagerProps) {
     const router = useRouter();
     const [users, setUsers] = useState<StationUser[]>(initialUsers);
@@ -169,6 +175,19 @@ export function StationUsersManager({
             }
         });
     };
+
+    // Embedded popup: just the create modal, no list / assign / header.
+    if (embedded) {
+        return (
+            <CreateModal
+                onClose={() => onClose?.()}
+                onCreated={() => {
+                    router.refresh();
+                    onClose?.();
+                }}
+            />
+        );
+    }
 
     return (
         <div>
