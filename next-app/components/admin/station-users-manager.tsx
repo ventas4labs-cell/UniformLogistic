@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     Check,
@@ -25,12 +25,21 @@ import {
     setStationUserActiveAction
 } from '@/app/(admin)/admin/station-users/actions';
 
-// Build the full share URL the station bookmarks. Server-rendered as
-// a relative path inside the table so the result hydrates with
-// window.location.origin once we're on the client.
+// Build the full share URL the station bookmarks. Safe to call in
+// event handlers (copy/regenerate) — they only run client-side. For
+// RENDER-time use (e.g. a title attribute) prefer buildStationUrlWith
+// + the mounted-origin state so the server and first client render
+// agree and we don't trip a hydration mismatch.
 function buildStationUrl(token: string): string {
     if (typeof window === 'undefined') return `/s/${token}`;
     return `${window.location.origin}/s/${token}`;
+}
+
+// origin === '' on the server and on the first client render, so both
+// produce `/s/<token>`; after mount the effect fills origin in and the
+// title upgrades to the absolute URL without a mismatch.
+function buildStationUrlWith(origin: string, token: string): string {
+    return origin ? `${origin}/s/${token}` : `/s/${token}`;
 }
 
 export interface OrderSummary {
@@ -57,6 +66,11 @@ export function StationUsersManager({
     const [creating, setCreating] = useState(false);
     const [assigning, setAssigning] = useState(false);
     const [pending, startTransition] = useTransition();
+    // Empty on server + first client render; filled after mount so the
+    // hover title can show the absolute URL without a hydration
+    // mismatch on the `title` attribute.
+    const [origin, setOrigin] = useState('');
+    useEffect(() => setOrigin(window.location.origin), []);
     // Tracks current order↔station pairings so the assign modal can
     // grey out pairs that already exist (avoids the round-trip + the
     // duplicate-PK error if admin tries to re-assign).
@@ -228,7 +242,7 @@ export function StationUsersManager({
                                         <div className="inline-flex items-center gap-1 bg-gray-100 dark:bg-zinc-800 rounded-lg overflow-hidden text-xs font-mono">
                                             <code
                                                 className="px-2 py-1.5 text-gray-700 dark:text-zinc-300 truncate max-w-[180px]"
-                                                title={buildStationUrl(u.accessToken)}
+                                                title={buildStationUrlWith(origin, u.accessToken)}
                                             >
                                                 /s/{u.accessToken.slice(0, 10)}…
                                             </code>
