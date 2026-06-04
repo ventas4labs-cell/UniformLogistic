@@ -33,14 +33,17 @@ export interface AdminAction {
     primary?: boolean;
     /** Optional live badge (e.g. count of pending items). */
     badgeKey?: 'invoicesToPay';
+    /** When set, the action opens a create popup in place instead of
+     *  navigating. `href` is the fallback if popups aren't available. */
+    quickCreate?: 'product' | 'logo';
 }
 
 export const ADMIN_ACTIONS: AdminAction[] = [
     { id: 'new-order', label: 'Nuevo pedido', href: '/catalog', Icon: ShoppingCart, primary: true },
     { id: 'orders', label: 'Ver pedidos', href: '/admin/orders', Icon: ClipboardList },
-    { id: 'new-product', label: 'Nuevo producto', href: '/admin/products', Icon: Package },
+    { id: 'new-product', label: 'Nuevo producto', href: '/admin/products', Icon: Package, quickCreate: 'product' },
     { id: 'new-company', label: 'Nueva empresa', href: '/admin/companies', Icon: Building2 },
-    { id: 'new-logo', label: 'Nuevo logo', href: '/admin/logos', Icon: Sticker },
+    { id: 'new-logo', label: 'Nuevo logo', href: '/admin/logos', Icon: Sticker, quickCreate: 'logo' },
     { id: 'invoices-pay', label: 'Facturas a pagar', href: '/admin/station-invoices', Icon: FileText, badgeKey: 'invoicesToPay' },
     { id: 'stock', label: 'Stock', href: '/admin/stock', Icon: Boxes },
     { id: 'materials', label: 'Materiales', href: '/admin/materials', Icon: Package },

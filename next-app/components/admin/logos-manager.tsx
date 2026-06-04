@@ -45,16 +45,29 @@ const categoryBadgeCls = (cat: LogoCategory) =>
 
 export function LogosManager({
     initialLogos,
-    companies
+    companies,
+    embedded = false,
+    autoOpenCreate = false,
+    onClose
 }: {
     initialLogos: Logo[];
     companies: Company[];
+    // Embedded mode renders ONLY the create/edit modal (no list/header)
+    // so it can be summoned as a popup from the fast actions.
+    embedded?: boolean;
+    autoOpenCreate?: boolean;
+    onClose?: () => void;
 }) {
     const router = useRouter();
     const [pending, startTransition] = useTransition();
     const [editing, setEditing] = useState<Logo | null>(null);
-    const [showForm, setShowForm] = useState(false);
+    const [showForm, setShowForm] = useState(autoOpenCreate);
     const [form, setForm] = useState<LogoInput>(emptyForm);
+
+    const closeForm = () => {
+        setShowForm(false);
+        onClose?.();
+    };
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [uploadingImage, setUploadingImage] = useState(false);
@@ -124,6 +137,7 @@ export function LogosManager({
             }
             setShowForm(false);
             router.refresh();
+            onClose?.();
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Error al guardar');
         } finally {
@@ -145,6 +159,7 @@ export function LogosManager({
 
     return (
         <div>
+            {!embedded && (
             <div className="flex justify-between items-center mb-6">
                 <div>
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-zinc-100">Logos</h2>
@@ -160,7 +175,9 @@ export function LogosManager({
                     <Plus size={18} /> Nuevo Logo
                 </button>
             </div>
+            )}
 
+            {!embedded && (
             <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm overflow-x-auto">
                 <table className="w-full text-left min-w-[700px]">
                     <thead className="bg-gray-50 dark:bg-zinc-900/60 border-b border-gray-200 dark:border-zinc-800">
@@ -265,6 +282,7 @@ export function LogosManager({
                     </tbody>
                 </table>
             </div>
+            )}
 
             {previewImage && (
                 <div
@@ -304,7 +322,7 @@ export function LogosManager({
                                 {editing ? 'Editar Logo' : 'Nuevo Logo'}
                             </h3>
                             <button
-                                onClick={() => setShowForm(false)}
+                                onClick={closeForm}
                                 className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"
                                 aria-label="Cerrar"
                             >
@@ -510,7 +528,7 @@ export function LogosManager({
                             <div className="flex gap-3 pt-2">
                                 <button
                                     type="button"
-                                    onClick={() => setShowForm(false)}
+                                    onClick={closeForm}
                                     className="flex-1 py-3 border border-gray-300 dark:border-zinc-700 rounded-lg font-bold text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800"
                                 >
                                     Cancelar

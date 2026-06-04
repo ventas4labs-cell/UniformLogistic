@@ -126,16 +126,31 @@ function DecimalInput({
 export function ProductsManager({
     initialProducts,
     companies,
-    logos
+    logos,
+    embedded = false,
+    autoOpenCreate = false,
+    onClose
 }: {
     initialProducts: AdminProduct[];
     companies: Company[];
     logos: Logo[];
+    // Embedded mode renders ONLY the create/edit modal (no list/header),
+    // so the form can be summoned as a popup from anywhere (top-bar fast
+    // actions, home grid) without leaving the current page.
+    embedded?: boolean;
+    autoOpenCreate?: boolean;
+    onClose?: () => void;
 }) {
     const router = useRouter();
     const [pending, startTransition] = useTransition();
     const [editing, setEditing] = useState<AdminProduct | null>(null);
-    const [showForm, setShowForm] = useState(false);
+    const [showForm, setShowForm] = useState(autoOpenCreate);
+
+    // Closing the form. In embedded mode also tell the host to unmount.
+    const closeForm = () => {
+        setShowForm(false);
+        onClose?.();
+    };
     const [form, setForm] = useState<ProductInput>(emptyForm);
     // Raw text for the comma-separated size inputs. Storing the typed
     // string separately from form.sizes (number[]/string[]) avoids the
@@ -308,6 +323,7 @@ export function ProductsManager({
             }
             setShowForm(false);
             router.refresh();
+            onClose?.();
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Error al guardar');
         } finally {
@@ -329,6 +345,7 @@ export function ProductsManager({
 
     return (
         <div>
+            {!embedded && (
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
                 <div className="min-w-0">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-zinc-100">Productos</h2>
@@ -348,7 +365,9 @@ export function ProductsManager({
                     </button>
                 </div>
             </div>
+            )}
 
+            {!embedded && (
             <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm overflow-x-auto">
                 <table className="w-full text-left min-w-[920px]">
                     <thead className="bg-gray-50 dark:bg-zinc-900/60 border-b border-gray-200 dark:border-zinc-800">
@@ -470,6 +489,7 @@ export function ProductsManager({
                     </tbody>
                 </table>
             </div>
+            )}
 
             {previewImage && (
                 <div
@@ -511,7 +531,7 @@ export function ProductsManager({
                                     onPrefill={mergeVoiceIntoForm}
                                 />
                                 <button
-                                    onClick={() => setShowForm(false)}
+                                    onClick={closeForm}
                                     className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"
                                     aria-label="Cerrar"
                                 >
@@ -1154,7 +1174,7 @@ export function ProductsManager({
                             <div className="flex gap-3 pt-2">
                                 <button
                                     type="button"
-                                    onClick={() => setShowForm(false)}
+                                    onClick={closeForm}
                                     className="flex-1 py-3 border border-gray-300 dark:border-zinc-700 rounded-lg font-bold text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800"
                                 >
                                     Cancelar

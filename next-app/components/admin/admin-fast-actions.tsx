@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { actionById } from '@/components/admin/admin-actions';
 import { FAST_ACTIONS_EVENT } from '@/lib/admin-fast-actions';
+import { openQuickCreate } from '@/lib/admin-quick-create';
 
 // Configurable one-click buttons in the admin top bar. Initial set is
 // read server-side (from the cookie) and passed in so there's no flash;
@@ -33,24 +34,46 @@ export function AdminFastActions({ initial }: { initial: string[] }) {
     return (
         <div className="ml-auto flex items-center gap-1.5 overflow-x-auto">
             {actions.map((a) => {
+                const action = a!;
                 const active =
-                    pathname === a!.href || pathname?.startsWith(a!.href + '/');
-                const Icon = a!.Icon;
+                    pathname === action.href ||
+                    pathname?.startsWith(action.href + '/');
+                const Icon = action.Icon;
+                const cls = `inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-semibold shrink-0 transition-colors ${
+                    active
+                        ? 'bg-orange-600 text-white'
+                        : action.primary
+                          ? 'text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-950/30'
+                          : 'text-gray-600 dark:text-zinc-300 hover:bg-orange-50 dark:hover:bg-orange-950/30 hover:text-orange-700 dark:hover:text-orange-300'
+                }`;
+                const inner = (
+                    <>
+                        <Icon size={16} />
+                        <span className="hidden md:inline">{action.label}</span>
+                    </>
+                );
+                // Create actions pop a modal in place instead of navigating.
+                if (action.quickCreate) {
+                    return (
+                        <button
+                            key={action.id}
+                            type="button"
+                            title={action.label}
+                            onClick={() => openQuickCreate(action.quickCreate!)}
+                            className={cls}
+                        >
+                            {inner}
+                        </button>
+                    );
+                }
                 return (
                     <Link
-                        key={a!.id}
-                        href={a!.href}
-                        title={a!.label}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-semibold shrink-0 transition-colors ${
-                            active
-                                ? 'bg-orange-600 text-white'
-                                : a!.primary
-                                  ? 'text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-950/30'
-                                  : 'text-gray-600 dark:text-zinc-300 hover:bg-orange-50 dark:hover:bg-orange-950/30 hover:text-orange-700 dark:hover:text-orange-300'
-                        }`}
+                        key={action.id}
+                        href={action.href}
+                        title={action.label}
+                        className={cls}
                     >
-                        <Icon size={16} />
-                        <span className="hidden md:inline">{a!.label}</span>
+                        {inner}
                     </Link>
                 );
             })}

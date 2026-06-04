@@ -9,6 +9,7 @@ import {
     FAST_ACTIONS_EVENT,
     serializeFastActions
 } from '@/lib/admin-fast-actions';
+import { openQuickCreate } from '@/lib/admin-quick-create';
 
 const YEAR = 60 * 60 * 24 * 365;
 
@@ -63,32 +64,45 @@ export function QuickActionsPanel({ initialPinned, badges }: Props) {
                     const TileIcon = a.primary ? Plus : a.Icon;
                     const badge =
                         a.badgeKey === 'invoicesToPay' ? badges?.invoicesToPay : undefined;
-                    return (
-                        <div key={a.id} className="relative">
-                            <Link
-                                href={a.href}
-                                className={`flex flex-col items-center justify-center gap-2 rounded-2xl p-4 text-center font-bold text-sm transition-all shadow-sm h-full ${
+                    const tileCls = `flex flex-col items-center justify-center gap-2 rounded-2xl p-4 text-center font-bold text-sm transition-all shadow-sm h-full w-full ${
+                        a.primary
+                            ? 'bg-orange-600 text-white hover:bg-orange-700'
+                            : 'bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 text-gray-700 dark:text-zinc-200 hover:border-orange-300 dark:hover:border-orange-500/40 hover:text-orange-700 dark:hover:text-orange-300'
+                    }`;
+                    const tileInner = (
+                        <>
+                            {badge !== undefined && badge > 0 && (
+                                <span className="absolute top-2 left-2 min-w-5 h-5 px-1.5 rounded-full bg-red-600 text-white text-[11px] font-extrabold flex items-center justify-center">
+                                    {badge}
+                                </span>
+                            )}
+                            <span
+                                className={`w-9 h-9 rounded-xl flex items-center justify-center ${
                                     a.primary
-                                        ? 'bg-orange-600 text-white hover:bg-orange-700'
-                                        : 'bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 text-gray-700 dark:text-zinc-200 hover:border-orange-300 dark:hover:border-orange-500/40 hover:text-orange-700 dark:hover:text-orange-300'
+                                        ? 'bg-white/20'
+                                        : 'bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400'
                                 }`}
                             >
-                                {badge !== undefined && badge > 0 && (
-                                    <span className="absolute top-2 left-2 min-w-5 h-5 px-1.5 rounded-full bg-red-600 text-white text-[11px] font-extrabold flex items-center justify-center">
-                                        {badge}
-                                    </span>
-                                )}
-                                <span
-                                    className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-                                        a.primary
-                                            ? 'bg-white/20'
-                                            : 'bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400'
-                                    }`}
+                                <TileIcon size={18} />
+                            </span>
+                            {a.label}
+                        </>
+                    );
+                    return (
+                        <div key={a.id} className="relative">
+                            {a.quickCreate ? (
+                                <button
+                                    type="button"
+                                    onClick={() => openQuickCreate(a.quickCreate!)}
+                                    className={tileCls}
                                 >
-                                    <TileIcon size={18} />
-                                </span>
-                                {a.label}
-                            </Link>
+                                    {tileInner}
+                                </button>
+                            ) : (
+                                <Link href={a.href} className={tileCls}>
+                                    {tileInner}
+                                </Link>
+                            )}
 
                             <button
                                 type="button"

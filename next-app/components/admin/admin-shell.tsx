@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { AdminMenu } from '@/components/admin/admin-menu';
 import { AdminFastActions } from '@/components/admin/admin-fast-actions';
+import { QuickCreateHost } from '@/components/admin/quick-create-host';
 import { FAST_ACTIONS_COOKIE, resolveFastActions } from '@/lib/admin-fast-actions';
 
 interface Props {
@@ -29,6 +30,10 @@ export async function AdminShell({ children }: Props) {
             <main className="p-4 sm:p-6 lg:p-8">
                 <div className="max-w-7xl mx-auto">{children}</div>
             </main>
+
+            {/* Global popup host for the "Nuevo producto" / "Nuevo logo"
+                fast actions — opens a create modal over the current page. */}
+            <QuickCreateHost />
         </div>
     );
 }
