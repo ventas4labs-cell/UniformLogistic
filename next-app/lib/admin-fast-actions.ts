@@ -12,8 +12,15 @@ export const FAST_ACTIONS_EVENT = 'ul:fast-actions-changed';
 
 // Shown the first time, before the admin has configured anything (cookie
 // absent). Once they configure — even to an empty set — the cookie is
-// written and this default no longer applies.
-export const DEFAULT_FAST_ACTIONS: string[] = ['orders'];
+// written and this default no longer applies. Ids reference ADMIN_ACTIONS.
+export const DEFAULT_FAST_ACTIONS: string[] = [
+    'new-order',
+    'orders',
+    'new-product',
+    'new-company',
+    'new-logo',
+    'invoices-pay'
+];
 
 // Cookie value is a comma-separated list of module ids (slugs, no special
 // chars) so it round-trips without encoding.

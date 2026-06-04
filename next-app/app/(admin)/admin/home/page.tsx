@@ -4,12 +4,9 @@ import {
     Building2,
     ClipboardList,
     Factory,
-    FileText,
     Package,
-    Plus,
     Receipt,
     ShieldCheck,
-    ShoppingCart,
     Sticker,
     XCircle
 } from 'lucide-react';
@@ -26,7 +23,7 @@ import { fetchProducts } from '@/lib/services/products';
 import { fetchLogos } from '@/lib/services/logos';
 import { fetchAllStationInvoices } from '@/lib/services/station-invoices';
 import { FAST_ACTIONS_COOKIE, resolveFastActions } from '@/lib/admin-fast-actions';
-import { FastActionsConfig } from '@/components/admin/fast-actions-config';
+import { QuickActionsPanel } from '@/components/admin/quick-actions-panel';
 
 // Admin panel home — quick actions + at-a-glance statistics. Replaces
 // the old behavior where /admin redirected straight to /admin/orders
@@ -96,30 +93,11 @@ export default async function AdminHomePage() {
                 </p>
             </header>
 
-            {/* ── Quick actions ────────────────────────────────────── */}
-            <section>
-                <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500 dark:text-zinc-400 mb-3">
-                    Acciones rápidas
-                </h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                    <QuickAction
-                        href="/catalog"
-                        label="Nuevo pedido"
-                        Icon={ShoppingCart}
-                        primary
-                    />
-                    <QuickAction href="/admin/orders" label="Ver pedidos" Icon={ClipboardList} />
-                    <QuickAction href="/admin/products" label="Nuevo producto" Icon={Package} />
-                    <QuickAction href="/admin/companies" label="Nueva empresa" Icon={Building2} />
-                    <QuickAction href="/admin/logos" label="Nuevo logo" Icon={Sticker} />
-                    <QuickAction
-                        href="/admin/station-invoices"
-                        label="Facturas a pagar"
-                        Icon={FileText}
-                        badge={invoicesToPay > 0 ? invoicesToPay : undefined}
-                    />
-                </div>
-            </section>
+            {/* ── Quick actions (configurable top-bar pins) ────────── */}
+            <QuickActionsPanel
+                initialPinned={fastActions}
+                badges={{ invoicesToPay }}
+            />
 
             {/* ── Order KPIs ───────────────────────────────────────── */}
             <section>
@@ -237,55 +215,11 @@ export default async function AdminHomePage() {
                     />
                 </div>
             </section>
-
-            {/* ── Fast-action configuration ────────────────────────── */}
-            <FastActionsConfig initial={fastActions} />
         </div>
     );
 }
 
 // ── Subcomponents ───────────────────────────────────────────────────────
-
-function QuickAction({
-    href,
-    label,
-    Icon,
-    primary,
-    badge
-}: {
-    href: string;
-    label: string;
-    Icon: React.ComponentType<{ size?: number; className?: string }>;
-    primary?: boolean;
-    badge?: number;
-}) {
-    return (
-        <Link
-            href={href}
-            className={`relative flex flex-col items-center justify-center gap-2 rounded-2xl p-4 text-center font-bold text-sm transition-all shadow-sm ${
-                primary
-                    ? 'bg-orange-600 text-white hover:bg-orange-700'
-                    : 'bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 text-gray-700 dark:text-zinc-200 hover:border-orange-300 dark:hover:border-orange-500/40 hover:text-orange-700 dark:hover:text-orange-300'
-            }`}
-        >
-            {badge !== undefined && (
-                <span className="absolute top-2 right-2 min-w-5 h-5 px-1.5 rounded-full bg-red-600 text-white text-[11px] font-extrabold flex items-center justify-center">
-                    {badge}
-                </span>
-            )}
-            <span
-                className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-                    primary
-                        ? 'bg-white/20'
-                        : 'bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400'
-                }`}
-            >
-                {primary ? <Plus size={18} /> : <Icon size={18} />}
-            </span>
-            {label}
-        </Link>
-    );
-}
 
 function StatCard({
     label,

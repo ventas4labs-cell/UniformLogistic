@@ -54,6 +54,3 @@ export const ADMIN_MODULES: AdminModule[] = [
     { id: 'empaque', label: 'Empaque', href: '/admin/empaque', Icon: PackageCheck, group: 'operaciones' },
     { id: 'ploter', label: 'Ploter', href: '/admin/ploter', Icon: PenTool, group: 'operaciones' }
 ];
-
-export const moduleById = (id: string): AdminModule | undefined =>
-    ADMIN_MODULES.find((m) => m.id === id);
