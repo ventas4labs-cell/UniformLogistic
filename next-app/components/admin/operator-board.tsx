@@ -183,6 +183,9 @@ function OrderCard({
     const [sentReports, setSentReports] = useState<Set<string>>(new Set());
     const [previewImage, setPreviewImage] = useState<{ src: string; alt: string } | null>(null);
     const [pdfLoading, setPdfLoading] = useState(false);
+    // Blob URL of the generated PDF held while the preview modal is
+    // open; revoked on close so we don't leak object URLs.
+    const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
     // Which insumo rows have their prep-editor disclosure open. Keyed
     // by insumo name (unique within this card's insumo list).
     const [prepOpen, setPrepOpen] = useState<Set<string>>(new Set());
@@ -194,10 +197,29 @@ function OrderCard({
         try {
             const { generateAdminPDF } = await import('@/lib/pdf-service');
             const pdf = generateAdminPDF(order, { stationNames });
-            pdf.save(`${order.id}.pdf`);
+            const url = URL.createObjectURL(pdf.output('blob'));
+            setPdfPreviewUrl((prev) => {
+                if (prev) URL.revokeObjectURL(prev);
+                return url;
+            });
         } finally {
             setPdfLoading(false);
         }
+    };
+
+    const closePdfPreview = () => {
+        setPdfPreviewUrl((prev) => {
+            if (prev) URL.revokeObjectURL(prev);
+            return null;
+        });
+    };
+
+    const downloadPdfPreview = () => {
+        if (!pdfPreviewUrl) return;
+        const a = document.createElement('a');
+        a.href = pdfPreviewUrl;
+        a.download = `${order.id}.pdf`;
+        a.click();
     };
 
     return (
@@ -506,6 +528,53 @@ function OrderCard({
                     alt={previewImage.alt}
                     onClose={() => setPreviewImage(null)}
                 />
+            )}
+
+            {pdfPreviewUrl && (
+                <div
+                    className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6"
+                    onClick={closePdfPreview}
+                >
+                    <div
+                        className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col overflow-hidden"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-gray-100 dark:border-zinc-800">
+                            <div className="min-w-0">
+                                <p className="font-mono text-sm font-bold text-orange-600 dark:text-orange-400">
+                                    {order.id}
+                                </p>
+                                <p className="text-xs text-gray-500 dark:text-zinc-400 truncate">
+                                    {order.companyName || '—'}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={downloadPdfPreview}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-950/40"
+                                    title="Descargar PDF"
+                                >
+                                    <FileDown size={14} /> Descargar
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={closePdfPreview}
+                                    className="p-1.5 rounded-lg text-gray-500 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-800"
+                                    aria-label="Cerrar"
+                                    title="Cerrar"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+                        </div>
+                        <iframe
+                            src={pdfPreviewUrl}
+                            title={`Vista previa ${order.id}`}
+                            className="flex-1 w-full bg-gray-100 dark:bg-zinc-950"
+                        />
+                    </div>
+                </div>
             )}
         </div>
     );
