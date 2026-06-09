@@ -53,6 +53,14 @@ export interface CartItem {
      * yet because the order hasn't been persisted.
      */
     uuid?: string;
+    /**
+     * True when the line was added at the corte stage as an "extra"
+     * (replacement / sample / forgotten size) rather than placed in
+     * the original order.
+     */
+    isExtra?: boolean;
+    /** Optional free-text reason for an extra ("muestra", "rep. talla M"). */
+    note?: string;
 }
 
 export interface Order {

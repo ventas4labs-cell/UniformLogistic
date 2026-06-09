@@ -8,7 +8,9 @@ import {
     Loader2,
     ChevronDown,
     ChevronUp,
-    Layers
+    Layers,
+    Plus,
+    X
 } from 'lucide-react';
 import type { Order } from '@/lib/types';
 import { aggregateCutLines, parseColors } from '@/lib/stage-utils';
@@ -16,6 +18,8 @@ import { StageCompleteToggle } from '@/components/admin/stage-complete-toggle';
 import type { StageTab } from '@/components/admin/stage-tab-bar';
 import { StageBoardFilters } from '@/components/admin/stage-board-filters';
 import { CollapsibleSearch } from '@/components/admin/collapsible-search';
+import { addCorteExtraItemAction } from '@/app/(admin)/admin/_stage-actions';
+import type { CartItem } from '@/lib/types';
 
 function CutSummary({ orders }: { orders: Order[] }) {
     const lines = useMemo(() => aggregateCutLines(orders), [orders]);
@@ -174,6 +178,8 @@ function ColorSwatches({ colors }: { colors: string[] }) {
     );
 }
 
+const emptyExtra = { productName: '', fabricType: '', size: '', quantity: 1, note: '' };
+
 function OrderCard({
     order,
     isCompleted,
@@ -184,7 +190,51 @@ function OrderCard({
     onLocalCompletionChange: (uuid: string, next: boolean) => void;
 }) {
     const [expanded, setExpanded] = useState(true);
-    const totalPieces = order.items.reduce((s, i) => s + i.quantity, 0);
+    // Extras added during this session, appended optimistically so the
+    // operator sees them immediately. The server data picks them up on
+    // the next refresh.
+    const [localExtras, setLocalExtras] = useState<CartItem[]>([]);
+    const [showExtraForm, setShowExtraForm] = useState(false);
+    const [extraForm, setExtraForm] = useState(emptyExtra);
+    const [savingExtra, setSavingExtra] = useState(false);
+    const [extraError, setExtraError] = useState<string | null>(null);
+
+    const items = [...order.items, ...localExtras];
+    const totalPieces = items.reduce((s, i) => s + i.quantity, 0);
+
+    const submitExtra = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!order.uuid) return;
+        setSavingExtra(true);
+        setExtraError(null);
+        const res = await addCorteExtraItemAction(order.uuid, {
+            productName: extraForm.productName,
+            fabricType: extraForm.fabricType,
+            size: extraForm.size,
+            quantity: extraForm.quantity,
+            note: extraForm.note
+        });
+        setSavingExtra(false);
+        if (res.error) {
+            setExtraError(res.error);
+            return;
+        }
+        setLocalExtras((prev) => [
+            ...prev,
+            {
+                uuid: res.itemId,
+                productId: 'EXTRA',
+                productName: extraForm.productName.trim(),
+                selection: { size: extraForm.size.trim() || '—' },
+                quantity: extraForm.quantity,
+                fabricType: extraForm.fabricType.trim() || undefined,
+                note: extraForm.note.trim() || undefined,
+                isExtra: true
+            }
+        ]);
+        setExtraForm(emptyExtra);
+        setShowExtraForm(false);
+    };
 
     return (
         <div
@@ -226,8 +276,13 @@ function OrderCard({
                         {totalPieces} pzas
                     </span>
                     <span className="bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-300 text-xs font-bold px-2 py-1 rounded-full">
-                        {order.items.length} líneas
+                        {items.length} líneas
                     </span>
+                    {localExtras.length > 0 && (
+                        <span className="bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 text-xs font-bold px-2 py-1 rounded-full">
+                            +{localExtras.length} extra
+                        </span>
+                    )}
                 </div>
             </div>
 
@@ -269,12 +324,31 @@ function OrderCard({
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100 dark:divide-zinc-800">
-                            {order.items.map((item, idx) => {
+                            {items.map((item, idx) => {
                                 const colors = parseColors(item.fabricType);
                                 return (
-                                    <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-zinc-800/30">
+                                    <tr
+                                        key={item.uuid || idx}
+                                        className={
+                                            item.isExtra
+                                                ? 'bg-amber-50/60 dark:bg-amber-950/20'
+                                                : 'hover:bg-gray-50 dark:hover:bg-zinc-800/30'
+                                        }
+                                    >
                                         <td className="px-4 py-2 text-gray-900 dark:text-zinc-100">
-                                            {item.productName}
+                                            <div className="flex items-center gap-1.5">
+                                                {item.isExtra && (
+                                                    <span className="text-[9px] font-extrabold uppercase tracking-wide text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/50 px-1.5 py-0.5 rounded">
+                                                        Extra
+                                                    </span>
+                                                )}
+                                                <span>{item.productName}</span>
+                                            </div>
+                                            {item.note && (
+                                                <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80 mt-0.5">
+                                                    {item.note}
+                                                </p>
+                                            )}
                                         </td>
                                         <td className="px-4 py-2 text-gray-600 dark:text-zinc-400">
                                             {item.fabricType || '—'}
@@ -293,6 +367,114 @@ function OrderCard({
                             })}
                         </tbody>
                     </table>
+
+                    {/* Add-extra affordance */}
+                    <div className="p-3 border-t border-gray-100 dark:border-zinc-800">
+                        {showExtraForm ? (
+                            <form
+                                onSubmit={submitExtra}
+                                className="space-y-2 bg-amber-50/60 dark:bg-amber-950/20 rounded-lg p-3 border border-amber-200 dark:border-amber-900/40"
+                            >
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                                        Agregar extra
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setShowExtraForm(false);
+                                            setExtraError(null);
+                                        }}
+                                        className="text-amber-700 dark:text-amber-300 hover:opacity-70"
+                                        aria-label="Cerrar"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="Producto *"
+                                    value={extraForm.productName}
+                                    onChange={(e) =>
+                                        setExtraForm((f) => ({ ...f, productName: e.target.value }))
+                                    }
+                                    className="w-full p-2 text-sm border border-amber-200 dark:border-amber-900/40 rounded-lg bg-white dark:bg-zinc-900 outline-none focus:ring-2 focus:ring-amber-500"
+                                />
+                                <div className="grid grid-cols-2 gap-2">
+                                    <input
+                                        type="text"
+                                        placeholder="Tela"
+                                        value={extraForm.fabricType}
+                                        onChange={(e) =>
+                                            setExtraForm((f) => ({ ...f, fabricType: e.target.value }))
+                                        }
+                                        className="w-full p-2 text-sm border border-amber-200 dark:border-amber-900/40 rounded-lg bg-white dark:bg-zinc-900 outline-none focus:ring-2 focus:ring-amber-500"
+                                    />
+                                    <input
+                                        type="text"
+                                        placeholder="Talla"
+                                        value={extraForm.size}
+                                        onChange={(e) =>
+                                            setExtraForm((f) => ({ ...f, size: e.target.value }))
+                                        }
+                                        className="w-full p-2 text-sm border border-amber-200 dark:border-amber-900/40 rounded-lg bg-white dark:bg-zinc-900 outline-none focus:ring-2 focus:ring-amber-500"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        required
+                                        placeholder="Cantidad *"
+                                        value={extraForm.quantity}
+                                        onChange={(e) =>
+                                            setExtraForm((f) => ({
+                                                ...f,
+                                                quantity: parseInt(e.target.value, 10) || 1
+                                            }))
+                                        }
+                                        className="w-full p-2 text-sm border border-amber-200 dark:border-amber-900/40 rounded-lg bg-white dark:bg-zinc-900 outline-none focus:ring-2 focus:ring-amber-500"
+                                    />
+                                    <input
+                                        type="text"
+                                        placeholder="Nota (motivo)"
+                                        value={extraForm.note}
+                                        onChange={(e) =>
+                                            setExtraForm((f) => ({ ...f, note: e.target.value }))
+                                        }
+                                        className="w-full p-2 text-sm border border-amber-200 dark:border-amber-900/40 rounded-lg bg-white dark:bg-zinc-900 outline-none focus:ring-2 focus:ring-amber-500"
+                                    />
+                                </div>
+                                {extraError && (
+                                    <p className="text-xs font-semibold text-red-600 dark:text-red-400">
+                                        {extraError}
+                                    </p>
+                                )}
+                                <button
+                                    type="submit"
+                                    disabled={savingExtra}
+                                    className="w-full py-2 bg-amber-600 text-white rounded-lg text-sm font-bold hover:bg-amber-700 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                                >
+                                    {savingExtra ? (
+                                        <Loader2 size={14} className="animate-spin" />
+                                    ) : (
+                                        <Plus size={14} />
+                                    )}
+                                    Agregar
+                                </button>
+                            </form>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => setShowExtraForm(true)}
+                                disabled={!order.uuid}
+                                className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-950/50 disabled:opacity-50"
+                            >
+                                <Plus size={14} /> Agregar extra
+                            </button>
+                        )}
+                    </div>
                 </div>
             )}
         </div>

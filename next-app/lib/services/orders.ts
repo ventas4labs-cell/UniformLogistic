@@ -176,6 +176,8 @@ interface ItemJoin {
     size: string;
     quantity: number;
     description: string | null;
+    is_extra: boolean | null;
+    note: string | null;
     product: ItemProduct | ItemProduct[] | null;
 }
 
@@ -207,6 +209,8 @@ const NESTED_SELECT = `
         size,
         quantity,
         description,
+        is_extra,
+        note,
         product:products ( product_type, fabric_type, bom_json, codigo_cabys, image_url )
     )
 `;
@@ -234,10 +238,16 @@ const mapRowToOrder = (row: RawOrderRow): Order => {
                 selection: { size: it.size },
                 quantity: it.quantity,
                 productType: product?.product_type || undefined,
-                fabricType: product?.fabric_type || undefined,
+                // Extras carry their tela in `description` (no products
+                // row to join), so fall back to it for the Tela column.
+                fabricType:
+                    product?.fabric_type ||
+                    (it.is_extra ? it.description || undefined : undefined),
                 bom: product?.bom_json || undefined,
                 codigoCabys: product?.codigo_cabys || undefined,
-                imageUrl: product?.image_url || undefined
+                imageUrl: product?.image_url || undefined,
+                isExtra: it.is_extra === true,
+                note: it.note || undefined
             };
         }),
         dateCreated: row.created_at,
@@ -381,6 +391,46 @@ export const updateOrderStatus = async (
         .update({ status })
         .eq('id', orderUuid);
     if (error) throw error;
+};
+
+export interface ExtraItemInput {
+    productName: string;
+    size: string;
+    quantity: number;
+    fabricType?: string;
+    note?: string;
+}
+
+/**
+ * Insert an "extra" line item on an order — used by the corte board.
+ * product_code is "EXTRA" (no products row), so the orphan-hydration
+ * pass + INSUMOS aggregation simply skip it (no BOM). Returns the new
+ * order_items.id.
+ */
+export const addExtraOrderItem = async (
+    supabase: SupabaseClient,
+    orderUuid: string,
+    input: ExtraItemInput,
+    addedBy: string | null
+): Promise<string> => {
+    const { data, error } = await supabase
+        .from('order_items')
+        .insert({
+            order_id: orderUuid,
+            product_code: 'EXTRA',
+            product_name: input.productName.trim(),
+            // The size column is NOT NULL; default to "—" when blank.
+            size: input.size.trim() || '—',
+            quantity: input.quantity,
+            description: input.fabricType?.trim() || null,
+            is_extra: true,
+            note: input.note?.trim() || null,
+            added_by: addedBy
+        })
+        .select('id')
+        .single();
+    if (error) throw error;
+    return (data as { id: string }).id;
 };
 
 export const deleteOrder = async (

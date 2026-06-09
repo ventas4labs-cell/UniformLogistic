@@ -2,7 +2,12 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/utils/supabase/server';
-import { updateOrderStatus, OrderStatus } from '@/lib/services/orders';
+import {
+    updateOrderStatus,
+    addExtraOrderItem,
+    OrderStatus,
+    type ExtraItemInput
+} from '@/lib/services/orders';
 import {
     createStageNotification,
     acknowledgeStageNotification,
@@ -137,4 +142,38 @@ export async function unmarkStageCompleteAction(
     await unmarkStageComplete(supabase, orderUuid, stage);
     for (const p of STAGE_PATHS) revalidatePath(p);
     revalidatePath('/station');
+}
+
+// ─── Corte: add an extra line item ───────────────────────────────────
+// The corte operator (admin OR the assigned corte station) can add an
+// extra piece beyond the placed order — a replacement, a sample, a
+// forgotten size. Stored as a normal order_items row flagged
+// is_extra=true. Authorization mirrors the stage-completion check:
+// admin OR an active corte station assigned to this order.
+export async function addCorteExtraItemAction(
+    orderUuid: string,
+    input: ExtraItemInput
+): Promise<{ error?: string; itemId?: string }> {
+    const supabase = await createClient();
+    const {
+        data: { user }
+    } = await supabase.auth.getUser();
+    if (!user) return { error: 'No autenticado.' };
+    if (!(await authorizeStageMutation(supabase, user.id, user.email, orderUuid, 'corte'))) {
+        return { error: 'No autorizado para esta orden.' };
+    }
+    if (!input.productName.trim()) return { error: 'El producto es obligatorio.' };
+    if (!Number.isFinite(input.quantity) || input.quantity <= 0) {
+        return { error: 'La cantidad debe ser mayor a cero.' };
+    }
+    try {
+        const itemId = await addExtraOrderItem(supabase, orderUuid, input, user.id);
+        for (const p of STAGE_PATHS) revalidatePath(p);
+        revalidatePath('/station');
+        return { itemId };
+    } catch (err) {
+        return {
+            error: err instanceof Error ? err.message : 'No se pudo agregar el extra.'
+        };
+    }
 }
