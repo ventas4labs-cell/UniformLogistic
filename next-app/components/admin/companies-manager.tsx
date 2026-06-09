@@ -3,25 +3,15 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Building2, Plus, Edit2, Trash2, Loader2, X, Link2, Check, UserPlus, Users } from 'lucide-react';
+import { Building2, Plus, Edit2, Trash2, Loader2, X, Link2, Check, Copy, RefreshCcw, Users } from 'lucide-react';
 import { Company, CompanyInput } from '@/lib/services/companies';
 import {
     createCompanyAction,
     updateCompanyAction,
-    deleteCompanyAction
+    deleteCompanyAction,
+    generateCompanyOrderLinkAction,
+    regenerateCompanyOrderLinkAction
 } from '@/app/(admin)/admin/companies/actions';
-
-interface InitialUserForm {
-    email: string;
-    password: string;
-    fullName: string;
-}
-
-const emptyUserForm: InitialUserForm = {
-    email: '',
-    password: '',
-    fullName: ''
-};
 
 const emptyForm: CompanyInput = {
     name: '',
@@ -56,27 +46,71 @@ export function CompaniesManager({
         setShowForm(false);
         onClose?.();
     };
-    // Companion user account created together with the empresa. Only
-    // shown on create; editing leaves user accounts to /admin/users.
-    const [userForm, setUserForm] = useState<InitialUserForm>(emptyUserForm);
-    const [createUser, setCreateUser] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [copiedId, setCopiedId] = useState<string | null>(null);
+    // Per-row order-link work in flight (generate / regenerate).
+    const [linkBusyId, setLinkBusyId] = useState<string | null>(null);
+
+    const orderLinkUrl = (token: string) =>
+        `${window.location.origin}/o/${token}`;
 
     const copyOrderLink = async (company: Company) => {
-        const base = window.location.origin + '/catalog';
-        const link = `${base}?company=${company.id}`;
-        await navigator.clipboard.writeText(link);
+        if (!company.accessToken) return;
+        await navigator.clipboard.writeText(orderLinkUrl(company.accessToken));
         setCopiedId(company.id);
         setTimeout(() => setCopiedId(null), 2000);
+    };
+
+    const generateLink = (company: Company) => {
+        setLinkBusyId(company.id);
+        startTransition(async () => {
+            try {
+                const res = await generateCompanyOrderLinkAction(company.id);
+                if (res.error) alert(res.error);
+                else if (res.accessToken) {
+                    await navigator.clipboard
+                        .writeText(orderLinkUrl(res.accessToken))
+                        .catch(() => {});
+                    setCopiedId(company.id);
+                    setTimeout(() => setCopiedId(null), 2000);
+                }
+                router.refresh();
+            } finally {
+                setLinkBusyId(null);
+            }
+        });
+    };
+
+    const regenerateLink = (company: Company) => {
+        if (
+            !confirm(
+                `¿Generar un link nuevo para "${company.name}"? El link anterior dejará de funcionar de inmediato.`
+            )
+        )
+            return;
+        setLinkBusyId(company.id);
+        startTransition(async () => {
+            try {
+                const res = await regenerateCompanyOrderLinkAction(company.id);
+                if (res.error) alert(res.error);
+                else if (res.accessToken) {
+                    await navigator.clipboard
+                        .writeText(orderLinkUrl(res.accessToken))
+                        .catch(() => {});
+                    setCopiedId(company.id);
+                    setTimeout(() => setCopiedId(null), 2000);
+                }
+                router.refresh();
+            } finally {
+                setLinkBusyId(null);
+            }
+        });
     };
 
     const startCreate = () => {
         setEditing(null);
         setForm(emptyForm);
-        setUserForm(emptyUserForm);
-        setCreateUser(true);
         setShowForm(true);
         setError(null);
     };
@@ -107,15 +141,7 @@ export function CompaniesManager({
                 router.refresh();
                 onClose?.();
             } else {
-                const initialUser =
-                    createUser && userForm.email.trim() && userForm.password.trim()
-                        ? {
-                              email: userForm.email,
-                              password: userForm.password,
-                              fullName: userForm.fullName
-                          }
-                        : undefined;
-                const res = await createCompanyAction(form, initialUser);
+                const res = await createCompanyAction(form);
                 if (res.error) {
                     setError(res.error);
                     return;
@@ -181,7 +207,7 @@ export function CompaniesManager({
                             <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Nombre</th>
                             <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Cédula Jurídica</th>
                             <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Contacto</th>
-                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Teléfono</th>
+                            <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Link de pedidos</th>
                             <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400">Estado</th>
                             <th className="p-4 font-semibold text-gray-600 dark:text-zinc-400 text-right">Acciones</th>
                         </tr>
@@ -207,7 +233,54 @@ export function CompaniesManager({
                                     </td>
                                     <td className="p-4 font-mono text-sm text-gray-600 dark:text-zinc-400">{c.documentNumber}</td>
                                     <td className="p-4 text-gray-600 dark:text-zinc-400">{c.contactName || '—'}</td>
-                                    <td className="p-4 text-gray-600 dark:text-zinc-400">{c.phone || '—'}</td>
+                                    <td className="p-4">
+                                        {c.accessToken ? (
+                                            <div className="inline-flex items-center gap-1 bg-gray-100 dark:bg-zinc-800 rounded-lg overflow-hidden">
+                                                <code
+                                                    className="px-2 py-1.5 text-xs font-mono text-gray-700 dark:text-zinc-300 truncate max-w-[150px]"
+                                                    title={`/o/${c.accessToken}`}
+                                                >
+                                                    /o/{c.accessToken.slice(0, 10)}…
+                                                </code>
+                                                <button
+                                                    onClick={() => copyOrderLink(c)}
+                                                    title="Copiar link"
+                                                    className={`px-2 py-1.5 border-l border-gray-200 dark:border-zinc-700 transition-colors ${
+                                                        copiedId === c.id
+                                                            ? 'text-green-600 dark:text-green-400'
+                                                            : 'text-gray-500 hover:text-orange-600 dark:hover:text-orange-400'
+                                                    }`}
+                                                >
+                                                    {copiedId === c.id ? <Check size={13} /> : <Copy size={13} />}
+                                                </button>
+                                                <button
+                                                    onClick={() => regenerateLink(c)}
+                                                    disabled={linkBusyId === c.id}
+                                                    title="Generar link nuevo (invalida el anterior)"
+                                                    className="px-2 py-1.5 border-l border-gray-200 dark:border-zinc-700 text-gray-500 hover:text-orange-600 dark:hover:text-orange-400 disabled:opacity-50"
+                                                >
+                                                    {linkBusyId === c.id ? (
+                                                        <Loader2 size={13} className="animate-spin" />
+                                                    ) : (
+                                                        <RefreshCcw size={13} />
+                                                    )}
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => generateLink(c)}
+                                                disabled={linkBusyId === c.id}
+                                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-950/50 disabled:opacity-50"
+                                            >
+                                                {linkBusyId === c.id ? (
+                                                    <Loader2 size={13} className="animate-spin" />
+                                                ) : (
+                                                    <Link2 size={13} />
+                                                )}
+                                                Generar link
+                                            </button>
+                                        )}
+                                    </td>
                                     <td className="p-4">
                                         <span
                                             className={`text-xs font-bold px-2 py-1 rounded-full ${c.isActive ? 'bg-green-100 dark:bg-green-950/50 text-green-800 dark:text-green-300' : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400'}`}
@@ -217,13 +290,6 @@ export function CompaniesManager({
                                     </td>
                                     <td className="p-4 text-right">
                                         <div className="flex justify-end gap-2">
-                                            <button
-                                                onClick={() => copyOrderLink(c)}
-                                                className={`p-2 rounded-lg transition-colors ${copiedId === c.id ? 'bg-green-50 dark:bg-green-950/30 text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-zinc-400 hover:bg-blue-50 hover:text-blue-600'}`}
-                                                title="Copiar link de pedidos"
-                                            >
-                                                {copiedId === c.id ? <Check size={16} /> : <Link2 size={16} />}
-                                            </button>
                                             <button
                                                 onClick={() => startEdit(c)}
                                                 className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-orange-50 hover:text-orange-600 rounded-lg"
@@ -321,79 +387,21 @@ export function CompaniesManager({
                                 Empresa activa
                             </label>
 
-                            {/* Companion user account — only on create. The
-                                empresa and the customer-user account are
-                                created in one round-trip; if user creation
-                                fails the empresa is rolled back to avoid
-                                orphan rows. */}
+                            {/* Order link — auto-generated on create. The
+                                empresa places orders through an individual
+                                /o/<token> link; no username/password. */}
                             {!editing && (
-                                <div className="rounded-xl border border-orange-200 dark:border-orange-900/40 bg-orange-50/40 dark:bg-orange-950/20 p-4 space-y-3">
-                                    <label className="flex items-center gap-2 text-sm font-bold text-orange-700 dark:text-orange-300">
-                                        <input
-                                            type="checkbox"
-                                            checked={createUser}
-                                            onChange={(e) => setCreateUser(e.target.checked)}
-                                            className="w-4 h-4 text-orange-600 dark:text-orange-400 rounded"
-                                        />
-                                        <UserPlus size={16} />
-                                        Crear usuario para esta empresa
-                                    </label>
-                                    {createUser ? (
-                                        <>
-                                            <p className="text-xs text-gray-600 dark:text-zinc-400">
-                                                Se creará una cuenta de cliente vinculada a esta
-                                                empresa. El contacto podrá iniciar sesión con
-                                                este email para hacer pedidos.
-                                            </p>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                                <Field label="Email del usuario *">
-                                                    <input
-                                                        required={createUser}
-                                                        type="email"
-                                                        autoComplete="off"
-                                                        value={userForm.email}
-                                                        onChange={(e) =>
-                                                            setUserForm({ ...userForm, email: e.target.value })
-                                                        }
-                                                        placeholder="contacto@empresa.com"
-                                                        className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none text-sm bg-white dark:bg-zinc-900"
-                                                    />
-                                                </Field>
-                                                <Field label="Contraseña inicial (≥ 8) *">
-                                                    <input
-                                                        required={createUser}
-                                                        type="text"
-                                                        autoComplete="new-password"
-                                                        minLength={8}
-                                                        value={userForm.password}
-                                                        onChange={(e) =>
-                                                            setUserForm({ ...userForm, password: e.target.value })
-                                                        }
-                                                        className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none text-sm bg-white dark:bg-zinc-900 font-mono"
-                                                    />
-                                                </Field>
-                                            </div>
-                                            <Field label="Nombre completo">
-                                                <input
-                                                    type="text"
-                                                    value={userForm.fullName}
-                                                    onChange={(e) =>
-                                                        setUserForm({ ...userForm, fullName: e.target.value })
-                                                    }
-                                                    placeholder={
-                                                        form.contactName ||
-                                                        'Se autocompleta con "Persona de contacto"'
-                                                    }
-                                                    className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none text-sm bg-white dark:bg-zinc-900"
-                                                />
-                                            </Field>
-                                        </>
-                                    ) : (
-                                        <p className="text-xs text-gray-500 dark:text-zinc-500 italic">
-                                            Podés crear y asignar el usuario después desde{' '}
-                                            <span className="font-semibold">Admin → Usuarios</span>.
-                                        </p>
-                                    )}
+                                <div className="rounded-xl border border-orange-200 dark:border-orange-900/40 bg-orange-50/40 dark:bg-orange-950/20 p-4 flex items-start gap-3">
+                                    <Link2
+                                        size={18}
+                                        className="text-orange-600 dark:text-orange-400 shrink-0 mt-0.5"
+                                    />
+                                    <p className="text-xs text-gray-600 dark:text-zinc-300">
+                                        Al crear la empresa se genera un{' '}
+                                        <span className="font-semibold">link individual de pedidos</span>.
+                                        Copialo desde la lista y compartilo con la empresa — con
+                                        ese link hacen pedidos sin usuario ni contraseña.
+                                    </p>
                                 </div>
                             )}
                             {error && (
