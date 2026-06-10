@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { fetchAllOrders } from '@/lib/services/orders';
 import { fetchStageCompletions } from '@/lib/services/stage-completions';
+import { orderNeedsStage } from '@/lib/stage-utils';
 import { ImpresionBoard } from '@/components/admin/impresion-board';
 
 export default async function ImpresionPage() {
@@ -9,7 +10,9 @@ export default async function ImpresionPage() {
         fetchAllOrders(supabase),
         fetchStageCompletions(supabase, 'impresion')
     ]);
-    const orders = all.filter((o) => o.status !== 'cancelled');
+    const orders = all.filter(
+        (o) => o.status !== 'cancelled' && orderNeedsStage(o, 'impresion')
+    );
     return (
         <ImpresionBoard
             initialOrders={orders}

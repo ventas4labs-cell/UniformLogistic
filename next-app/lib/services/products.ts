@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Product, ProductType } from '@/lib/types';
+import type { StageKey } from '@/lib/services/stage-completions';
 
 export interface BomItem {
     name: string;
@@ -85,6 +86,7 @@ export interface ProductRow {
     is_active: boolean | null;
     bom_json: BomItem[] | null;
     codigo_cabys: string | null;
+    stages_json: StageKey[] | null;
 }
 
 // Legacy rows pre-migration may have type_label = null. Derive a
@@ -101,6 +103,11 @@ export interface AdminProduct extends Product {
     codigoCabys: string;
     /** UUIDs of companies the product is currently assigned to. */
     companyIds: string[];
+    /**
+     * Production stages this product needs. Empty means "all stages"
+     * (back-compat for products created before this field existed).
+     */
+    stages: StageKey[];
 }
 
 const genderToCategory = (gender: ProductRow['gender']): Product['category'] => {
@@ -126,7 +133,8 @@ export const mapProductRow = (
     isActive: row.is_active !== false,
     bom: (row.bom_json as BomItem[]) || [],
     codigoCabys: row.codigo_cabys || '',
-    companyIds
+    companyIds,
+    stages: (row.stages_json as StageKey[]) || []
 });
 
 export const fetchCatalogForCompany = async (
@@ -138,7 +146,7 @@ export const fetchCatalogForCompany = async (
         .select(`
             product:products (
                 id, product_code, name, description, image_url,
-                product_type, type_label, gender, sizes_json, fabric_type, is_active, bom_json, codigo_cabys
+                product_type, type_label, gender, sizes_json, fabric_type, is_active, bom_json, codigo_cabys, stages_json
             )
         `)
         .eq('company_id', companyId)
@@ -206,10 +214,12 @@ export interface ProductInput {
      * Undefined means leave assignments untouched (back-compat).
      */
     companyIds?: string[];
+    /** Production stages this product needs. Empty = all stages. */
+    stages?: StageKey[];
 }
 
 const PRODUCT_SELECT =
-    'id, product_code, name, description, image_url, product_type, type_label, gender, sizes_json, fabric_type, is_active, bom_json, codigo_cabys';
+    'id, product_code, name, description, image_url, product_type, type_label, gender, sizes_json, fabric_type, is_active, bom_json, codigo_cabys, stages_json';
 
 interface ProductRowWithLinks extends ProductRow {
     links: { company_id: string }[] | null;
@@ -289,7 +299,8 @@ export const createProduct = async (
             fabric_type: input.fabricType || null,
             is_active: input.isActive ?? true,
             bom_json: input.bom || [],
-            codigo_cabys: input.codigoCabys || null
+            codigo_cabys: input.codigoCabys || null,
+            stages_json: input.stages ?? []
         })
         .select(PRODUCT_SELECT)
         .single();
@@ -321,7 +332,8 @@ export const updateProduct = async (
             fabric_type: input.fabricType || null,
             is_active: input.isActive ?? true,
             bom_json: input.bom || [],
-            codigo_cabys: input.codigoCabys || null
+            codigo_cabys: input.codigoCabys || null,
+            stages_json: input.stages ?? []
         })
         .eq('id', uuid)
         .select(PRODUCT_SELECT)

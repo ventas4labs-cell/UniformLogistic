@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { fetchAllOrders } from '@/lib/services/orders';
 import { fetchStageCompletions } from '@/lib/services/stage-completions';
+import { orderNeedsStage } from '@/lib/stage-utils';
 import { SimpleStageBoard } from '@/components/admin/simple-stage-board';
 
 export default async function BordadoPage() {
@@ -9,7 +10,9 @@ export default async function BordadoPage() {
         fetchAllOrders(supabase),
         fetchStageCompletions(supabase, 'bordado')
     ]);
-    const orders = all.filter((o) => o.status !== 'cancelled');
+    const orders = all.filter(
+        (o) => o.status !== 'cancelled' && orderNeedsStage(o, 'bordado')
+    );
     return (
         <SimpleStageBoard
             initialOrders={orders}

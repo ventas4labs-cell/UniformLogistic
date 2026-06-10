@@ -12,26 +12,37 @@ interface Props {
     // Set<StageKey> from the page's fetchStageCompletionsForOrders
     // result, or `new Set()` if the order has none yet.
     completed: Set<StageKey>;
+    // Stages the order's products actually need. Only these render and
+    // count toward "Listo". Defaults to every stage.
+    applicableStages?: StageKey[];
     // Compact mode renders smaller pills (used in the Pedidos card grid
     // where space is tight). Default is the regular size used on the
     // stage board headers.
     compact?: boolean;
 }
 
-// Read-only visual: shows which of the 4 ops stages are done for one
-// order. The strip is rendered everywhere we want to summarize stage
-// progress — Pedidos cards, board headers, order detail dialogs.
-export function StageCompletionStrip({ completed, compact = false }: Props) {
-    const total = STAGE_ORDER.length;
-    const done = STAGE_ORDER.filter((s) => completed.has(s)).length;
-    const allDone = done === total;
+// Read-only visual: shows which ops stages are done for one order. The
+// strip is rendered everywhere we want to summarize stage progress —
+// Pedidos cards, board headers, order detail dialogs.
+export function StageCompletionStrip({
+    completed,
+    applicableStages,
+    compact = false
+}: Props) {
+    const stages =
+        applicableStages && applicableStages.length > 0
+            ? STAGE_ORDER.filter((s) => applicableStages.includes(s))
+            : STAGE_ORDER;
+    const total = stages.length;
+    const done = stages.filter((s) => completed.has(s)).length;
+    const allDone = total > 0 && done === total;
 
     return (
         <div
             className="flex flex-wrap items-center gap-1.5"
             aria-label={`Etapas completadas: ${done} de ${total}`}
         >
-            {STAGE_ORDER.map((stage) => {
+            {stages.map((stage) => {
                 const isDone = completed.has(stage);
                 return (
                     <span

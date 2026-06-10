@@ -19,7 +19,8 @@ import {
     unacknowledgeStageNotificationAction
 } from '@/app/(admin)/admin/_stage-actions';
 import { StageControlPanel } from '@/components/admin/stage-control-panel';
-import { STAGE_ORDER, type StageKey } from '@/lib/services/stage-completions';
+import { type StageKey } from '@/lib/services/stage-completions';
+import { orderApplicableStages } from '@/lib/stage-utils';
 import { OrderAssignmentsPanel } from '@/components/admin/order-assignments-panel';
 import type { StationUser } from '@/lib/services/station-users';
 import type { StationAssignment } from '@/lib/services/station-assignments';
@@ -139,9 +140,10 @@ export function OrdersTable({
         if (o.status === 'cancelled') return 'cancelled';
         if (!o.uuid) return 'pending';
         const map = completedAtByOrder.get(o.uuid) || {};
-        const done = STAGE_ORDER.filter((s) => !!map[s]).length;
+        const applicable = orderApplicableStages(o);
+        const done = applicable.filter((s) => !!map[s]).length;
         if (done === 0) return 'pending';
-        if (done === STAGE_ORDER.length) return 'done';
+        if (done === applicable.length) return 'done';
         return 'in-progress';
     };
     const [pending, startTransition] = useTransition();
@@ -668,6 +670,7 @@ export function OrdersTable({
                                         <StageControlPanel
                                             orderUuid={order.uuid}
                                             completedAt={completedAt}
+                                            applicableStages={orderApplicableStages(order)}
                                             onLocalToggle={handleStageToggle}
                                         />
                                     </div>

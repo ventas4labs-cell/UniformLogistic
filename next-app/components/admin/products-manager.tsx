@@ -20,6 +20,11 @@ import type { AdminProduct, ProductInput, BomItem } from '@/lib/services/product
 import type { Company } from '@/lib/services/companies';
 import type { Logo } from '@/lib/services/logos';
 import {
+    STAGE_ORDER,
+    STAGE_LABELS,
+    type StageKey
+} from '@/lib/services/stage-completions';
+import {
     createProductAction,
     updateProductAction,
     deleteProductAction,
@@ -42,7 +47,10 @@ const emptyForm: ProductInput = {
     isActive: true,
     bom: [],
     codigoCabys: '',
-    companyIds: []
+    companyIds: [],
+    // New products default to every stage; admin unchecks the ones the
+    // product doesn't need.
+    stages: [...STAGE_ORDER]
 };
 
 const parseList = (input: string): string[] =>
@@ -288,7 +296,11 @@ export function ProductsManager({
             isActive: p.isActive,
             bom: p.bom || [],
             codigoCabys: p.codigoCabys || '',
-            companyIds: p.companyIds || []
+            companyIds: p.companyIds || [],
+            // Empty stages on an existing product means "all stages"
+            // (legacy) — show every box checked so the admin sees the
+            // effective behaviour before narrowing it.
+            stages: p.stages.length > 0 ? p.stages : [...STAGE_ORDER]
         });
         setSizesText(sizesTextFromForm(p.sizes));
         // Auto-expand the override panel for any BOM line that already
@@ -766,6 +778,45 @@ export function ProductsManager({
                                 )}
                                 <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
                                     Solo las empresas seleccionadas verán este producto en su catálogo.
+                                </p>
+                            </Field>
+
+                            <Field label="Etapas necesarias">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 border border-gray-200 dark:border-zinc-700 rounded-lg p-3">
+                                    {STAGE_ORDER.map((stage) => {
+                                        const checked = (form.stages || []).includes(stage);
+                                        return (
+                                            <label
+                                                key={stage}
+                                                className="flex items-center gap-2 text-sm text-gray-700 dark:text-zinc-300 px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-zinc-800 cursor-pointer"
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={checked}
+                                                    onChange={(e) => {
+                                                        const set = new Set(form.stages || []);
+                                                        if (e.target.checked) set.add(stage);
+                                                        else set.delete(stage);
+                                                        // Preserve canonical order.
+                                                        setForm({
+                                                            ...form,
+                                                            stages: STAGE_ORDER.filter((s) =>
+                                                                set.has(s)
+                                                            ) as StageKey[]
+                                                        });
+                                                    }}
+                                                    className="w-4 h-4 accent-orange-600"
+                                                />
+                                                <span className="font-medium">
+                                                    {STAGE_LABELS[stage]}
+                                                </span>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
+                                    El pedido solo aparece en los tableros de las etapas
+                                    marcadas. Desmarcá las que este producto no necesita.
                                 </p>
                             </Field>
 

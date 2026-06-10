@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { fetchAllOrders } from '@/lib/services/orders';
 import { fetchStageCompletions } from '@/lib/services/stage-completions';
+import { orderNeedsStage } from '@/lib/stage-utils';
 import { CorteBoard } from '@/components/admin/corte-board';
 
 export default async function CortePage() {
@@ -12,7 +13,9 @@ export default async function CortePage() {
     // Workflow is parallel: every non-cancelled order shows up on every
     // board immediately. Corte marks its own work complete via the
     // per-stage completion toggle (independent of orders.status).
-    const orders = all.filter((o) => o.status !== 'cancelled');
+    const orders = all.filter(
+        (o) => o.status !== 'cancelled' && orderNeedsStage(o, 'corte')
+    );
     return (
         <CorteBoard
             initialOrders={orders}

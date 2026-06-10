@@ -6,6 +6,7 @@ import { Calendar, ClipboardList, Search } from 'lucide-react';
 import type { Order } from '@/lib/types';
 import { StageCompletionStrip } from '@/components/admin/stage-completion-strip';
 import { STAGE_ORDER, type StageKey } from '@/lib/services/stage-completions';
+import { orderApplicableStages } from '@/lib/stage-utils';
 
 interface Props {
     companyName: string;
@@ -164,7 +165,11 @@ export function CompanyDetail({ companyName, orders, initialStageCompletions }: 
                                     </span>
                                 </div>
 
-                                <StageCompletionStrip completed={completed} compact />
+                                <StageCompletionStrip
+                                    completed={completed}
+                                    applicableStages={orderApplicableStages(order)}
+                                    compact
+                                />
 
                                 {order.purchaseOrder && (
                                     <p className="text-[11px] text-gray-500 dark:text-zinc-500">

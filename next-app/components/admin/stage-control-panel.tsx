@@ -17,6 +17,9 @@ interface Props {
     // Map of stage → ISO completedAt timestamp. Stages missing from the
     // map are treated as not-yet-completed.
     completedAt: Partial<Record<StageKey, string>>;
+    // The stages this order's products actually need. Only these are
+    // shown and counted. Defaults to every stage.
+    applicableStages?: StageKey[];
     // Local-state mutator so the parent Pedidos table flips the UI
     // optimistically before the server action returns.
     onLocalToggle: (
@@ -32,11 +35,20 @@ interface Props {
 // Clicking a stage cell marks it complete from the Pedidos surface —
 // useful when admin needs to override a stage operator who forgot to
 // click, or to roll back a premature completion.
-export function StageControlPanel({ orderUuid, completedAt, onLocalToggle }: Props) {
-    const done = STAGE_ORDER.filter((s) => !!completedAt[s]).length;
-    const total = STAGE_ORDER.length;
-    const allDone = done === total;
-    const pct = Math.round((done / total) * 100);
+export function StageControlPanel({
+    orderUuid,
+    completedAt,
+    applicableStages,
+    onLocalToggle
+}: Props) {
+    const stages =
+        applicableStages && applicableStages.length > 0
+            ? STAGE_ORDER.filter((s) => applicableStages.includes(s))
+            : STAGE_ORDER;
+    const done = stages.filter((s) => !!completedAt[s]).length;
+    const total = stages.length;
+    const allDone = total > 0 && done === total;
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
     return (
         <div className="space-y-2">
@@ -66,7 +78,7 @@ export function StageControlPanel({ orderUuid, completedAt, onLocalToggle }: Pro
             </div>
 
             <div className="grid grid-cols-4 gap-1.5">
-                {STAGE_ORDER.map((stage) => (
+                {stages.map((stage) => (
                     <StageCell
                         key={stage}
                         orderUuid={orderUuid}

@@ -167,6 +167,7 @@ interface ItemProduct {
     bom_json: { name: string; qty: number }[] | null;
     codigo_cabys: string | null;
     image_url: string | null;
+    stages_json: string[] | null;
 }
 
 interface ItemJoin {
@@ -211,7 +212,7 @@ const NESTED_SELECT = `
         description,
         is_extra,
         note,
-        product:products ( product_type, fabric_type, bom_json, codigo_cabys, image_url )
+        product:products ( product_type, fabric_type, bom_json, codigo_cabys, image_url, stages_json )
     )
 `;
 
@@ -247,7 +248,8 @@ const mapRowToOrder = (row: RawOrderRow): Order => {
                 codigoCabys: product?.codigo_cabys || undefined,
                 imageUrl: product?.image_url || undefined,
                 isExtra: it.is_extra === true,
-                note: it.note || undefined
+                note: it.note || undefined,
+                stages: product?.stages_json || undefined
             };
         }),
         dateCreated: row.created_at,

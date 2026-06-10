@@ -1,10 +1,33 @@
 import type { CartItem, Order } from '@/lib/types';
 import { extractSizeLabel, resolveBomQty } from '@/lib/services/products';
+import { STAGE_ORDER, type StageKey } from '@/lib/services/stage-completions';
 
 // Stage-board helpers shared across /admin/operador (bodega), /admin/corte,
 // /admin/maquila, /admin/impresion. Extracted from operator-board so the
 // new boards reuse the same aggregation logic and the same quantity
 // rounding rules.
+
+// ── Per-product stage applicability ─────────────────────────────────
+// A product declares the stages it needs (products.stages_json). An
+// empty/undefined list means "all stages" — back-compat for products
+// created before the field existed, so they keep showing everywhere.
+
+export function itemStages(item: CartItem): StageKey[] {
+    const s = item.stages;
+    return s && s.length > 0 ? (s as StageKey[]) : STAGE_ORDER;
+}
+
+/** Stages this order actually needs — the union across its items. */
+export function orderApplicableStages(order: Order): StageKey[] {
+    const set = new Set<StageKey>();
+    for (const it of order.items) for (const s of itemStages(it)) set.add(s);
+    return STAGE_ORDER.filter((s) => set.has(s));
+}
+
+/** True if any item in the order needs the given stage. */
+export function orderNeedsStage(order: Order, stage: StageKey): boolean {
+    return order.items.some((it) => itemStages(it).includes(stage));
+}
 
 export interface InsumoSummary {
     name: string;

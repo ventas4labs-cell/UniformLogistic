@@ -4,6 +4,7 @@ import { fetchCompletionsForOrders } from '@/lib/services/insumo-completions';
 import { fetchStageCompletions } from '@/lib/services/stage-completions';
 import { fetchPreparationsForOrders } from '@/lib/services/insumo-preparations';
 import { fetchAssignmentsForOrders } from '@/lib/services/station-assignments';
+import { orderNeedsStage } from '@/lib/stage-utils';
 import { OperatorBoard } from '@/components/admin/operator-board';
 
 export default async function OperadorPage() {
@@ -28,7 +29,9 @@ export default async function OperadorPage() {
 
     return (
         <OperatorBoard
-            initialOrders={orders.filter((o) => o.status !== 'cancelled')}
+            initialOrders={orders.filter(
+                (o) => o.status !== 'cancelled' && orderNeedsStage(o, 'bodega')
+            )}
             initialCompletions={insumoCompletions}
             initialBodegaCompletedOrderIds={Array.from(bodegaCompleted)}
             initialPreparations={preparations}

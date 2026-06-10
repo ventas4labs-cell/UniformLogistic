@@ -61,6 +61,12 @@ export interface CartItem {
     isExtra?: boolean;
     /** Optional free-text reason for an extra ("muestra", "rep. talla M"). */
     note?: string;
+    /**
+     * Production stages the item's product needs (from products.stages_json).
+     * Empty/undefined means "all stages". Drives which stage boards an
+     * order surfaces on. String keys to keep this type dependency-free.
+     */
+    stages?: string[];
 }
 
 export interface Order {

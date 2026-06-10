@@ -23,6 +23,7 @@ import { fetchProducts } from '@/lib/services/products';
 import { fetchLogos } from '@/lib/services/logos';
 import { fetchAllStationInvoices } from '@/lib/services/station-invoices';
 import { FAST_ACTIONS_COOKIE, resolveFastActions } from '@/lib/admin-fast-actions';
+import { orderApplicableStages, orderNeedsStage } from '@/lib/stage-utils';
 import { QuickActionsPanel } from '@/components/admin/quick-actions-panel';
 
 // Admin panel home — quick actions + at-a-glance statistics. Replaces
@@ -50,24 +51,30 @@ export default async function AdminHomePage() {
         .filter((id): id is string => Boolean(id));
     const completions = await fetchStageCompletionsForOrders(supabase, orderIds);
 
-    const totalStages = STAGE_ORDER.length;
     const active = orders.filter((o) => o.status !== 'cancelled');
     const cancelled = orders.filter((o) => o.status === 'cancelled');
 
-    const stagesDone = (uuid: string | undefined): number =>
-        uuid ? completions.get(uuid)?.size || 0 : 0;
+    // An order is complete when every stage it actually needs is done.
+    const isOrderComplete = (o: (typeof orders)[number]): boolean => {
+        const applicable = orderApplicableStages(o);
+        if (applicable.length === 0) return false;
+        const perOrder = o.uuid ? completions.get(o.uuid) : undefined;
+        return applicable.every((s) => perOrder?.has(s));
+    };
 
-    const completed = active.filter((o) => stagesDone(o.uuid) >= totalStages);
-    const inProduction = active.filter((o) => stagesDone(o.uuid) < totalStages);
+    const completed = active.filter(isOrderComplete);
+    const inProduction = active.filter((o) => !isOrderComplete(o));
 
     const piecesInProduction = inProduction.reduce(
         (s, o) => s + o.items.reduce((a, i) => a + i.quantity, 0),
         0
     );
 
-    // Per-stage pending: active orders whose completion set lacks the stage.
+    // Per-stage pending: active orders that NEED the stage and haven't
+    // completed it yet. Orders whose products skip a stage don't count.
     const stagePending = STAGE_ORDER.map((stage) => {
         const pending = active.filter((o) => {
+            if (!orderNeedsStage(o, stage)) return false;
             const perOrder = o.uuid ? completions.get(o.uuid) : undefined;
             return !perOrder?.has(stage);
         }).length;
