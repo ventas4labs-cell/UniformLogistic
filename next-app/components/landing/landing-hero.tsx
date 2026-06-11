@@ -31,16 +31,22 @@ const STATS: { value: string; label: string }[] = [
 export function LandingHero({ appHref }: { appHref: string | null }) {
     return (
         <section className="relative overflow-hidden">
-            {/* Living backdrop — the high-speed embroidery line, veiled in
-                ivory so the type stays in charge. */}
+            {/* Living backdrop — the high-speed embroidery line. The veil is
+                directional: solid ivory over the type column on the left,
+                clearing to the right so the footage reads, then a vertical
+                fade anchors the stats row back on solid paper. */}
             <SectionVideo
                 src="/landing/embroidery-fast.mp4"
                 poster="/landing/embroidery-fast-poster.jpg"
-                className="opacity-25"
+                className="opacity-65"
             />
             <div
                 aria-hidden
-                className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#F7F4EE]/75 via-[#F7F4EE]/82 to-[#F7F4EE]"
+                className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#F7F4EE] from-30% via-[#F7F4EE]/70 via-60% to-[#F7F4EE]/10"
+            />
+            <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#F7F4EE]/55 via-transparent via-35% to-[#F7F4EE] to-[92%]"
             />
             {/* Pattern-paper grid — faint cutting-table backdrop. */}
             <div
