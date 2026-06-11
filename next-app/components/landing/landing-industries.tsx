@@ -1,0 +1,71 @@
+import { ArrowUpRight } from 'lucide-react';
+
+// ─── Industry solutions ──────────────────────────────────────────────
+// Numbered ledger rows, staggered in by the orchestrator. Hover floods
+// the row with ink and flips the type to ivory — one deliberate,
+// memorable interaction instead of many small ones.
+
+const SECTORS: { n: string; name: string; line: string }[] = [
+    {
+        n: '01',
+        name: 'Banca y finanzas',
+        line: 'Imagen impecable en cada sucursal, tallas renovadas sin fricción.'
+    },
+    {
+        n: '02',
+        name: 'Seguridad privada',
+        line: 'Dotación completa por oficial, reposiciones y stock de respaldo.'
+    },
+    {
+        n: '03',
+        name: 'Corporativo y oficinas',
+        line: 'Identidad bordada o impresa, pedidos por departamento.'
+    },
+    {
+        n: '04',
+        name: 'Industria y operaciones',
+        line: 'Prendas de trabajo resistentes, entregadas por etapas verificables.'
+    }
+];
+
+export function LandingIndustries() {
+    return (
+        <section id="sectores" className="relative">
+            <div className="mx-auto max-w-6xl px-6 py-28">
+                <div data-reveal className="mb-14 flex items-end justify-between gap-6">
+                    <h2 className="font-display text-5xl font-black uppercase tracking-tight sm:text-6xl">
+                        Sectores
+                    </h2>
+                    <p className="hidden max-w-xs pb-2 text-sm leading-relaxed text-[#16130F]/55 sm:block">
+                        Equipos de 10 a 1 000 personas visten con nosotros en todo el
+                        país.
+                    </p>
+                </div>
+
+                <div data-reveal-group className="border-t border-[#16130F]/15">
+                    {SECTORS.map((s) => (
+                        <div
+                            key={s.n}
+                            data-reveal-item
+                            className="group grid cursor-default grid-cols-[3.5rem_minmax(0,1fr)_2rem] items-baseline gap-4 border-b border-[#16130F]/15 px-2 py-8 transition-colors duration-300 hover:bg-[#16130F] sm:grid-cols-[5rem_minmax(0,1fr)_minmax(0,20rem)_3rem] sm:px-4"
+                        >
+                            <span className="font-mono text-xs text-[#EA580C]">
+                                {s.n}
+                            </span>
+                            <h3 className="font-display text-3xl font-extrabold uppercase tracking-tight transition-colors duration-300 group-hover:text-[#F7F4EE] sm:text-4xl">
+                                {s.name}
+                            </h3>
+                            <p className="col-span-2 col-start-2 text-sm leading-relaxed text-[#16130F]/55 transition-colors duration-300 group-hover:text-[#F7F4EE]/60 sm:col-span-1 sm:col-start-auto">
+                                {s.line}
+                            </p>
+                            <ArrowUpRight
+                                size={20}
+                                className="hidden justify-self-end text-[#16130F]/30 transition-all duration-300 group-hover:translate-x-1 group-hover:-translate-y-1 group-hover:text-[#EA580C] sm:block"
+                            />
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </section>
+    );
+}
