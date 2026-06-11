@@ -22,7 +22,7 @@ export function PortalMockup() {
             {/* Main order card */}
             <div
                 data-float
-                className="relative z-10 border border-[#16130F]/12 bg-white shadow-[0_24px_60px_-24px_rgba(22,19,15,0.35)]"
+                className="relative z-10 rounded-2xl border border-[#16130F]/12 bg-white shadow-[0_24px_60px_-24px_rgba(22,19,15,0.35)]"
             >
                 <div className="flex items-center justify-between border-b border-[#16130F]/10 px-5 py-3.5">
                     <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#16130F]/50">
@@ -36,14 +36,14 @@ export function PortalMockup() {
                 <div className="px-5 pb-5 pt-4">
                     <div className="flex items-end justify-between">
                         <div>
-                            <p className="font-display text-lg font-extrabold uppercase leading-tight">
+                            <p className="font-sans text-lg font-extrabold leading-tight">
                                 Banco Central
                             </p>
                             <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.16em] text-[#16130F]/45">
                                 120 pzas · Entrega 12 jul
                             </p>
                         </div>
-                        <span className="font-display text-2xl font-black text-[#EA580C]">
+                        <span className="font-sans text-2xl font-extrabold text-[#EA580C]">
                             {done}/7
                         </span>
                     </div>
@@ -53,7 +53,7 @@ export function PortalMockup() {
                         {STAGES.map((s) => (
                             <span
                                 key={s.label}
-                                className={`h-1.5 flex-1 ${
+                                className={`h-1.5 flex-1 rounded-full ${
                                     s.done ? 'bg-[#EA580C]' : 'bg-[#16130F]/10'
                                 }`}
                             />
@@ -91,13 +91,13 @@ export function PortalMockup() {
             {/* Stock chip */}
             <div
                 data-float
-                className="absolute -left-6 top-8 z-20 hidden items-center gap-2.5 border border-[#16130F]/12 bg-[#F7F4EE] px-4 py-3 shadow-[0_16px_40px_-20px_rgba(22,19,15,0.4)] sm:flex"
+                className="absolute -left-6 top-8 z-20 hidden items-center gap-2.5 rounded-2xl border border-[#16130F]/12 bg-[#F7F4EE] px-4 py-3 shadow-[0_16px_40px_-20px_rgba(22,19,15,0.4)] sm:flex"
             >
-                <span className="grid h-8 w-8 place-items-center bg-[#16130F] text-[#F7F4EE]">
+                <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#16130F] text-[#F7F4EE]">
                     <Package size={14} />
                 </span>
                 <div>
-                    <p className="font-display text-sm font-extrabold leading-none">
+                    <p className="font-sans text-sm font-extrabold leading-none">
                         1 240 pzas
                     </p>
                     <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.16em] text-[#16130F]/50">
@@ -109,13 +109,13 @@ export function PortalMockup() {
             {/* Live-order toast */}
             <div
                 data-float
-                className="absolute -bottom-6 -right-3 z-20 flex items-center gap-2.5 border border-[#16130F]/12 bg-white px-4 py-3 shadow-[0_16px_40px_-20px_rgba(22,19,15,0.4)]"
+                className="absolute -bottom-6 -right-3 z-20 flex items-center gap-2.5 rounded-2xl border border-[#16130F]/12 bg-white px-4 py-3 shadow-[0_16px_40px_-20px_rgba(22,19,15,0.4)]"
             >
-                <span className="grid h-8 w-8 place-items-center bg-[#EA580C] text-white">
+                <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#EA580C] text-white">
                     <Bell size={14} />
                 </span>
                 <div>
-                    <p className="font-display text-sm font-extrabold leading-none">
+                    <p className="font-sans text-sm font-extrabold leading-none">
                         Pedido recibido
                     </p>
                     <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.16em] text-[#16130F]/50">

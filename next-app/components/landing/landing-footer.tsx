@@ -8,10 +8,10 @@ export function LandingFooter() {
                 <div className="grid gap-14 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)]">
                     <div>
                         <div className="flex items-center gap-3">
-                            <span className="grid h-9 w-9 place-items-center bg-[#EA580C] font-display text-sm font-black text-[#F7F4EE]">
+                            <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#EA580C] text-sm font-extrabold text-[#F7F4EE]">
                                 UL
                             </span>
-                            <span className="font-display text-base font-extrabold uppercase tracking-[0.18em]">
+                            <span className="text-base font-bold tracking-tight">
                                 Uniform Logistic
                             </span>
                         </div>

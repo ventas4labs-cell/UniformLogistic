@@ -25,7 +25,7 @@ export function LandingCta({ appHref }: { appHref: string | null }) {
                 </p>
                 <h2
                     data-reveal
-                    className="mx-auto mt-6 max-w-4xl font-display text-6xl font-black uppercase leading-[0.92] tracking-tight sm:text-7xl"
+                    className="mx-auto mt-6 max-w-3xl font-sans text-5xl font-extrabold leading-[1.04] tracking-tight sm:text-6xl"
                 >
                     ¿Listo para reclamar
                     <br />
@@ -37,7 +37,7 @@ export function LandingCta({ appHref }: { appHref: string | null }) {
                 >
                     <Link
                         href={appHref ?? '/login'}
-                        className="group inline-flex items-center gap-2 bg-[#EA580C] px-8 py-4 font-mono text-xs uppercase tracking-[0.2em] text-[#F7F4EE] transition-colors hover:bg-[#F7F4EE] hover:text-[#16130F]"
+                        className="group inline-flex items-center gap-2 rounded-full bg-[#EA580C] px-8 py-4 text-sm font-bold text-[#F7F4EE] shadow-[0_12px_32px_-12px_rgba(234,88,12,0.6)] transition-colors hover:bg-[#F7F4EE] hover:text-[#16130F]"
                     >
                         Explorar el portal
                         <ArrowRight
@@ -47,7 +47,7 @@ export function LandingCta({ appHref }: { appHref: string | null }) {
                     </Link>
                     <a
                         href="mailto:ulogisticcr@gmail.com?subject=Solicitud%20de%20demo%20%E2%80%94%20Uniform%20Logistic"
-                        className="inline-flex items-center gap-2 border border-[#F7F4EE]/35 px-8 py-4 font-mono text-xs uppercase tracking-[0.2em] text-[#F7F4EE] transition-colors hover:border-[#F7F4EE] hover:bg-[#F7F4EE] hover:text-[#16130F]"
+                        className="inline-flex items-center gap-2 rounded-full border border-[#F7F4EE]/35 px-8 py-4 text-sm font-bold text-[#F7F4EE] transition-colors hover:border-[#F7F4EE] hover:bg-[#F7F4EE] hover:text-[#16130F]"
                     >
                         Solicitar una demo
                     </a>

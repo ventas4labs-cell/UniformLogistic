@@ -34,7 +34,7 @@ export function LandingIndustries() {
         <section id="sectores" className="relative">
             <div className="mx-auto max-w-6xl px-6 py-28">
                 <div data-reveal className="mb-14 flex items-end justify-between gap-6">
-                    <h2 className="font-display text-5xl font-black uppercase tracking-tight sm:text-6xl">
+                    <h2 className="font-sans text-4xl font-extrabold tracking-tight sm:text-5xl">
                         Sectores
                     </h2>
                     <p className="hidden max-w-xs pb-2 text-sm leading-relaxed text-[#16130F]/55 sm:block">
@@ -49,13 +49,13 @@ export function LandingIndustries() {
                             <div
                                 key={s.n}
                                 data-reveal-item
-                                className="group grid cursor-default grid-cols-[3.5rem_minmax(0,1fr)_2rem] items-baseline gap-4 border-b border-[#16130F]/15 px-2 py-8 transition-colors duration-300 hover:bg-[#16130F] sm:px-4"
+                                className="group grid cursor-default grid-cols-[3.5rem_minmax(0,1fr)_2rem] items-baseline gap-4 rounded-2xl border-b border-[#16130F]/15 px-4 py-8 transition-colors duration-300 hover:bg-[#16130F] sm:px-5"
                             >
                                 <span className="font-mono text-xs text-[#EA580C]">
                                     {s.n}
                                 </span>
                                 <div>
-                                    <h3 className="font-display text-3xl font-extrabold uppercase tracking-tight transition-colors duration-300 group-hover:text-[#F7F4EE] sm:text-4xl">
+                                    <h3 className="font-sans text-2xl font-extrabold tracking-tight transition-colors duration-300 group-hover:text-[#F7F4EE] sm:text-3xl">
                                         {s.name}
                                     </h3>
                                     <p className="mt-2 text-sm leading-relaxed text-[#16130F]/55 transition-colors duration-300 group-hover:text-[#F7F4EE]/60">
@@ -73,7 +73,7 @@ export function LandingIndustries() {
                     {/* The workshop behind the sectors — garments on the line. */}
                     <figure
                         data-reveal
-                        className="relative hidden self-stretch overflow-hidden border border-[#16130F]/15 lg:block"
+                        className="relative hidden self-stretch overflow-hidden rounded-3xl border border-[#16130F]/15 lg:block"
                     >
                         <Image
                             src="/landing/taller-blanco.jpg"

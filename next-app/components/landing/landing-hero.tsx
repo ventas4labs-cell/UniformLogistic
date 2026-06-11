@@ -83,7 +83,7 @@ export function LandingHero({ appHref }: { appHref: string | null }) {
                     propio — Costa Rica
                 </p>
 
-                <h1 className="font-display text-[16vw] font-black uppercase leading-[0.92] tracking-tight sm:text-[12vw] lg:text-[7.5rem]">
+                <h1 className="font-sans text-[11.5vw] font-extrabold leading-[1.02] tracking-tight sm:text-[8.5vw] lg:text-[5.6rem]">
                     <SunriseLine>Uniformes hechos</SunriseLine>
                     <SunriseLine>en Costa Rica.</SunriseLine>
                     <SunriseLine className="text-[#EA580C]">
@@ -101,17 +101,17 @@ export function LandingHero({ appHref }: { appHref: string | null }) {
                         <div className="mt-8 flex flex-wrap items-center gap-4">
                             <Link
                                 href={appHref ?? '/login'}
-                                className="group inline-flex items-center gap-2 bg-[#EA580C] px-7 py-4 font-mono text-xs uppercase tracking-[0.2em] text-[#F7F4EE] transition-colors hover:bg-[#16130F]"
+                                className="group inline-flex items-center gap-2 rounded-full bg-[#EA580C] px-8 py-4 text-sm font-bold text-[#F7F4EE] shadow-[0_12px_32px_-12px_rgba(234,88,12,0.55)] transition-colors hover:bg-[#16130F]"
                             >
                                 Explorar el portal
                                 <ArrowRight
-                                    size={14}
+                                    size={15}
                                     className="transition-transform group-hover:translate-x-1"
                                 />
                             </Link>
                             <a
                                 href="mailto:ulogisticcr@gmail.com?subject=Solicitud%20de%20demo%20%E2%80%94%20Uniform%20Logistic"
-                                className="inline-flex items-center gap-2 border border-[#16130F]/25 px-7 py-4 font-mono text-xs uppercase tracking-[0.2em] transition-colors hover:border-[#16130F] hover:bg-[#16130F] hover:text-[#F7F4EE]"
+                                className="inline-flex items-center gap-2 rounded-full border border-[#16130F]/20 px-8 py-4 text-sm font-bold transition-colors hover:border-[#16130F] hover:bg-[#16130F] hover:text-[#F7F4EE]"
                             >
                                 Solicitar una demo
                             </a>
@@ -136,7 +136,7 @@ export function LandingHero({ appHref }: { appHref: string | null }) {
                                 i > 0 ? 'lg:border-l lg:border-[#16130F]/15 lg:pl-6' : ''
                             } ${i % 2 === 1 ? 'border-l border-[#16130F]/15 pl-6 lg:border-l' : ''}`}
                         >
-                            <span className="font-display text-4xl font-black text-[#EA580C]">
+                            <span className="font-sans text-4xl font-extrabold tracking-tight text-[#EA580C]">
                                 {s.value}
                             </span>
                             <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#16130F]/55">

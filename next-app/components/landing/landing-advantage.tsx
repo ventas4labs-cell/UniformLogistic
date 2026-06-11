@@ -56,7 +56,7 @@ export function LandingAdvantage() {
                     <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-[#F7F4EE]/45">
                         La ventaja tecnológica
                     </p>
-                    <h2 className="mt-6 font-display text-5xl font-black uppercase leading-[0.95] tracking-tight sm:text-6xl">
+                    <h2 className="mt-6 font-sans text-4xl font-extrabold leading-[1.06] tracking-tight sm:text-5xl">
                         Menos correos.
                         <br />
                         Menos llamadas.
@@ -93,7 +93,7 @@ export function LandingAdvantage() {
                                 <span className="font-mono text-sm text-[#EA580C]">
                                     {f.n}
                                 </span>
-                                <h3 className="font-display text-2xl font-extrabold uppercase leading-tight tracking-tight transition-colors group-hover:text-[#EA580C]">
+                                <h3 className="font-sans text-2xl font-extrabold leading-snug tracking-tight transition-colors group-hover:text-[#EA580C]">
                                     {f.title}
                                 </h3>
                                 <p className="leading-relaxed text-[#F7F4EE]/60">
@@ -107,7 +107,7 @@ export function LandingAdvantage() {
                 {/* The workshop, full color: intricate embroidery footage. */}
                 <figure
                     data-reveal
-                    className="relative mt-16 h-72 overflow-hidden border border-[#F7F4EE]/12 sm:h-96"
+                    className="relative mt-16 h-72 overflow-hidden rounded-3xl border border-[#F7F4EE]/12 sm:h-96"
                 >
                     <SectionVideo
                         src="/landing/embroidery-detail.mp4"

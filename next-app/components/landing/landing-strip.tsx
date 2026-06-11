@@ -25,16 +25,16 @@ const SHOTS: { src: string; alt: string; caption: string }[] = [
 
 export function LandingStrip() {
     return (
-        <section className="border-y border-[#16130F]/15 bg-[#F1EDE4]">
+        <section className="border-y border-[#16130F]/10 bg-[#F1EDE4]">
             <div
                 data-reveal-group
-                className="mx-auto grid max-w-6xl grid-cols-1 gap-px sm:grid-cols-3"
+                className="mx-auto grid max-w-6xl grid-cols-1 gap-5 px-6 py-12 sm:grid-cols-3"
             >
                 {SHOTS.map((s) => (
                     <figure
                         key={s.src}
                         data-reveal-item
-                        className="group relative overflow-hidden border-[#16130F]/15 max-sm:border-b sm:border-r sm:last:border-r-0"
+                        className="group relative overflow-hidden rounded-3xl shadow-[0_18px_44px_-22px_rgba(22,19,15,0.35)]"
                     >
                         <div className="relative aspect-[4/3] sm:aspect-[3/4] lg:aspect-[4/3]">
                             <Image
