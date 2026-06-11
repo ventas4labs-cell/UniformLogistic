@@ -1,3 +1,5 @@
+import { SectionVideo } from './section-video';
+
 // ─── The technological advantage ─────────────────────────────────────
 // Contrast flip to warm black. ROI-framed copy: the software exists to
 // give operations teams their hours back. A dashed "stitch" rule sews
@@ -27,6 +29,17 @@ export function LandingAdvantage() {
             id="ventaja"
             className="relative overflow-hidden bg-[#16130F] text-[#F7F4EE]"
         >
+            {/* Section backdrop — the industrial printer at work, sunk
+                deep under ink so the copy carries the section. */}
+            <SectionVideo
+                src="/landing/printer.mp4"
+                poster="/landing/printer-poster.jpg"
+                className="opacity-[0.13]"
+            />
+            <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#16130F]/70 via-[#16130F]/35 to-[#16130F]"
+            />
             {/* Parallax ember glow */}
             <div
                 aria-hidden
@@ -91,30 +104,21 @@ export function LandingAdvantage() {
                     </div>
                 </div>
 
-                {/* Photography slot — swap for taller/embroidery footage. */}
+                {/* The workshop, full color: intricate embroidery footage. */}
                 <figure
                     data-reveal
                     className="relative mt-16 h-72 overflow-hidden border border-[#F7F4EE]/12 sm:h-96"
                 >
-                    <div
-                        aria-hidden
-                        className="absolute inset-0"
-                        style={{
-                            backgroundImage:
-                                'repeating-linear-gradient(45deg, rgba(247,244,238,0.05) 0 2px, transparent 2px 14px), repeating-linear-gradient(-45deg, rgba(247,244,238,0.04) 0 2px, transparent 2px 14px)'
-                        }}
+                    <SectionVideo
+                        src="/landing/embroidery-detail.mp4"
+                        poster="/landing/embroidery-detail-poster.jpg"
                     />
                     <div
                         aria-hidden
-                        data-parallax="0.15"
-                        className="absolute inset-0"
-                        style={{
-                            background:
-                                'radial-gradient(ellipse 60% 70% at 30% 60%, rgba(234,88,12,0.14), transparent 70%)'
-                        }}
+                        className="absolute inset-0 bg-gradient-to-t from-[#16130F]/60 via-transparent to-[#16130F]/20"
                     />
-                    <figcaption className="absolute bottom-5 left-5 font-mono text-[10px] uppercase tracking-[0.24em] text-[#F7F4EE]/45">
-                        [ Fotografía — taller de bordado, San José ]
+                    <figcaption className="absolute bottom-5 left-5 font-mono text-[10px] uppercase tracking-[0.24em] text-[#F7F4EE]/80">
+                        [ Taller — bordado industrial en vivo ]
                     </figcaption>
                 </figure>
             </div>

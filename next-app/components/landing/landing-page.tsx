@@ -5,6 +5,7 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { LandingNav } from './landing-nav';
 import { LandingHero } from './landing-hero';
+import { LandingStrip } from './landing-strip';
 import { LandingAdvantage } from './landing-advantage';
 import { LandingIndustries } from './landing-industries';
 import { LandingCta } from './landing-cta';
@@ -134,6 +135,16 @@ export function LandingPage({ appHref }: { appHref: string | null }) {
             });
         });
 
+        // Reduced motion: background videos hold their poster frame.
+        mm.add('(prefers-reduced-motion: reduce)', () => {
+            root.current
+                ?.querySelectorAll<HTMLVideoElement>('video')
+                .forEach((v) => {
+                    v.pause();
+                    v.removeAttribute('autoplay');
+                });
+        });
+
         return () => mm.revert();
     }, []);
 
@@ -145,6 +156,7 @@ export function LandingPage({ appHref }: { appHref: string | null }) {
             <LandingNav appHref={appHref} />
             <main>
                 <LandingHero appHref={appHref} />
+                <LandingStrip />
                 <LandingAdvantage />
                 <LandingIndustries />
                 <LandingCta appHref={appHref} />

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { PortalMockup } from './portal-mockup';
+import { SectionVideo } from './section-video';
 
 // Masked line for the GSAP "sunrise" reveal — the inner .hero-line
 // rises out of the overflow-hidden wrapper.
@@ -30,6 +31,17 @@ const STATS: { value: string; label: string }[] = [
 export function LandingHero({ appHref }: { appHref: string | null }) {
     return (
         <section className="relative overflow-hidden">
+            {/* Living backdrop — the high-speed embroidery line, veiled in
+                ivory so the type stays in charge. */}
+            <SectionVideo
+                src="/landing/embroidery-fast.mp4"
+                poster="/landing/embroidery-fast-poster.jpg"
+                className="opacity-25"
+            />
+            <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#F7F4EE]/75 via-[#F7F4EE]/82 to-[#F7F4EE]"
+            />
             {/* Pattern-paper grid — faint cutting-table backdrop. */}
             <div
                 aria-hidden

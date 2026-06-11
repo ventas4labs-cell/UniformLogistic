@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { ArrowUpRight } from 'lucide-react';
 
 // ─── Industry solutions ──────────────────────────────────────────────
@@ -42,28 +43,50 @@ export function LandingIndustries() {
                     </p>
                 </div>
 
-                <div data-reveal-group className="border-t border-[#16130F]/15">
-                    {SECTORS.map((s) => (
-                        <div
-                            key={s.n}
-                            data-reveal-item
-                            className="group grid cursor-default grid-cols-[3.5rem_minmax(0,1fr)_2rem] items-baseline gap-4 border-b border-[#16130F]/15 px-2 py-8 transition-colors duration-300 hover:bg-[#16130F] sm:grid-cols-[5rem_minmax(0,1fr)_minmax(0,20rem)_3rem] sm:px-4"
-                        >
-                            <span className="font-mono text-xs text-[#EA580C]">
-                                {s.n}
-                            </span>
-                            <h3 className="font-display text-3xl font-extrabold uppercase tracking-tight transition-colors duration-300 group-hover:text-[#F7F4EE] sm:text-4xl">
-                                {s.name}
-                            </h3>
-                            <p className="col-span-2 col-start-2 text-sm leading-relaxed text-[#16130F]/55 transition-colors duration-300 group-hover:text-[#F7F4EE]/60 sm:col-span-1 sm:col-start-auto">
-                                {s.line}
-                            </p>
-                            <ArrowUpRight
-                                size={20}
-                                className="hidden justify-self-end text-[#16130F]/30 transition-all duration-300 group-hover:translate-x-1 group-hover:-translate-y-1 group-hover:text-[#EA580C] sm:block"
-                            />
-                        </div>
-                    ))}
+                <div className="grid gap-12 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+                    <div data-reveal-group className="self-start border-t border-[#16130F]/15">
+                        {SECTORS.map((s) => (
+                            <div
+                                key={s.n}
+                                data-reveal-item
+                                className="group grid cursor-default grid-cols-[3.5rem_minmax(0,1fr)_2rem] items-baseline gap-4 border-b border-[#16130F]/15 px-2 py-8 transition-colors duration-300 hover:bg-[#16130F] sm:px-4"
+                            >
+                                <span className="font-mono text-xs text-[#EA580C]">
+                                    {s.n}
+                                </span>
+                                <div>
+                                    <h3 className="font-display text-3xl font-extrabold uppercase tracking-tight transition-colors duration-300 group-hover:text-[#F7F4EE] sm:text-4xl">
+                                        {s.name}
+                                    </h3>
+                                    <p className="mt-2 text-sm leading-relaxed text-[#16130F]/55 transition-colors duration-300 group-hover:text-[#F7F4EE]/60">
+                                        {s.line}
+                                    </p>
+                                </div>
+                                <ArrowUpRight
+                                    size={20}
+                                    className="justify-self-end text-[#16130F]/30 transition-all duration-300 group-hover:translate-x-1 group-hover:-translate-y-1 group-hover:text-[#EA580C]"
+                                />
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* The workshop behind the sectors — garments on the line. */}
+                    <figure
+                        data-reveal
+                        className="relative hidden self-stretch overflow-hidden border border-[#16130F]/15 lg:block"
+                    >
+                        <Image
+                            src="/landing/taller-blanco.jpg"
+                            alt="Máquinas de bordado trabajando sobre uniformes blancos en el taller"
+                            fill
+                            sizes="(min-width: 1024px) 33vw, 100vw"
+                            className="object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#16130F]/50 via-transparent to-transparent" />
+                        <figcaption className="absolute bottom-4 left-4 font-mono text-[10px] uppercase tracking-[0.22em] text-[#F7F4EE]/85">
+                            [ Producción en curso — taller UL ]
+                        </figcaption>
+                    </figure>
                 </div>
             </div>
         </section>

@@ -1,23 +1,25 @@
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
+import { SectionVideo } from './section-video';
 
-// Closing band — one oversized question, two actions.
+// Closing band — one oversized question over the boutique footage,
+// sunk under ink so the type and the two actions carry it.
 export function LandingCta({ appHref }: { appHref: string | null }) {
     return (
-        <section className="relative overflow-hidden border-t border-[#16130F]/15">
+        <section className="relative overflow-hidden border-t border-[#16130F]/15 bg-[#16130F] text-[#F7F4EE]">
+            <SectionVideo
+                src="/landing/boutique.mp4"
+                poster="/landing/boutique-poster.jpg"
+                className="opacity-30"
+            />
             <div
                 aria-hidden
-                data-parallax="0.2"
-                className="pointer-events-none absolute left-1/2 top-0 h-[26rem] w-[44rem] -translate-x-1/2 rounded-full blur-3xl"
-                style={{
-                    background:
-                        'radial-gradient(closest-side, rgba(234,88,12,0.14), transparent 75%)'
-                }}
+                className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#16130F]/85 via-[#16130F]/60 to-[#16130F]/90"
             />
-            <div className="relative mx-auto max-w-6xl px-6 py-28 text-center">
+            <div className="relative mx-auto max-w-6xl px-6 py-32 text-center">
                 <p
                     data-reveal
-                    className="font-mono text-[11px] uppercase tracking-[0.3em] text-[#16130F]/50"
+                    className="font-mono text-[11px] uppercase tracking-[0.3em] text-[#F7F4EE]/55"
                 >
                     Sin contratos de permanencia · Demo de 20 minutos
                 </p>
@@ -35,7 +37,7 @@ export function LandingCta({ appHref }: { appHref: string | null }) {
                 >
                     <Link
                         href={appHref ?? '/login'}
-                        className="group inline-flex items-center gap-2 bg-[#16130F] px-8 py-4 font-mono text-xs uppercase tracking-[0.2em] text-[#F7F4EE] transition-colors hover:bg-[#EA580C]"
+                        className="group inline-flex items-center gap-2 bg-[#EA580C] px-8 py-4 font-mono text-xs uppercase tracking-[0.2em] text-[#F7F4EE] transition-colors hover:bg-[#F7F4EE] hover:text-[#16130F]"
                     >
                         Explorar el portal
                         <ArrowRight
@@ -45,7 +47,7 @@ export function LandingCta({ appHref }: { appHref: string | null }) {
                     </Link>
                     <a
                         href="mailto:ulogisticcr@gmail.com?subject=Solicitud%20de%20demo%20%E2%80%94%20Uniform%20Logistic"
-                        className="inline-flex items-center gap-2 border border-[#16130F]/25 px-8 py-4 font-mono text-xs uppercase tracking-[0.2em] transition-colors hover:border-[#16130F] hover:bg-[#16130F] hover:text-[#F7F4EE]"
+                        className="inline-flex items-center gap-2 border border-[#F7F4EE]/35 px-8 py-4 font-mono text-xs uppercase tracking-[0.2em] text-[#F7F4EE] transition-colors hover:border-[#F7F4EE] hover:bg-[#F7F4EE] hover:text-[#16130F]"
                     >
                         Solicitar una demo
                     </a>

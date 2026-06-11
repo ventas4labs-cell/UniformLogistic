@@ -55,3 +55,8 @@ modify_psd*.py
 /*.jpg
 /*.jpeg
 /*.png
+
+# Raw media sources (654MB vecteezy originals) — optimized copies live in next-app/public/landing/
+/Resources/
+/*.mov
+/*.mp4
