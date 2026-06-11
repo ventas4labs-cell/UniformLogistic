@@ -14,7 +14,9 @@
 //  12. Bottom CTA (orange bg)
 //  13. Footer (dark)
 //
-// Logged-in users are redirected to /home so this page is prospect-only.
+// The root URL always shows the landing page (it's the "main link" we
+// share). Logged-in visitors aren't redirected away — the top nav swaps
+// Iniciar/Registrarse for an "Ir a la app" button into their dashboard.
 //
 // Photos that need files in next-app/public/ (alt-text falls through
 // gracefully if a file is missing):
@@ -23,7 +25,6 @@
 //   /employee-team.jpg         (employee experience)
 
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
 import { createClient } from '@/utils/supabase/server';
 import { landingPath } from '@/lib/admin-acting-company';
 import {
@@ -50,11 +51,13 @@ export default async function Home() {
     const {
         data: { user }
     } = await supabase.auth.getUser();
-    if (user) redirect(landingPath(user.email));
+    // Logged-in visitors stay on the landing page; the nav gives them a
+    // one-click jump into their app (admin panel or customer dashboard).
+    const appHref = user ? landingPath(user.email) : null;
 
     return (
         <main className="min-h-screen bg-white text-zinc-900">
-            <TopNav />
+            <TopNav appHref={appHref} />
             <Hero />
             <BestOfSection />
             <MoreSelectionSection />
@@ -81,7 +84,7 @@ const NAV_LINKS = [
     { label: 'Hablar con ventas', href: '#contacto' }
 ];
 
-function TopNav() {
+function TopNav({ appHref }: { appHref: string | null }) {
     return (
         <header className="sticky top-0 z-50 bg-white border-b border-zinc-200">
             <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -115,18 +118,30 @@ function TopNav() {
                     <span className="hidden sm:inline-flex items-center gap-1 text-xs text-zinc-500 font-semibold px-2">
                         <Globe size={14} /> CR
                     </span>
-                    <Link
-                        href="/login"
-                        className="text-sm font-semibold text-zinc-800 hover:text-zinc-950"
-                    >
-                        Iniciar
-                    </Link>
-                    <Link
-                        href="/login"
-                        className="text-sm font-bold px-4 py-2 rounded-full bg-orange-600 hover:bg-orange-700 text-white transition-colors"
-                    >
-                        Registrarse
-                    </Link>
+                    {appHref ? (
+                        <Link
+                            href={appHref}
+                            className="inline-flex items-center gap-1.5 text-sm font-bold px-4 py-2 rounded-full bg-orange-600 hover:bg-orange-700 text-white transition-colors"
+                        >
+                            Ir a la app
+                            <ArrowRight size={15} />
+                        </Link>
+                    ) : (
+                        <>
+                            <Link
+                                href="/login"
+                                className="text-sm font-semibold text-zinc-800 hover:text-zinc-950"
+                            >
+                                Iniciar
+                            </Link>
+                            <Link
+                                href="/login"
+                                className="text-sm font-bold px-4 py-2 rounded-full bg-orange-600 hover:bg-orange-700 text-white transition-colors"
+                            >
+                                Registrarse
+                            </Link>
+                        </>
+                    )}
                 </div>
             </div>
         </header>
