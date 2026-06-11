@@ -44,7 +44,23 @@ export interface CartItem {
     quantity: number;
     productType?: ProductType;
     fabricType?: string;
-    bom?: { name: string; qty: number }[];
+    /**
+     * Product BOM, snapshotted from products.bom_json. Generic insumo
+     * rows carry name/qty (+ optional per-size overrides); rows that
+     * represent a logo also carry the logo linkage fields so the
+     * production boards can render logos per product without a join.
+     * Mirrors BomItem in services/products.ts (inlined to keep this
+     * module dependency-free).
+     */
+    bom?: {
+        name: string;
+        qty: number;
+        qtyBySize?: Record<string, number>;
+        logoId?: string;
+        logoImageUrl?: string;
+        logoCategory?: 'bordado' | 'impresion';
+        logoPlacement?: string;
+    }[];
     codigoCabys?: string;
     imageUrl?: string;
     /**

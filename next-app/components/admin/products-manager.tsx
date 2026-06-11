@@ -1125,6 +1125,21 @@ export function ProductsManager({
                                                 </button>
                                             </div>
 
+                                            {item.logoId && (
+                                                <input
+                                                    type="text"
+                                                    value={item.logoPlacement || ''}
+                                                    onChange={(e) =>
+                                                        updateBom({
+                                                            ...item,
+                                                            logoPlacement: e.target.value
+                                                        })
+                                                    }
+                                                    placeholder="Ubicación / instrucción en este producto (ej: pecho izquierdo, 8 cm)"
+                                                    className="w-full p-2 border border-gray-200 dark:border-zinc-700 rounded-lg text-xs focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-zinc-900"
+                                                />
+                                            )}
+
                                             {sizePool.length > 0 && (
                                                 <div className="pl-1">
                                                     <button

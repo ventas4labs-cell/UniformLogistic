@@ -15,6 +15,19 @@ import {
 import { isAdminEmail } from '@/lib/admin-acting-company';
 import type { StageKey } from '@/lib/services/stage-completions';
 
+// In-house stage boards. An (un)assignment can outsource an order to
+// any stage, so we revalidate every board afterward — each board
+// subtracts the orders outsourced to its own external stations.
+const STAGE_BOARD_PATHS = [
+    '/admin/operador',
+    '/admin/corte',
+    '/admin/maquila',
+    '/admin/impresion',
+    '/admin/bordado',
+    '/admin/empaque',
+    '/admin/ploter'
+];
+
 /**
  * 32-byte URL-safe random token (no padding). Used as both the
  * /s/<token> slug the station bookmarks and the auth.users password
@@ -176,6 +189,9 @@ export async function assignStationToOrderAction(
     await assignStationToOrder(service, orderId, stationUserId, adminId);
     revalidatePath('/admin/orders');
     revalidatePath('/station');
+    // Outsourcing hides the order from the matching in-house board (and
+    // unassigning brings it back) — refresh them all.
+    for (const p of STAGE_BOARD_PATHS) revalidatePath(p);
     return {};
 }
 
@@ -189,6 +205,7 @@ export async function unassignStationFromOrderAction(
     await unassignStationFromOrder(service, orderId, stationUserId);
     revalidatePath('/admin/orders');
     revalidatePath('/station');
+    for (const p of STAGE_BOARD_PATHS) revalidatePath(p);
     return {};
 }
 
@@ -227,5 +244,6 @@ export async function bulkAssignStationToOrdersAction(
     revalidatePath('/admin/orders');
     revalidatePath('/admin/station-users');
     revalidatePath('/station');
+    for (const p of STAGE_BOARD_PATHS) revalidatePath(p);
     return { created, existing };
 }

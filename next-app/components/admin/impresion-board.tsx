@@ -2,27 +2,41 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Printer, RefreshCw } from 'lucide-react';
+import { Printer, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import type { Order } from '@/lib/types';
+import type { Logo } from '@/lib/services/logos';
 import { StageCompleteToggle } from '@/components/admin/stage-complete-toggle';
 import type { StageTab } from '@/components/admin/stage-tab-bar';
 import { StageBoardFilters } from '@/components/admin/stage-board-filters';
 import { CollapsibleSearch } from '@/components/admin/collapsible-search';
+import { OrderLogosButton } from '@/components/admin/order-logos-modal';
+
+// Cards are uniform: at most this many item rows show, with a
+// min-height so short orders match; longer orders collapse behind an
+// expand chevron so one big order can't tower over the grid.
+const MAX_VISIBLE_ITEMS = 4;
 
 function OrderCard({
     order,
     isCompleted,
-    onLocalChange
+    onLocalChange,
+    logos
 }: {
     order: Order;
     isCompleted: boolean;
     onLocalChange: (uuid: string, next: boolean) => void;
+    logos: Logo[];
 }) {
     const totalPieces = order.items.reduce((s, i) => s + i.quantity, 0);
+    const [expanded, setExpanded] = useState(false);
+    const visibleItems = expanded
+        ? order.items
+        : order.items.slice(0, MAX_VISIBLE_ITEMS);
+    const hiddenCount = Math.max(0, order.items.length - MAX_VISIBLE_ITEMS);
 
     return (
         <div
-            className={`bg-white dark:bg-zinc-900 rounded-xl shadow-sm border overflow-hidden ${
+            className={`bg-white dark:bg-zinc-900 rounded-xl shadow-sm border overflow-hidden flex flex-col ${
                 isCompleted
                     ? 'border-green-200 dark:border-green-900/40'
                     : 'border-gray-200 dark:border-zinc-800'
@@ -62,6 +76,11 @@ function OrderCard({
                     <span className="bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-300 text-xs font-bold px-2 py-1 rounded-full">
                         {order.items.length} líneas
                     </span>
+                    <OrderLogosButton
+                        order={order}
+                        category="impresion"
+                        logos={logos}
+                    />
                 </div>
 
                 {order.notes && (
@@ -71,26 +90,46 @@ function OrderCard({
                 )}
             </div>
 
-            <div className="border-t border-gray-100 dark:border-zinc-800">
-                <div className="p-4 space-y-1.5">
-                    {order.items.map((item, idx) => (
-                        <div
-                            key={idx}
-                            className="flex items-center gap-3 text-sm bg-gray-50 dark:bg-zinc-800/50 rounded-lg px-3 py-2"
-                        >
-                            <div className="min-w-0 flex-1">
-                                <span className="font-medium text-gray-900 dark:text-zinc-100">
-                                    {item.productName}
-                                </span>
-                                <span className="text-gray-500 dark:text-zinc-400 ml-2 text-xs">
-                                    {item.selection.size || ''}
+            <div className="border-t border-gray-100 dark:border-zinc-800 flex-1 flex flex-col">
+                <div className="p-4 flex flex-col flex-1 min-h-[160px]">
+                    <div className="space-y-1.5">
+                        {visibleItems.map((item, idx) => (
+                            <div
+                                key={idx}
+                                className="flex items-center gap-3 text-sm bg-gray-50 dark:bg-zinc-800/50 rounded-lg px-3 py-2"
+                            >
+                                <div className="min-w-0 flex-1">
+                                    <span className="font-medium text-gray-900 dark:text-zinc-100">
+                                        {item.productName}
+                                    </span>
+                                    <span className="text-gray-500 dark:text-zinc-400 ml-2 text-xs">
+                                        {item.selection.size || ''}
+                                    </span>
+                                </div>
+                                <span className="font-bold text-gray-700 dark:text-zinc-200 shrink-0 ml-2">
+                                    x{item.quantity}
                                 </span>
                             </div>
-                            <span className="font-bold text-gray-700 dark:text-zinc-200 shrink-0 ml-2">
-                                x{item.quantity}
-                            </span>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
+                    {hiddenCount > 0 && (
+                        <button
+                            type="button"
+                            onClick={() => setExpanded((e) => !e)}
+                            className="mt-auto pt-3 flex items-center justify-center gap-1 text-xs font-bold text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-200"
+                            aria-expanded={expanded}
+                        >
+                            {expanded ? (
+                                <>
+                                    <ChevronUp size={14} /> Ver menos
+                                </>
+                            ) : (
+                                <>
+                                    <ChevronDown size={14} /> +{hiddenCount} líneas más
+                                </>
+                            )}
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
@@ -99,10 +138,12 @@ function OrderCard({
 
 export function ImpresionBoard({
     initialOrders,
-    initialCompletedOrderIds
+    initialCompletedOrderIds,
+    logos
 }: {
     initialOrders: Order[];
     initialCompletedOrderIds: string[];
+    logos: Logo[];
 }) {
     const [orders] = useState<Order[]>(initialOrders);
     const [completed, setCompleted] = useState<Set<string>>(
@@ -199,6 +240,7 @@ export function ImpresionBoard({
                             order={order}
                             isCompleted={!!order.uuid && completed.has(order.uuid)}
                             onLocalChange={handleLocalChange}
+                            logos={logos}
                         />
                     ))}
                 </div>

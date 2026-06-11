@@ -26,4 +26,5 @@ Equivalently: open the highest-numbered `NNNN-*.md` in this folder.
 
 | # | File | Date | Summary |
 |---|------|------|---------|
+| 0002 | [0002-2026-06-10-logos-cards-outsourcing.md](./0002-2026-06-10-logos-cards-outsourcing.md) | 2026-06-10 | Logos-per-order modal on Bordado/Impresión boards, per-product logo placement, uniform stage-board cards with expand chevron, in-house boards hide orders outsourced to an external station, PostgREST `stages_json` cache fix. |
 | 0001 | [0001-2026-06-10-full-project-context.md](./0001-2026-06-10-full-project-context.md) | 2026-06-10 | Full project handoff — stack, data model, auth model, production workflow, every admin module, Supabase/migration ops, hard rules, change log. |

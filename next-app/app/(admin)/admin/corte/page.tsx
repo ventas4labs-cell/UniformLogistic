@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { fetchAllOrders } from '@/lib/services/orders';
 import { fetchStageCompletions } from '@/lib/services/stage-completions';
+import { fetchOrdersOutsourcedToStage } from '@/lib/services/station-assignments';
 import { orderNeedsStage } from '@/lib/stage-utils';
 import { CorteBoard } from '@/components/admin/corte-board';
 
@@ -13,8 +14,19 @@ export default async function CortePage() {
     // Workflow is parallel: every non-cancelled order shows up on every
     // board immediately. Corte marks its own work complete via the
     // per-stage completion toggle (independent of orders.status).
-    const orders = all.filter(
+    const corteOrders = all.filter(
         (o) => o.status !== 'cancelled' && orderNeedsStage(o, 'corte')
+    );
+    // An order handed to an EXTERNAL corte station is produced there, so
+    // drop it from this in-house corte board to avoid double production.
+    // (Re-appears here if the assignment is removed.)
+    const outsourced = await fetchOrdersOutsourcedToStage(
+        supabase,
+        corteOrders.map((o) => o.uuid).filter((id): id is string => !!id),
+        'corte'
+    );
+    const orders = corteOrders.filter(
+        (o) => !(o.uuid && outsourced.has(o.uuid))
     );
     return (
         <CorteBoard

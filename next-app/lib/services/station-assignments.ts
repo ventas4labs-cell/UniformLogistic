@@ -55,6 +55,26 @@ export async function fetchAssignmentsForOrders(
     }));
 }
 
+/**
+ * Of the given orders, which uuids have been outsourced to an EXTERNAL
+ * station for `stage`. Each in-house stage board subtracts this set so
+ * an order produced at an external workshop doesn't also show on the
+ * local board (double production). Removing the assignment brings the
+ * order back to the local board.
+ */
+export async function fetchOrdersOutsourcedToStage(
+    supabase: SupabaseClient,
+    orderIds: string[],
+    stage: string
+): Promise<Set<string>> {
+    const assignments = await fetchAssignmentsForOrders(supabase, orderIds);
+    return new Set(
+        assignments
+            .filter((a) => a.stationUserStage === stage)
+            .map((a) => a.orderId)
+    );
+}
+
 /** Order ids this station user is assigned to. Used by /station to scope the list. */
 export async function fetchOrderIdsAssignedTo(
     supabase: SupabaseClient,

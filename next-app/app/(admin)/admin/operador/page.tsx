@@ -27,10 +27,21 @@ export default async function OperadorPage() {
         (stationNamesByOrder[a.orderId] ||= []).push(name);
     }
 
+    // Orders sent to an external bodega station are prepared there, so
+    // hide them from this in-house board to avoid double production.
+    const outsourcedBodega = new Set(
+        assignments
+            .filter((a) => a.stationUserStage === 'bodega')
+            .map((a) => a.orderId)
+    );
+
     return (
         <OperatorBoard
             initialOrders={orders.filter(
-                (o) => o.status !== 'cancelled' && orderNeedsStage(o, 'bodega')
+                (o) =>
+                    o.status !== 'cancelled' &&
+                    orderNeedsStage(o, 'bodega') &&
+                    !(o.uuid && outsourcedBodega.has(o.uuid))
             )}
             initialCompletions={insumoCompletions}
             initialBodegaCompletedOrderIds={Array.from(bodegaCompleted)}

@@ -24,6 +24,11 @@ export interface BomItem {
     logoId?: string;
     logoImageUrl?: string;
     logoCategory?: 'bordado' | 'impresion';
+    // Optional per-product placement / instruction for this logo on
+    // THIS product (e.g. "pecho izquierdo, 8 cm"). Distinct from the
+    // logo's global catalog `notes`/`size`; the production boards show
+    // both. Only meaningful when `logoId` is set.
+    logoPlacement?: string;
 }
 
 /** Normalize a size label for case-insensitive override lookups. */
