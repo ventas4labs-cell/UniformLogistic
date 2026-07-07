@@ -8,12 +8,11 @@ import {
     Loader2,
     ChevronDown,
     ChevronUp,
-    Layers,
     Plus,
     X
 } from 'lucide-react';
 import type { Order } from '@/lib/types';
-import { aggregateCutLines, parseColors } from '@/lib/stage-utils';
+import { parseColors } from '@/lib/stage-utils';
 import { StageCompleteToggle } from '@/components/admin/stage-complete-toggle';
 import type { StageTab } from '@/components/admin/stage-tab-bar';
 import { StageBoardFilters } from '@/components/admin/stage-board-filters';
@@ -21,81 +20,6 @@ import { CollapsibleSearch } from '@/components/admin/collapsible-search';
 import { addCorteExtraItemAction } from '@/app/(admin)/admin/_stage-actions';
 import type { CartItem } from '@/lib/types';
 
-function CutSummary({ orders }: { orders: Order[] }) {
-    const lines = useMemo(() => aggregateCutLines(orders), [orders]);
-    if (lines.length === 0) return null;
-
-    const grandTotal = lines.reduce((s, l) => s + l.totalQty, 0);
-
-    return (
-        <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm border border-purple-200 dark:border-purple-900/50 overflow-hidden">
-            <div className="p-4 border-b border-gray-100 dark:border-zinc-800 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <Layers size={18} className="text-purple-600 dark:text-purple-400" />
-                    <h3 className="text-sm font-bold uppercase tracking-wide text-gray-700 dark:text-zinc-300">
-                        Plan de Corte Consolidado
-                    </h3>
-                </div>
-                <span className="text-xs font-bold text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-950/50 px-3 py-1 rounded-full">
-                    {grandTotal} pzas totales
-                </span>
-            </div>
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                    <thead className="bg-gray-50 dark:bg-zinc-900/60 border-b border-gray-200 dark:border-zinc-800">
-                        <tr>
-                            <th className="text-left p-3 font-semibold text-gray-600 dark:text-zinc-400">
-                                Tela
-                            </th>
-                            <th className="text-left p-3 font-semibold text-gray-600 dark:text-zinc-400">
-                                Color
-                            </th>
-                            <th className="text-left p-3 font-semibold text-gray-600 dark:text-zinc-400">
-                                Talla
-                            </th>
-                            <th className="text-right p-3 font-semibold text-gray-600 dark:text-zinc-400">
-                                Cant.
-                            </th>
-                            <th className="text-left p-3 font-semibold text-gray-600 dark:text-zinc-400">
-                                Órdenes
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-zinc-800">
-                        {lines.map((line, idx) => (
-                            <tr
-                                key={`${line.fabric}-${line.color}-${line.size}-${idx}`}
-                                className="hover:bg-gray-50 dark:hover:bg-zinc-800/50"
-                            >
-                                <td className="p-3 text-gray-900 dark:text-zinc-100">
-                                    {line.fabric}
-                                </td>
-                                <td className="p-3">
-                                    <ColorSwatches
-                                        colors={
-                                            line.color === '—'
-                                                ? []
-                                                : line.color.split(' / ')
-                                        }
-                                    />
-                                </td>
-                                <td className="p-3 font-mono text-gray-700 dark:text-zinc-300">
-                                    {line.size}
-                                </td>
-                                <td className="p-3 text-right font-bold text-purple-700 dark:text-purple-300">
-                                    {line.totalQty}
-                                </td>
-                                <td className="p-3 text-xs text-gray-500 dark:text-zinc-400">
-                                    {line.orderRefs.join(', ')}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    );
-}
 
 // Base color hex by Spanish color name (lowercase keys). Falls back to
 // a neutral gray for unrecognized names.
@@ -496,7 +420,6 @@ export function CorteBoard({
     const [searchTerm, setSearchTerm] = useState('');
     const [companyFilter, setCompanyFilter] = useState<string>('all');
     const [pending] = useTransition();
-    const [showSummary, setShowSummary] = useState(true);
     const router = useRouter();
 
     const handleLocalCompletionChange = (uuid: string, next: boolean) => {
@@ -567,20 +490,6 @@ export function CorteBoard({
                     </button>
                 </div>
             </div>
-
-            {orders.length > 0 && (
-                <div className="mb-4">
-                    <button
-                        onClick={() => setShowSummary(!showSummary)}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-xl text-sm font-bold hover:bg-purple-700 transition-colors shadow-sm mb-2"
-                    >
-                        <Layers size={16} />
-                        Plan de corte consolidado
-                        {showSummary ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                    </button>
-                    {showSummary && <CutSummary orders={filtered} />}
-                </div>
-            )}
 
             {filtered.length === 0 ? (
                 <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm p-12 text-center text-gray-500 dark:text-zinc-400">
