@@ -19,6 +19,10 @@ import {
     unmarkStageComplete,
     type StageKey
 } from '@/lib/services/stage-completions';
+import {
+    saveStageItemProgress,
+    type ProgressEntry
+} from '@/lib/services/stage-item-progress';
 import { fetchStationUser } from '@/lib/services/station-users';
 import { isStationAssignedToOrder } from '@/lib/services/station-assignments';
 import { isAdminEmail } from '@/lib/admin-acting-company';
@@ -142,6 +146,62 @@ export async function unmarkStageCompleteAction(
     await unmarkStageComplete(supabase, orderUuid, stage);
     for (const p of STAGE_PATHS) revalidatePath(p);
     revalidatePath('/station');
+}
+
+// ─── Partial stage progress (per-item) ───────────────────────────────
+// Some stages (Bordado) finish an order in batches. The operator records
+// how many pieces of each line are done. We persist those counts and
+// then reconcile the binary completion: when every line is at its full
+// quantity the stage is marked complete; if any line drops below full
+// while the stage was complete, it's un-marked. Authorization mirrors
+// the completion toggle (admin OR the assigned station for this stage).
+export async function saveStageProgressAction(
+    orderUuid: string,
+    stage: StageKey,
+    entries: ProgressEntry[]
+): Promise<{ error?: string; completed?: boolean }> {
+    const supabase = await createClient();
+    const {
+        data: { user }
+    } = await supabase.auth.getUser();
+    if (!user) return { error: 'No autenticado.' };
+    if (!(await authorizeStageMutation(supabase, user.id, user.email, orderUuid, stage))) {
+        return { error: 'No autorizado para esta etapa de este pedido.' };
+    }
+
+    try {
+        await saveStageItemProgress(supabase, orderUuid, stage, entries, user.id);
+
+        // Reconcile the binary completion against the true line
+        // quantities (read from the DB, not the client payload).
+        const { data: items, error } = await supabase
+            .from('order_items')
+            .select('id, quantity')
+            .eq('order_id', orderUuid);
+        if (error) throw error;
+
+        const doneById = new Map(entries.map((e) => [e.orderItemId, Math.max(0, Math.round(e.qtyDone))]));
+        const rows = (items || []) as { id: string; quantity: number }[];
+        const allFull =
+            rows.length > 0 &&
+            rows.every((it) => (doneById.get(it.id) ?? 0) >= it.quantity);
+
+        if (allFull) {
+            await markStageComplete(supabase, orderUuid, stage, user.id);
+        } else {
+            // Not everything is done — make sure a stale "complete" flag
+            // doesn't linger (e.g. operator corrected a count downward).
+            await unmarkStageComplete(supabase, orderUuid, stage);
+        }
+
+        for (const p of STAGE_PATHS) revalidatePath(p);
+        revalidatePath('/station');
+        return { completed: allFull };
+    } catch (err) {
+        return {
+            error: err instanceof Error ? err.message : 'No se pudo guardar el avance.'
+        };
+    }
 }
 
 // ─── Corte: add an extra line item ───────────────────────────────────

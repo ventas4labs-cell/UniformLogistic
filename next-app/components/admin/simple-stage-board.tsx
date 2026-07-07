@@ -16,9 +16,11 @@ import { StageCompleteToggle } from '@/components/admin/stage-complete-toggle';
 import type { StageTab } from '@/components/admin/stage-tab-bar';
 import { StageBoardFilters } from '@/components/admin/stage-board-filters';
 import type { StageKey } from '@/lib/services/stage-completions';
+import type { ItemProgress } from '@/lib/services/stage-item-progress';
 import type { Logo, LogoCategory } from '@/lib/services/logos';
 import { CollapsibleSearch } from '@/components/admin/collapsible-search';
 import { OrderLogosButton } from '@/components/admin/order-logos-modal';
+import { StagePartialEditor } from '@/components/admin/stage-partial-editor';
 
 // Generic stage board for stages whose UI is just "list of orders with
 // a per-order completion toggle" — no insumo handling, no global
@@ -33,6 +35,11 @@ interface Props {
     /** Logos catalog — only passed for stages that show a per-order
      * Logos button (Bordado). Joined live for size/notes in the modal. */
     logos?: Logo[];
+    /** When true, each card exposes a per-line "done / total" editor for
+     * recording partial progress (Bordado). */
+    allowPartial?: boolean;
+    /** Board-wide map of order_item_id → qty done, for the partial editor. */
+    initialProgress?: ItemProgress;
 }
 
 // Stages whose boards surface a Logos button, mapped to the logo
@@ -73,7 +80,9 @@ function OrderCard({
     isCompleted,
     onLocalChange,
     logoCategory,
-    logos
+    logos,
+    allowPartial,
+    initialProgress
 }: {
     order: Order;
     stage: StageKey;
@@ -81,6 +90,8 @@ function OrderCard({
     onLocalChange: (uuid: string, next: boolean) => void;
     logoCategory?: LogoCategory;
     logos?: Logo[];
+    allowPartial?: boolean;
+    initialProgress?: ItemProgress;
 }) {
     const totalPieces = order.items.reduce((s, i) => s + i.quantity, 0);
     const [expanded, setExpanded] = useState(false);
@@ -148,6 +159,17 @@ function OrderCard({
             </div>
 
             <div className="border-t border-gray-100 dark:border-zinc-800 flex-1 flex flex-col">
+                {allowPartial ? (
+                    <div className="p-4 flex-1">
+                        <StagePartialEditor
+                            order={order}
+                            stage={stage}
+                            initialProgress={initialProgress || {}}
+                            isCompleted={isCompleted}
+                            onCompletedChange={onLocalChange}
+                        />
+                    </div>
+                ) : (
                 <div className="p-4 flex flex-col flex-1 min-h-[160px]">
                     <div className="space-y-1.5">
                         {visibleItems.map((item, idx) => (
@@ -188,6 +210,7 @@ function OrderCard({
                         </button>
                     )}
                 </div>
+                )}
             </div>
         </div>
     );
@@ -197,7 +220,9 @@ export function SimpleStageBoard({
     initialOrders,
     initialCompletedOrderIds,
     stage,
-    logos
+    logos,
+    allowPartial,
+    initialProgress
 }: Props) {
     const config = STAGE_CONFIG[stage];
     if (!config) {
@@ -303,6 +328,8 @@ export function SimpleStageBoard({
                             onLocalChange={handleLocalChange}
                             logoCategory={logoCategory}
                             logos={logos}
+                            allowPartial={allowPartial}
+                            initialProgress={initialProgress}
                         />
                     ))}
                 </div>

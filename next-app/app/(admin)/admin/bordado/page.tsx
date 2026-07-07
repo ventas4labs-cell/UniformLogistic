@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { fetchAllOrders } from '@/lib/services/orders';
 import { fetchStageCompletions } from '@/lib/services/stage-completions';
+import { fetchStageItemProgress } from '@/lib/services/stage-item-progress';
 import { fetchLogos } from '@/lib/services/logos';
 import { fetchOrdersOutsourcedToStage } from '@/lib/services/station-assignments';
 import { orderNeedsStage } from '@/lib/stage-utils';
@@ -8,9 +9,10 @@ import { SimpleStageBoard } from '@/components/admin/simple-stage-board';
 
 export default async function BordadoPage() {
     const supabase = await createClient();
-    const [all, completed, logos] = await Promise.all([
+    const [all, completed, progress, logos] = await Promise.all([
         fetchAllOrders(supabase),
         fetchStageCompletions(supabase, 'bordado'),
+        fetchStageItemProgress(supabase, 'bordado'),
         fetchLogos(supabase)
     ]);
     const bordadoOrders = all.filter(
@@ -32,6 +34,8 @@ export default async function BordadoPage() {
             initialCompletedOrderIds={Array.from(completed)}
             stage="bordado"
             logos={logos}
+            allowPartial
+            initialProgress={progress}
         />
     );
 }
