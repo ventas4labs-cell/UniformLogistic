@@ -2,10 +2,10 @@
 
 import Link from 'next/link';
 import { useActionState, useState } from 'react';
-import { ArrowLeft, Eye, EyeOff, Loader2 } from 'lucide-react';
-import { signInAction, signUpAction, type AuthState } from './actions';
+import { ArrowLeft, Eye, EyeOff, Loader2, LogOut } from 'lucide-react';
+import { signInAction, signOutAction, signUpAction, type AuthState } from './actions';
 
-export function LoginForm() {
+export function LoginForm({ currentEmail }: { currentEmail?: string | null }) {
     const [isSignUp, setIsSignUp] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const action = isSignUp ? signUpAction : signInAction;
@@ -128,6 +128,27 @@ export function LoginForm() {
                             </>
                         )}
                     </p>
+
+                    {/* Active session — lets a station user (or admin who
+                        opened a station link) sign out and get back into
+                        the system instead of being trapped on /station. */}
+                    {currentEmail && (
+                        <div className="mb-6 rounded-lg border border-white/10 bg-zinc-900/70 p-4">
+                            <p className="text-sm text-zinc-300">
+                                Ya tienes una sesión activa como{' '}
+                                <span className="font-semibold text-white">{currentEmail}</span>.
+                            </p>
+                            <form action={signOutAction} className="mt-3">
+                                <button
+                                    type="submit"
+                                    className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-zinc-800 hover:bg-zinc-700 px-4 py-2 text-sm font-semibold text-white transition-colors"
+                                >
+                                    <LogOut size={15} />
+                                    Cerrar sesión para cambiar de cuenta
+                                </button>
+                            </form>
+                        </div>
+                    )}
 
                     {/* Status */}
                     {state?.error && (
