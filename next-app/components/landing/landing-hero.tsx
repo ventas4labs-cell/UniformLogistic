@@ -22,10 +22,10 @@ function SunriseLine({
 }
 
 const STATS: { value: string; label: string }[] = [
-    { value: '7', label: 'etapas de producción visibles' },
-    { value: '1', label: 'enlace por empresa para pedir' },
-    { value: '0', label: 'llamadas para saber su pedido' },
-    { value: '24/7', label: 'stock de su empresa en línea' }
+    { value: '100%', label: 'confección nacional, en nuestro taller' },
+    { value: '3', label: 'técnicas de marca: bordado, impresión y ploter' },
+    { value: 'S–5XL', label: 'tallas para cada persona de su equipo' },
+    { value: '24/7', label: 'pedidos y stock en línea' }
 ];
 
 export function LandingHero({ appHref }: { appHref: string | null }) {
@@ -79,42 +79,42 @@ export function LandingHero({ appHref }: { appHref: string | null }) {
                     data-hero-fade
                     className="mb-10 font-mono text-[11px] uppercase tracking-[0.3em] text-[#16130F]/55"
                 >
-                    Manufactura textil <span className="text-[#EA580C]">+</span> software
-                    propio — Costa Rica
+                    Manufactura textil de uniformes — San José, Costa Rica
                 </p>
 
-                <h1 className="font-sans text-[11.5vw] font-extrabold leading-[1.02] tracking-tight sm:text-[8.5vw] lg:text-[5.6rem]">
-                    <SunriseLine>Uniformes hechos</SunriseLine>
-                    <SunriseLine>en Costa Rica.</SunriseLine>
+                <h1 className="font-sans text-[11.5vw] font-bold leading-[1.04] tracking-tight sm:text-[8.5vw] lg:text-[5.4rem]">
+                    <SunriseLine>Uniformes que visten</SunriseLine>
+                    <SunriseLine>la marca de su empresa.</SunriseLine>
                     <SunriseLine className="text-[#EA580C]">
-                        Pedidos en segundos.
+                        Hechos en Costa Rica.
                     </SunriseLine>
                 </h1>
 
                 <div className="mt-12 grid gap-10 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-end">
                     <div data-hero-fade className="max-w-md">
                         <p className="text-lg leading-relaxed text-[#16130F]/70">
-                            La única manufactura de uniformes del país con software
-                            propio: cada pedido, cada etapa de producción y el stock de
-                            su empresa, visibles en un portal hecho a su medida.
+                            Confeccionamos los uniformes de bancos, empresas de
+                            seguridad y corporaciones en todo el país, con su logo
+                            bordado o impreso con precisión. Y cuando hay que pedir
+                            más, nuestro portal lo resuelve en minutos.
                         </p>
                         <div className="mt-8 flex flex-wrap items-center gap-4">
-                            <Link
-                                href={appHref ?? '/login'}
+                            <a
+                                href="mailto:ulogisticcr@gmail.com?subject=Cotizaci%C3%B3n%20de%20uniformes%20%E2%80%94%20Uniform%20Logistic"
                                 className="group inline-flex items-center gap-2 rounded-full bg-[#EA580C] px-8 py-4 text-sm font-bold text-[#F7F4EE] shadow-[0_12px_32px_-12px_rgba(234,88,12,0.55)] transition-colors hover:bg-[#16130F]"
                             >
-                                Explorar el portal
+                                Cotizar uniformes
                                 <ArrowRight
                                     size={15}
                                     className="transition-transform group-hover:translate-x-1"
                                 />
-                            </Link>
-                            <a
-                                href="mailto:ulogisticcr@gmail.com?subject=Solicitud%20de%20demo%20%E2%80%94%20Uniform%20Logistic"
+                            </a>
+                            <Link
+                                href={appHref ?? '/login'}
                                 className="inline-flex items-center gap-2 rounded-full border border-[#16130F]/20 px-8 py-4 text-sm font-bold transition-colors hover:border-[#16130F] hover:bg-[#16130F] hover:text-[#F7F4EE]"
                             >
-                                Solicitar una demo
-                            </a>
+                                Explorar el portal
+                            </Link>
                         </div>
                     </div>
 
@@ -136,7 +136,7 @@ export function LandingHero({ appHref }: { appHref: string | null }) {
                                 i > 0 ? 'lg:border-l lg:border-[#16130F]/15 lg:pl-6' : ''
                             } ${i % 2 === 1 ? 'border-l border-[#16130F]/15 pl-6 lg:border-l' : ''}`}
                         >
-                            <span className="font-sans text-4xl font-extrabold tracking-tight text-[#EA580C]">
+                            <span className="font-sans text-4xl font-bold tracking-tight text-[#EA580C]">
                                 {s.value}
                             </span>
                             <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#16130F]/55">
