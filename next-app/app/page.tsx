@@ -11,6 +11,7 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { landingPath } from '@/lib/admin-acting-company';
+import { fetchStationUser } from '@/lib/services/station-users';
 import { LandingPage } from '@/components/landing/landing-page';
 
 export default async function Home() {
@@ -18,7 +19,17 @@ export default async function Home() {
     const {
         data: { user }
     } = await supabase.auth.getUser();
-    const appHref = user ? landingPath(user.email) : null;
 
-    return <LandingPage appHref={appHref} />;
+    // Route each account to its real home. A station user (e.g. after
+    // opening an /s/<token> link) belongs on the restricted /station
+    // shell — sending them to landingPath()'s /home just bounces through
+    // the (app) layout to /station anyway, which looks like a bug. The
+    // nav also exposes a sign-out so the owner isn't stuck on /station.
+    let appHref: string | null = null;
+    if (user) {
+        const station = await fetchStationUser(supabase, user.id);
+        appHref = station ? '/station' : landingPath(user.email);
+    }
+
+    return <LandingPage appHref={appHref} isAuthed={!!user} />;
 }

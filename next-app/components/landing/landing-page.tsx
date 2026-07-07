@@ -29,7 +29,13 @@ gsap.registerPlugin(ScrollTrigger);
 // Everything is wrapped in gsap.matchMedia so prefers-reduced-motion
 // users get a static page — content is server-rendered visible and only
 // hidden by the tweens themselves.
-export function LandingPage({ appHref }: { appHref: string | null }) {
+export function LandingPage({
+    appHref,
+    isAuthed = false
+}: {
+    appHref: string | null;
+    isAuthed?: boolean;
+}) {
     const root = useRef<HTMLDivElement>(null);
 
     useLayoutEffect(() => {
@@ -153,7 +159,7 @@ export function LandingPage({ appHref }: { appHref: string | null }) {
             ref={root}
             className="min-h-screen bg-[#F7F4EE] text-[#16130F] antialiased selection:bg-[#EA580C] selection:text-[#F7F4EE]"
         >
-            <LandingNav appHref={appHref} />
+            <LandingNav appHref={appHref} isAuthed={isAuthed} />
             <main>
                 <LandingHero appHref={appHref} />
                 <LandingStrip />
