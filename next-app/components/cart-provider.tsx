@@ -8,22 +8,35 @@ import {
     useMemo,
     useState,
 } from 'react';
-import type { CartItem, SizeSelection } from '@/lib/types';
+import type { CartItem, ProductType, SizeSelection } from '@/lib/types';
 
 const STORAGE_KEY = 'ul-cart-v1';
+
+/** Lightweight product meta captured when adding to the cart so the
+ *  slide-over mini-cart can show a thumbnail + format sizes without a
+ *  server round-trip. */
+interface AddMeta {
+    id: string;
+    name: string;
+    image?: string;
+    type?: ProductType;
+}
 
 interface CartCtx {
     cart: CartItem[];
     totalItems: number;
     addItems: (
-        productId: string,
-        productName: string,
+        product: AddMeta,
         items: { selection: SizeSelection; quantity: number }[]
     ) => void;
     removeAt: (index: number) => void;
     setQuantity: (index: number, quantity: number) => void;
     replace: (items: CartItem[]) => void;
     clear: () => void;
+    // Slide-over ("pop-up") cart controls.
+    isOpen: boolean;
+    openCart: () => void;
+    closeCart: () => void;
 }
 
 const CartContext = createContext<CartCtx | null>(null);
@@ -31,6 +44,7 @@ const CartContext = createContext<CartCtx | null>(null);
 export function CartProvider({ children }: { children: React.ReactNode }) {
     const [cart, setCart] = useState<CartItem[]>([]);
     const [hydrated, setHydrated] = useState(false);
+    const [isOpen, setIsOpen] = useState(false);
 
     // Hydrate from localStorage once on mount
     useEffect(() => {
@@ -59,15 +73,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
     const addItems = useCallback(
         (
-            productId: string,
-            productName: string,
+            product: AddMeta,
             items: { selection: SizeSelection; quantity: number }[]
         ) => {
             const rows: CartItem[] = items.map((i) => ({
-                productId,
-                productName,
+                productId: product.id,
+                productName: product.name,
                 selection: i.selection,
                 quantity: i.quantity,
+                imageUrl: product.image || undefined,
+                productType: product.type,
             }));
             setCart((prev) => [...prev, ...rows]);
         },
@@ -91,14 +106,28 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
     const clear = useCallback(() => setCart([]), []);
 
+    const openCart = useCallback(() => setIsOpen(true), []);
+    const closeCart = useCallback(() => setIsOpen(false), []);
+
     const totalItems = useMemo(
         () => cart.reduce((acc, i) => acc + i.quantity, 0),
         [cart]
     );
 
     const value = useMemo(
-        () => ({ cart, totalItems, addItems, removeAt, setQuantity, replace, clear }),
-        [cart, totalItems, addItems, removeAt, setQuantity, replace, clear]
+        () => ({
+            cart,
+            totalItems,
+            addItems,
+            removeAt,
+            setQuantity,
+            replace,
+            clear,
+            isOpen,
+            openCart,
+            closeCart,
+        }),
+        [cart, totalItems, addItems, removeAt, setQuantity, replace, clear, isOpen, openCart, closeCart]
     );
 
     return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

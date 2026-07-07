@@ -19,7 +19,7 @@ const TITLES: Record<string, string> = {
 export function TopNav({ isAdmin = false }: { isAdmin?: boolean }) {
     const pathname = usePathname() || '';
     const router = useRouter();
-    const { cart } = useCart();
+    const { cart, openCart } = useCart();
 
     // Admin lands on the dashboard, customers on the warehouse home page.
     // The icon is the same either way — only the destination shifts.
@@ -66,8 +66,9 @@ export function TopNav({ isAdmin = false }: { isAdmin?: boolean }) {
                     >
                         <Home size={20} />
                     </Link>
-                    <Link
-                        href="/cart"
+                    <button
+                        onClick={openCart}
+                        aria-label="Abrir carrito"
                         className="relative p-2.5 bg-zinc-900 dark:bg-orange-600 rounded-xl text-white hover:bg-orange-600 dark:hover:bg-orange-500 transition-all shadow-lg active:scale-95 group"
                     >
                         <ShoppingCart size={20} />
@@ -76,7 +77,7 @@ export function TopNav({ isAdmin = false }: { isAdmin?: boolean }) {
                                 {cart.length}
                             </span>
                         )}
-                    </Link>
+                    </button>
                     <form action={signOutAction}>
                         <button
                             type="submit"

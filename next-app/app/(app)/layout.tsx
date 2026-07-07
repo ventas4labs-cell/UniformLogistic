@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/utils/supabase/server';
 import { CartProvider } from '@/components/cart-provider';
+import { CartDrawer } from '@/components/cart-drawer';
 import { TopNav } from '@/components/top-nav';
 import { fetchStationUser } from '@/lib/services/station-users';
 
@@ -32,6 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 <main className="mx-auto w-full max-w-7xl px-4 lg:px-8 py-6">
                     {children}
                 </main>
+                <CartDrawer />
             </div>
         </CartProvider>
     );

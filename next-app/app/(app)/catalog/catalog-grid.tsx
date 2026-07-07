@@ -36,7 +36,7 @@ export function CatalogGrid({ catalog, actingCompany }: Props) {
     // remote image 404s or otherwise fails to load, instead of leaving the
     // browser's broken-image glyph in place.
     const [imgFailed, setImgFailed] = useState<Record<string, boolean>>({});
-    const { cart, addItems, clear } = useCart();
+    const { cart, addItems, clear, openCart } = useCart();
     const [isSwitching, startSwitch] = useTransition();
 
     const handleSwitchCompany = () => {
@@ -281,8 +281,17 @@ export function CatalogGrid({ catalog, actingCompany }: Props) {
                     product={active}
                     onCancel={() => setActive(null)}
                     onAdd={(items) => {
-                        addItems(active.id, active.name, items);
+                        addItems(
+                            {
+                                id: active.id,
+                                name: active.name,
+                                image: active.image,
+                                type: active.type
+                            },
+                            items
+                        );
                         setActive(null);
+                        openCart();
                     }}
                 />
             )}
