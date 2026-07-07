@@ -439,13 +439,17 @@ export const deleteOrder = async (
     supabase: SupabaseClient,
     orderUuid: string
 ): Promise<void> => {
-    // order_items, missing_insumo_reports, and insumo_completions all
-    // cascade on order_id, so a single delete on `orders` cleans up the
-    // full graph.
-    const { error } = await supabase
-        .from('orders')
-        .delete()
-        .eq('id', orderUuid);
+    // Delegate to the RPC that snapshots the order into
+    // deleted_orders_history and deletes it in one transaction. That
+    // keeps the history complete even if a cascade partially fails,
+    // and lets the browser client run the operation without needing
+    // blanket delete privileges on orders (the RPC is SECURITY DEFINER
+    // and only performs this one vetted operation). order_number is
+    // sequence-generated, so the deleted number is naturally skipped
+    // — no manual gap-filling.
+    const { error } = await supabase.rpc('delete_order_with_history', {
+        p_order_uuid: orderUuid
+    });
     if (error) throw error;
 };
 

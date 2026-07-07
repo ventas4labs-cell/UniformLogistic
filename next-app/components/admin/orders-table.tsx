@@ -2,12 +2,13 @@
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
-import { Download, Search, RefreshCw, Loader2, Eye, Receipt, Pencil, Trash2, Filter, Calendar, User, Building2, Bell, X, AlertTriangle, CheckCircle2, Undo2, Plus } from 'lucide-react';
+import { Download, Search, RefreshCw, Loader2, Eye, Receipt, Pencil, Trash2, Filter, Calendar, User, Building2, Bell, X, AlertTriangle, CheckCircle2, Undo2, Plus, History } from 'lucide-react';
 import type { Order } from '@/lib/types';
 import type { AdminProduct } from '@/lib/services/products';
 import type { MissingInsumoReport } from '@/lib/services/missing-insumos';
 import type { StageNotification } from '@/lib/services/stage-notifications';
 import type { OrderStatus } from '@/lib/services/orders';
+import type { DeletedOrderHistoryEntry } from '@/lib/services/deleted-orders';
 import {
     updateOrderStatusAction,
     deleteOrderAction,
@@ -35,7 +36,8 @@ export function OrdersTable({
     stageNotifications: initialStageNotifications,
     initialStageCompletions = [],
     stationUsers = [],
-    initialAssignments = []
+    initialAssignments = [],
+    deletedOrders = []
 }: {
     initialOrders: Order[];
     products: AdminProduct[];
@@ -44,6 +46,7 @@ export function OrdersTable({
     initialStageCompletions?: { orderId: string; stage: StageKey; completedAt: string }[];
     stationUsers?: StationUser[];
     initialAssignments?: StationAssignment[];
+    deletedOrders?: DeletedOrderHistoryEntry[];
 }) {
     const [orders, setOrders] = useState<Order[]>(initialOrders);
     const [reports, setReports] = useState<MissingInsumoReport[]>(initialReports);
@@ -163,6 +166,9 @@ export function OrdersTable({
         setPreviewPdf(null);
     };
     const [deleting, setDeleting] = useState(false);
+    // Whether the deleted-orders history modal is open. Populated from
+    // the server-fetched `deletedOrders` prop; opens on-demand only.
+    const [showDeletedHistory, setShowDeletedHistory] = useState(false);
     // Which order's notification popover is currently open.
     const [notifOrder, setNotifOrder] = useState<Order | null>(null);
     const router = useRouter();
@@ -382,6 +388,21 @@ export function OrdersTable({
                         <Filter size={18} />
                         {(bucketFilter !== 'all' || companyFilter !== 'all') && (
                             <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-orange-600 ring-2 ring-white dark:ring-zinc-950" />
+                        )}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setShowDeletedHistory(true)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-bold text-gray-700 dark:text-zinc-300 bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 rounded-lg transition-colors"
+                        title="Historial de pedidos eliminados"
+                        aria-label="Historial de pedidos eliminados"
+                    >
+                        <History size={14} />
+                        Historial
+                        {deletedOrders.length > 0 && (
+                            <span className="ml-0.5 min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-gray-700 dark:bg-zinc-600 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                                {deletedOrders.length > 99 ? '99+' : deletedOrders.length}
+                            </span>
                         )}
                     </button>
                     <button
@@ -655,6 +676,13 @@ export function OrdersTable({
                                         )}
                                     </div>
 
+                                    {/* Item names — one entry per unique product
+                                        with the total quantity summed across all
+                                        sizes. Lets the admin identify what's in
+                                        the order at a glance without opening the
+                                        detail modal. */}
+                                    <OrderItemsPreview order={order} />
+
                                     {/* Stage control center — interactive 4-cell
                                         panel. Each cell shows the stage and a
                                         check when done; clicking flips the
@@ -913,15 +941,15 @@ export function OrdersTable({
                             ¿Cancelar pedido {cancellingOrder.id}?
                         </h3>
                         <p className="text-sm text-gray-600 dark:text-zinc-400 mb-2">
-                            El pedido pasará a estado{' '}
-                            <span className="font-semibold">Cancelada</span>. Dejará
-                            de aparecer en los tableros de producción
-                            (Bodega, Corte, Maquila, …) y se ocultará para las
-                            estaciones externas asignadas.
+                            El pedido se eliminará por completo: dejará de
+                            aparecer en Pedidos y en todos los tableros de
+                            producción (Bodega, Corte, Maquila, …).
                         </p>
                         <p className="text-xs text-gray-500 dark:text-zinc-500 mb-5 italic">
-                            Podés reactivarlo después con el botón de reactivar
-                            en la misma esquina del pedido cancelado.
+                            Queda registrado en el{' '}
+                            <span className="font-semibold">Historial</span> del
+                            botón arriba, por si necesitás consultarlo después.
+                            El número de orden no se reutiliza.
                         </p>
                         <div className="flex gap-3">
                             <button
@@ -936,11 +964,18 @@ export function OrdersTable({
                                     if (!cancellingOrder.uuid) return;
                                     setCancelling(true);
                                     try {
-                                        handleUpdateStatus(
-                                            cancellingOrder.uuid,
-                                            'cancelled'
+                                        await deleteOrderAction(cancellingOrder.uuid);
+                                        setOrders((prev) =>
+                                            prev.filter(
+                                                (o) => o.uuid !== cancellingOrder.uuid
+                                            )
                                         );
                                         setCancellingOrder(null);
+                                        router.refresh();
+                                    } catch (e) {
+                                        alert(
+                                            `Error al cancelar: ${e instanceof Error ? e.message : e}`
+                                        );
                                     } finally {
                                         setCancelling(false);
                                     }
@@ -954,6 +989,13 @@ export function OrdersTable({
                         </div>
                     </div>
                 </div>
+            )}
+
+            {showDeletedHistory && (
+                <DeletedOrdersHistoryModal
+                    deletedOrders={deletedOrders}
+                    onClose={() => setShowDeletedHistory(false)}
+                />
             )}
         </div>
     );
@@ -1261,5 +1303,273 @@ function ReportRow({
                 )}
             </div>
         </div>
+    );
+}
+
+function DeletedOrdersHistoryModal({
+    deletedOrders,
+    onClose
+}: {
+    deletedOrders: DeletedOrderHistoryEntry[];
+    onClose: () => void;
+}) {
+    const [expanded, setExpanded] = useState<Set<string>>(new Set());
+    const [search, setSearch] = useState('');
+
+    const toggleExpanded = (id: string) => {
+        setExpanded((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const filtered = deletedOrders.filter((e) => {
+        const term = search.trim().toLowerCase();
+        if (!term) return true;
+        return (
+            e.orderRef.toLowerCase().includes(term) ||
+            (e.companyName || '').toLowerCase().includes(term) ||
+            (e.contactName || '').toLowerCase().includes(term) ||
+            (e.deletedByEmail || '').toLowerCase().includes(term)
+        );
+    });
+
+    return (
+        <div
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={onClose}
+        >
+            <div
+                className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-zinc-800">
+                    <div>
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-zinc-100 flex items-center gap-2">
+                            <History size={18} className="text-gray-500 dark:text-zinc-400" />
+                            Pedidos eliminados
+                        </h3>
+                        <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
+                            Historial de órdenes borradas. Los números de orden
+                            eliminados quedan libres pero no se reutilizan.
+                        </p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"
+                        aria-label="Cerrar"
+                    >
+                        <X size={18} />
+                    </button>
+                </div>
+
+                <div className="p-4 border-b border-gray-100 dark:border-zinc-800">
+                    <div className="relative">
+                        <Search
+                            className="absolute left-3 top-2.5 text-gray-400 dark:text-zinc-500"
+                            size={16}
+                        />
+                        <input
+                            type="text"
+                            placeholder="Buscar por número, empresa, contacto o quién eliminó..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                        />
+                    </div>
+                </div>
+
+                <div className="overflow-y-auto flex-1 p-4 space-y-2">
+                    {filtered.length === 0 ? (
+                        <p className="text-sm text-gray-500 dark:text-zinc-400 text-center py-8">
+                            {deletedOrders.length === 0
+                                ? 'No hay pedidos eliminados.'
+                                : 'Ningún resultado para la búsqueda.'}
+                        </p>
+                    ) : (
+                        filtered.map((entry) => {
+                            const isOpen = expanded.has(entry.id);
+                            return (
+                                <div
+                                    key={entry.id}
+                                    className="border border-gray-200 dark:border-zinc-800 rounded-lg overflow-hidden"
+                                >
+                                    <button
+                                        onClick={() => toggleExpanded(entry.id)}
+                                        className="w-full flex items-start justify-between gap-3 p-3 text-left hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors"
+                                    >
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="font-mono text-sm font-bold text-orange-600 dark:text-orange-400">
+                                                    {entry.orderRef}
+                                                </span>
+                                                {entry.status && (
+                                                    <span className="text-[10px] font-bold uppercase tracking-wide bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400 px-1.5 py-0.5 rounded">
+                                                        {entry.status}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-sm text-gray-900 dark:text-zinc-100 mt-0.5 truncate">
+                                                {entry.companyName || '—'}
+                                                {entry.contactName && (
+                                                    <span className="text-gray-500 dark:text-zinc-400">
+                                                        {' '}· {entry.contactName}
+                                                    </span>
+                                                )}
+                                            </p>
+                                            <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
+                                                {entry.totalPieces} pzas · {entry.totalItems} líneas
+                                                {' · Eliminado '}
+                                                {new Date(entry.deletedAt).toLocaleString()}
+                                                {entry.deletedByEmail && (
+                                                    <span> por {entry.deletedByEmail}</span>
+                                                )}
+                                            </p>
+                                        </div>
+                                        <span className="text-gray-400 dark:text-zinc-500 text-xs shrink-0 mt-0.5">
+                                            {isOpen ? 'Ocultar' : 'Detalle'}
+                                        </span>
+                                    </button>
+                                    {isOpen && (
+                                        <div className="border-t border-gray-100 dark:border-zinc-800 bg-gray-50/60 dark:bg-zinc-900/40 p-3 space-y-2">
+                                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                                {entry.purchaseOrder && (
+                                                    <div>
+                                                        <span className="text-gray-500 dark:text-zinc-500">
+                                                            OC:
+                                                        </span>{' '}
+                                                        <span className="font-medium">
+                                                            {entry.purchaseOrder}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                {entry.estimatedDeliveryDate && (
+                                                    <div>
+                                                        <span className="text-gray-500 dark:text-zinc-500">
+                                                            Entrega:
+                                                        </span>{' '}
+                                                        <span className="font-medium">
+                                                            {new Date(
+                                                                entry.estimatedDeliveryDate
+                                                            ).toLocaleDateString()}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                {entry.originalCreatedAt && (
+                                                    <div>
+                                                        <span className="text-gray-500 dark:text-zinc-500">
+                                                            Creada:
+                                                        </span>{' '}
+                                                        <span className="font-medium">
+                                                            {new Date(
+                                                                entry.originalCreatedAt
+                                                            ).toLocaleDateString()}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {entry.notes && (
+                                                <p className="text-xs italic text-gray-600 dark:text-zinc-400 bg-white dark:bg-zinc-900 p-2 rounded">
+                                                    {entry.notes}
+                                                </p>
+                                            )}
+                                            {entry.items.length > 0 && (
+                                                <div className="bg-white dark:bg-zinc-900 rounded overflow-hidden">
+                                                    <table className="w-full text-xs">
+                                                        <thead className="bg-gray-100 dark:bg-zinc-800">
+                                                            <tr>
+                                                                <th className="text-left px-2 py-1 font-semibold text-gray-600 dark:text-zinc-400">
+                                                                    Producto
+                                                                </th>
+                                                                <th className="text-left px-2 py-1 font-semibold text-gray-600 dark:text-zinc-400">
+                                                                    Talla
+                                                                </th>
+                                                                <th className="text-right px-2 py-1 font-semibold text-gray-600 dark:text-zinc-400">
+                                                                    Cant.
+                                                                </th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-gray-100 dark:divide-zinc-800">
+                                                            {entry.items.map((it, idx) => (
+                                                                <tr key={idx}>
+                                                                    <td className="px-2 py-1">
+                                                                        <span className="font-medium text-gray-900 dark:text-zinc-100">
+                                                                            {it.product_name}
+                                                                        </span>{' '}
+                                                                        <span className="text-gray-500 dark:text-zinc-500">
+                                                                            {it.product_code}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="px-2 py-1 font-mono text-gray-700 dark:text-zinc-300">
+                                                                        {it.size || '—'}
+                                                                    </td>
+                                                                    <td className="px-2 py-1 text-right font-bold text-gray-800 dark:text-zinc-200">
+                                                                        {it.quantity}
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function OrderItemsPreview({ order }: { order: Order }) {
+    if (order.items.length === 0) return null;
+
+    // Group by product name so a shirt sold in five sizes shows once
+    // with the summed quantity, not five separate lines. Iterating in
+    // source order preserves the sequence the operator saw when
+    // building the order.
+    const byName = new Map<string, { qty: number; sizeCount: number }>();
+    for (const it of order.items) {
+        const key = it.productName || it.productId || '—';
+        const cur = byName.get(key) || { qty: 0, sizeCount: 0 };
+        cur.qty += it.quantity;
+        cur.sizeCount += 1;
+        byName.set(key, cur);
+    }
+    const grouped = Array.from(byName, ([name, v]) => ({ name, ...v }));
+
+    // Cap the visible list so a big order doesn't push the card off
+    // screen. Rest of the products collapse into a "y N más" pill.
+    const MAX_VISIBLE = 3;
+    const visible = grouped.slice(0, MAX_VISIBLE);
+    const overflow = grouped.length - visible.length;
+
+    return (
+        <ul className="space-y-1 text-xs text-gray-700 dark:text-zinc-300">
+            {visible.map((g) => (
+                <li key={g.name} className="flex items-baseline gap-2">
+                    <span className="w-1 h-1 rounded-full bg-orange-400 dark:bg-orange-500 shrink-0 translate-y-[-2px]" />
+                    <span className="flex-1 truncate">{g.name}</span>
+                    <span className="font-bold text-gray-900 dark:text-zinc-100 shrink-0">
+                        ×{g.qty}
+                    </span>
+                    {g.sizeCount > 1 && (
+                        <span className="text-[10px] text-gray-500 dark:text-zinc-500 shrink-0">
+                            {g.sizeCount} tallas
+                        </span>
+                    )}
+                </li>
+            ))}
+            {overflow > 0 && (
+                <li className="text-[11px] italic text-gray-500 dark:text-zinc-500 pl-3">
+                    y {overflow} más…
+                </li>
+            )}
+        </ul>
     );
 }
