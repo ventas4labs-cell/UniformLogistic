@@ -31,5 +31,7 @@ export default async function Home() {
         appHref = station ? '/station' : landingPath(user.email);
     }
 
-    return <LandingPage appHref={appHref} isAuthed={!!user} />;
+    // "Cotizar uniformes" opens the public live configurator — the same
+    // page for prospects and logged-in visitors.
+    return <LandingPage appHref={appHref} isAuthed={!!user} quoteHref="/cotizar" />;
 }

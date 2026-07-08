@@ -16,9 +16,9 @@ export function LandingFooter() {
                             </span>
                         </div>
                         <p className="mt-5 max-w-sm text-sm leading-relaxed text-[#F7F4EE]/55">
-                            Manufactura textil con software propio. Uniformes
-                            corporativos producidos, administrados y entregados con
-                            visibilidad total.
+                            Manufactura textil de uniformes. Corte, costura,
+                            bordado e impresión bajo un mismo techo, para
+                            equipos de 10 a 1 000 personas en todo el país.
                         </p>
                     </div>
 
@@ -77,7 +77,7 @@ export function LandingFooter() {
                     <span>
                         © {new Date().getFullYear()} Uniform Logistic · Costa Rica
                     </span>
-                    <span>Manufactura textil + software propio</span>
+                    <span>Manufactura textil de uniformes · Costa Rica</span>
                 </div>
             </div>
         </footer>

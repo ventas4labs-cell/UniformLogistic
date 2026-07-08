@@ -1,25 +1,25 @@
 import { SectionVideo } from './section-video';
 
-// ─── The technological advantage ─────────────────────────────────────
-// Contrast flip to warm black. ROI-framed copy: the software exists to
-// give operations teams their hours back. A dashed "stitch" rule sews
-// itself down the section as you scroll (data-stitch).
+// ─── The workshop ────────────────────────────────────────────────────
+// Contrast flip to warm black. Copy carries the manufacturing story:
+// cut, sew, brand, finish — all under one roof, with a dashed "stitch"
+// rule that sews itself down the section as you scroll (data-stitch).
 
 const FEATURES: { n: string; title: string; body: string }[] = [
     {
         n: '01',
-        title: 'Producción transparente',
-        body: 'Siga cada orden por las 7 etapas del taller — corte, maquila, impresión, bordado y más — en tiempo real. Sin pedir reportes, sin esperar respuestas.'
+        title: 'Corte y costura propios',
+        body: 'Máquinas industriales y patronaje ajustado por talla en tallas S a 5XL. Telas seleccionadas para durar el turno completo y aguantar el lavado industrial.'
     },
     {
         n: '02',
-        title: 'Pedidos sin fricción',
-        body: 'Cada empresa recibe un enlace individual: su equipo elige tallas y cantidades en minutos. Sin usuarios, sin contraseñas, sin hojas de cálculo.'
+        title: 'Marca aplicada en el taller',
+        body: 'Bordado en cabezales de alta velocidad, impresión digital y ploter para lotes grandes. Cada logo se aplica sin salir del taller — un solo responsable de principio a fin.'
     },
     {
         n: '03',
-        title: 'Stock administrado',
-        body: 'Guardamos su inventario de uniformes en nuestra bodega y usted lo ve, reserva y despacha desde el portal. Cero llamadas para saber qué queda.'
+        title: 'Control de calidad prenda por prenda',
+        body: 'Cada lote se revisa a mano antes de salir: costura, aplicación de marca, tallas y empaque. Si algo no queda perfecto, no llega a su gente.'
     }
 ];
 
@@ -54,20 +54,20 @@ export function LandingAdvantage() {
             <div className="relative mx-auto max-w-6xl px-6 py-28">
                 <div data-reveal className="max-w-3xl">
                     <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-[#F7F4EE]/45">
-                        La ventaja tecnológica
+                        El taller
                     </p>
                     <h2 className="mt-6 font-sans text-4xl font-extrabold leading-[1.06] tracking-tight sm:text-5xl">
-                        Menos correos.
+                        Corte. Costura.
                         <br />
-                        Menos llamadas.
+                        Marca.
                         <br />
-                        <span className="text-[#EA580C]">Más horas para su operación.</span>
+                        <span className="text-[#EA580C]">Todo bajo un mismo techo.</span>
                     </h2>
                     <p className="mt-8 max-w-xl text-lg leading-relaxed text-[#F7F4EE]/65">
-                        Ningún otro taller textil en Costa Rica le da esto: software
-                        propio que convierte la compra de uniformes — perseguir
-                        proveedores, consolidar tallas, adivinar fechas — en minutos de
-                        gestión al mes. Ese es el retorno: el tiempo de su gente.
+                        Nuestro taller confecciona los uniformes desde la tela
+                        cruda hasta la prenda marcada y empacada. Sin subcontratos
+                        que no vemos, sin lotes que se pierden entre proveedores —
+                        un solo taller, un solo responsable, una sola calidad.
                     </p>
                 </div>
 

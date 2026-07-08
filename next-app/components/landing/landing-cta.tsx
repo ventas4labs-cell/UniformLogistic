@@ -1,10 +1,12 @@
-import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { SectionVideo } from './section-video';
 
+const QUOTE_MAILTO =
+    'mailto:ulogisticcr@gmail.com?subject=Cotizaci%C3%B3n%20de%20uniformes%20%E2%80%94%20Uniform%20Logistic';
+
 // Closing band — one oversized question over the boutique footage,
 // sunk under ink so the type and the two actions carry it.
-export function LandingCta({ appHref }: { appHref: string | null }) {
+export function LandingCta({ quoteHref = null }: { quoteHref?: string | null }) {
     return (
         <section className="relative overflow-hidden border-t border-[#16130F]/15 bg-[#16130F] text-[#F7F4EE]">
             <SectionVideo
@@ -21,35 +23,35 @@ export function LandingCta({ appHref }: { appHref: string | null }) {
                     data-reveal
                     className="font-mono text-[11px] uppercase tracking-[0.3em] text-[#F7F4EE]/55"
                 >
-                    Sin contratos de permanencia · Demo de 20 minutos
+                    Cotización sin costo · Muestra física para aprobación
                 </p>
                 <h2
                     data-reveal
                     className="mx-auto mt-6 max-w-3xl font-sans text-5xl font-extrabold leading-[1.04] tracking-tight sm:text-6xl"
                 >
-                    ¿Listo para reclamar
+                    ¿Listo para vestir
                     <br />
-                    <span className="text-[#EA580C]">su tiempo?</span>
+                    <span className="text-[#EA580C]">su marca?</span>
                 </h2>
                 <div
                     data-reveal
                     className="mt-12 flex flex-wrap items-center justify-center gap-4"
                 >
-                    <Link
-                        href={appHref ?? '/login'}
+                    <a
+                        href={quoteHref ?? QUOTE_MAILTO}
                         className="group inline-flex items-center gap-2 rounded-full bg-[#EA580C] px-8 py-4 text-sm font-bold text-[#F7F4EE] shadow-[0_12px_32px_-12px_rgba(234,88,12,0.6)] transition-colors hover:bg-[#F7F4EE] hover:text-[#16130F]"
                     >
-                        Explorar el portal
+                        Cotizar uniformes
                         <ArrowRight
                             size={14}
                             className="transition-transform group-hover:translate-x-1"
                         />
-                    </Link>
+                    </a>
                     <a
-                        href="mailto:ulogisticcr@gmail.com?subject=Solicitud%20de%20demo%20%E2%80%94%20Uniform%20Logistic"
+                        href="mailto:ulogisticcr@gmail.com?subject=Visitar%20el%20taller%20%E2%80%94%20Uniform%20Logistic"
                         className="inline-flex items-center gap-2 rounded-full border border-[#F7F4EE]/35 px-8 py-4 text-sm font-bold text-[#F7F4EE] transition-colors hover:border-[#F7F4EE] hover:bg-[#F7F4EE] hover:text-[#16130F]"
                     >
-                        Solicitar una demo
+                        Visitar el taller
                     </a>
                 </div>
             </div>

@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { SectionVideo } from './section-video';
 
@@ -23,11 +22,13 @@ function SunriseLine({
 const STATS: { value: string; label: string }[] = [
     { value: '100%', label: 'confección nacional, en nuestro taller' },
     { value: '3', label: 'técnicas de marca: bordado, impresión y ploter' },
-    { value: 'S–5XL', label: 'tallas para cada persona de su equipo' },
-    { value: '24/7', label: 'pedidos y stock en línea' }
+    { value: 'S–5XL', label: 'tallas para cada persona de su equipo' }
 ];
 
-export function LandingHero({ appHref }: { appHref: string | null }) {
+const QUOTE_MAILTO =
+    'mailto:ulogisticcr@gmail.com?subject=Cotizaci%C3%B3n%20de%20uniformes%20%E2%80%94%20Uniform%20Logistic';
+
+export function LandingHero({ quoteHref = null }: { quoteHref?: string | null }) {
     return (
         <section className="relative overflow-hidden">
             {/* Living backdrop — the high-speed embroidery line. The veil is
@@ -92,14 +93,14 @@ export function LandingHero({ appHref }: { appHref: string | null }) {
                 <div className="mt-12">
                     <div data-hero-fade className="max-w-xl">
                         <p className="text-lg leading-relaxed text-[#16130F]/70">
-                            Confeccionamos los uniformes de bancos, empresas de
-                            seguridad y corporaciones en todo el país, con su logo
-                            bordado o impreso con precisión. Y cuando hay que pedir
-                            más, nuestro portal lo resuelve en minutos.
+                            Confeccionamos en Costa Rica los uniformes de bancos,
+                            empresas de seguridad y corporaciones — tela cortada,
+                            cosida, bordada e impresa bajo un mismo techo, lista
+                            para su gente en semanas y no en meses.
                         </p>
                         <div className="mt-8 flex flex-wrap items-center gap-4">
                             <a
-                                href="mailto:ulogisticcr@gmail.com?subject=Cotizaci%C3%B3n%20de%20uniformes%20%E2%80%94%20Uniform%20Logistic"
+                                href={quoteHref ?? QUOTE_MAILTO}
                                 className="group inline-flex items-center gap-2 rounded-full bg-[#EA580C] px-8 py-4 text-sm font-bold text-[#F7F4EE] shadow-[0_12px_32px_-12px_rgba(234,88,12,0.55)] transition-colors hover:bg-[#16130F]"
                             >
                                 Cotizar uniformes
@@ -108,12 +109,12 @@ export function LandingHero({ appHref }: { appHref: string | null }) {
                                     className="transition-transform group-hover:translate-x-1"
                                 />
                             </a>
-                            <Link
-                                href={appHref ?? '/login'}
+                            <a
+                                href="#sectores"
                                 className="inline-flex items-center gap-2 rounded-full border border-[#16130F]/20 px-8 py-4 text-sm font-bold transition-colors hover:border-[#16130F] hover:bg-[#16130F] hover:text-[#F7F4EE]"
                             >
-                                Explorar el portal
-                            </Link>
+                                Ver nuestro taller
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -121,14 +122,14 @@ export function LandingHero({ appHref }: { appHref: string | null }) {
                 {/* Hairline stats — measurement marks on the pattern paper. */}
                 <div
                     data-reveal
-                    className="mt-24 grid grid-cols-2 border-t border-[#16130F]/15 lg:grid-cols-4"
+                    className="mt-24 grid grid-cols-1 border-t border-[#16130F]/15 sm:grid-cols-3"
                 >
                     {STATS.map((s, i) => (
                         <div
                             key={s.label}
                             className={`flex flex-col gap-2 py-7 pr-6 ${
-                                i > 0 ? 'lg:border-l lg:border-[#16130F]/15 lg:pl-6' : ''
-                            } ${i % 2 === 1 ? 'border-l border-[#16130F]/15 pl-6 lg:border-l' : ''}`}
+                                i > 0 ? 'sm:border-l sm:border-[#16130F]/15 sm:pl-6' : ''
+                            }`}
                         >
                             <span className="font-sans text-4xl font-bold tracking-tight text-[#EA580C]">
                                 {s.value}

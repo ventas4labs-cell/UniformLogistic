@@ -42,6 +42,8 @@ export const ADMIN_MODULES: AdminModule[] = [
     { id: 'cuentas', label: 'Cuentas', href: '/admin/cuentas', Icon: Wallet, group: 'principal' },
     { id: 'companies', label: 'Empresas', href: '/admin/companies', Icon: Building2, group: 'principal' },
     { id: 'products', label: 'Productos', href: '/admin/products', Icon: Package, group: 'principal' },
+    { id: 'catalogo-default', label: 'Catálogo default', href: '/admin/catalogo-default', Icon: Boxes, group: 'principal' },
+    { id: 'cotizador', label: 'Cotizador', href: '/admin/cotizador', Icon: FileText, group: 'principal' },
     { id: 'logos', label: 'Logos', href: '/admin/logos', Icon: Sticker, group: 'principal' },
     { id: 'station-users', label: 'Estaciones', href: '/admin/station-users', Icon: HardHat, group: 'principal' },
     { id: 'station-invoices', label: 'Facturas a pagar', href: '/admin/station-invoices', Icon: FileText, group: 'principal' },

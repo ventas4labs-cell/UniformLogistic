@@ -31,10 +31,14 @@ gsap.registerPlugin(ScrollTrigger);
 // hidden by the tweens themselves.
 export function LandingPage({
     appHref,
-    isAuthed = false
+    isAuthed = false,
+    quoteHref = null
 }: {
     appHref: string | null;
     isAuthed?: boolean;
+    /** Admin-only deep link into the internal quote builder. When null
+     *  the "Cotizar uniformes" CTAs fall back to the public mailto. */
+    quoteHref?: string | null;
 }) {
     const root = useRef<HTMLDivElement>(null);
 
@@ -161,11 +165,11 @@ export function LandingPage({
         >
             <LandingNav appHref={appHref} isAuthed={isAuthed} />
             <main>
-                <LandingHero appHref={appHref} />
+                <LandingHero quoteHref={quoteHref} />
                 <LandingStrip />
                 <LandingAdvantage />
                 <LandingIndustries />
-                <LandingCta appHref={appHref} />
+                <LandingCta quoteHref={quoteHref} />
             </main>
             <LandingFooter />
         </div>
