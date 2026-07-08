@@ -309,7 +309,10 @@ export function OrdersTable({
         return (
             o.customerName?.toLowerCase().includes(term) ||
             o.companyName?.toLowerCase().includes(term) ||
-            o.id?.toLowerCase().includes(term)
+            o.id?.toLowerCase().includes(term) ||
+            // Match by article: any order containing an item whose name
+            // includes the term surfaces in the results.
+            o.items.some((i) => i.productName?.toLowerCase().includes(term))
         );
     });
 
@@ -341,7 +344,7 @@ export function OrdersTable({
                             <input
                                 type="search"
                                 autoFocus
-                                placeholder="Buscar pedidos…"
+                                placeholder="Buscar por orden, empresa, cliente o artículo…"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 onBlur={() => {
