@@ -53,6 +53,25 @@ const emptyForm: ProductInput = {
     stages: [...STAGE_ORDER]
 };
 
+// Measurement units offered for a BOM line. `value` is stored on the
+// BomItem; `label` is what the dropdown shows. Default is "u" (per-piece
+// unit) when a line has no unit set.
+const BOM_UNITS: { value: string; label: string }[] = [
+    { value: 'u', label: 'unidad (u)' },
+    { value: 'm', label: 'metros (m)' },
+    { value: 'cm', label: 'centímetros (cm)' },
+    { value: 'm²', label: 'metros² (m²)' },
+    { value: 'yd', label: 'yardas (yd)' },
+    { value: 'g', label: 'gramos (g)' },
+    { value: 'kg', label: 'kilos (kg)' },
+    { value: 'ml', label: 'mililitros (ml)' },
+    { value: 'L', label: 'litros (L)' },
+    { value: 'par', label: 'par' },
+    { value: 'docena', label: 'docena' },
+    { value: 'rollo', label: 'rollo' },
+    { value: 'cono', label: 'cono' }
+];
+
 const parseList = (input: string): string[] =>
     input.split(',').map((s) => s.trim()).filter(Boolean);
 
@@ -1028,8 +1047,23 @@ export function ProductsManager({
                                                         updateBom({ ...item, qty })
                                                     }
                                                     placeholder="Cant."
-                                                    className="w-24 p-2 border rounded-lg text-sm text-center focus:ring-2 focus:ring-orange-500 outline-none"
+                                                    className="w-20 p-2 border rounded-lg text-sm text-center focus:ring-2 focus:ring-orange-500 outline-none"
                                                 />
+                                                <select
+                                                    value={item.unit || 'u'}
+                                                    onChange={(e) =>
+                                                        updateBom({ ...item, unit: e.target.value })
+                                                    }
+                                                    aria-label="Unidad de medida"
+                                                    title="Unidad de medida"
+                                                    className="w-24 p-2 border rounded-lg text-sm bg-white dark:bg-zinc-900 focus:ring-2 focus:ring-orange-500 outline-none"
+                                                >
+                                                    {BOM_UNITS.map((u) => (
+                                                        <option key={u.value} value={u.value}>
+                                                            {u.label}
+                                                        </option>
+                                                    ))}
+                                                </select>
                                                 <button
                                                     type="button"
                                                     onClick={() => {

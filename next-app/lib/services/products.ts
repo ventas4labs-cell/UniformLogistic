@@ -8,6 +8,10 @@ export interface BomItem {
     // matching the line item's size, or when this insumo is consumed
     // uniformly across every size.
     qty: number;
+    // Measurement unit for `qty` (e.g. "m", "cm", "g", "u"). Shown to
+    // the right of the quantity in the BOM editor and on the production
+    // boards / materials inventory. Undefined = "u" (per-piece unit).
+    unit?: string;
     // Optional per-size override. Keys are size labels as they appear
     // in `sizes.men` / `sizes.women` (e.g. "XXL", "2XL", "3XL"). Lookup
     // is case-insensitive and whitespace-tolerant — see resolveBomQty.
