@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
-import { PortalMockup } from './portal-mockup';
 import { SectionVideo } from './section-video';
 
 // Masked line for the GSAP "sunrise" reveal — the inner .hero-line
@@ -90,8 +89,8 @@ export function LandingHero({ appHref }: { appHref: string | null }) {
                     </SunriseLine>
                 </h1>
 
-                <div className="mt-12 grid gap-10 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-end">
-                    <div data-hero-fade className="max-w-md">
+                <div className="mt-12">
+                    <div data-hero-fade className="max-w-xl">
                         <p className="text-lg leading-relaxed text-[#16130F]/70">
                             Confeccionamos los uniformes de bancos, empresas de
                             seguridad y corporaciones en todo el país, con su logo
@@ -116,11 +115,6 @@ export function LandingHero({ appHref }: { appHref: string | null }) {
                                 Explorar el portal
                             </Link>
                         </div>
-                    </div>
-
-                    {/* The product, floating over the cutting table. */}
-                    <div data-hero-fade className="relative md:justify-self-end">
-                        <PortalMockup />
                     </div>
                 </div>
 
