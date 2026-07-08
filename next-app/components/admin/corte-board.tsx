@@ -20,6 +20,10 @@ import { CollapsibleSearch } from '@/components/admin/collapsible-search';
 import { addCorteExtraItemAction } from '@/app/(admin)/admin/_stage-actions';
 import { OrderProductsSummary } from '@/components/admin/order-products-summary';
 import type { CartItem } from '@/lib/types';
+import {
+    OrderReportButton,
+    MissingReportsHistoryButton
+} from '@/components/admin/missing-report-controls';
 
 
 // Base color hex by Spanish color name (lowercase keys). Falls back to
@@ -211,6 +215,12 @@ function OrderCard({
                         </span>
                     )}
                 </div>
+
+                {order.uuid && (
+                    <div className="mt-3">
+                        <OrderReportButton orderId={order.uuid} />
+                    </div>
+                )}
             </div>
 
             <button
@@ -483,6 +493,7 @@ export function CorteBoard({
                         companyFilter={companyFilter}
                         setCompanyFilter={setCompanyFilter}
                     />
+                    <MissingReportsHistoryButton />
                     <button
                         onClick={() => router.refresh()}
                         className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"

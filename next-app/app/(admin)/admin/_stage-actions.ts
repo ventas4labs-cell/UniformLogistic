@@ -26,6 +26,13 @@ import {
 import { fetchStationUser } from '@/lib/services/station-users';
 import { isStationAssignedToOrder } from '@/lib/services/station-assignments';
 import { isAdminEmail } from '@/lib/admin-acting-company';
+import {
+    createMissingReport,
+    fetchAllReports,
+    resolveReport,
+    unresolveReport,
+    type MissingInsumoReport
+} from '@/lib/services/missing-insumos';
 
 // Stage-board status updates revalidate every stage page so an order
 // moving from corte → maquila disappears from one board and appears on
@@ -234,6 +241,78 @@ export async function addCorteExtraItemAction(
     } catch (err) {
         return {
             error: err instanceof Error ? err.message : 'No se pudo agregar el extra.'
+        };
+    }
+}
+
+// ─── Missing-item reports (all operation boards) ────────────────────
+// Any operation module can flag a shortage against an order. Unlike the
+// operator/maquila per-insumo report (which knows the BOM required qty),
+// this is a free-text item + missing quantity, so required_qty defaults
+// to 0 at the DB level. All reports — insumo-based or free-text — land
+// in the same missing_insumo_reports table and share the history view.
+export async function reportMissingItemAction(
+    orderUuid: string,
+    itemName: string,
+    missingQty: number,
+    notes?: string
+): Promise<{ error?: string }> {
+    const supabase = await createClient();
+    const {
+        data: { user }
+    } = await supabase.auth.getUser();
+    if (!user) return { error: 'No autenticado.' };
+    if (!itemName.trim()) return { error: 'Indicá qué artículo falta.' };
+    if (!Number.isFinite(missingQty) || missingQty <= 0) {
+        return { error: 'La cantidad faltante debe ser mayor a cero.' };
+    }
+    try {
+        await createMissingReport(supabase, {
+            order_id: orderUuid,
+            insumo_name: itemName.trim(),
+            required_qty: 0,
+            missing_qty: missingQty,
+            reported_by: user.id,
+            notes: notes?.trim() || undefined
+        });
+        for (const p of STAGE_PATHS) revalidatePath(p);
+        return {};
+    } catch (err) {
+        return {
+            error: err instanceof Error ? err.message : 'No se pudo enviar el reporte.'
+        };
+    }
+}
+
+// Read model for the history panel. Lazily called when the operator
+// opens the "Historial de reportes" modal so we don't load reports into
+// every board on mount.
+export async function fetchMissingReportsAction(): Promise<MissingInsumoReport[]> {
+    const supabase = await createClient();
+    const {
+        data: { user }
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error('No autenticado');
+    return fetchAllReports(supabase);
+}
+
+export async function resolveMissingReportAction(
+    reportId: string,
+    resolved: boolean
+): Promise<{ error?: string }> {
+    const supabase = await createClient();
+    const {
+        data: { user }
+    } = await supabase.auth.getUser();
+    if (!user) return { error: 'No autenticado.' };
+    try {
+        if (resolved) await resolveReport(supabase, reportId);
+        else await unresolveReport(supabase, reportId);
+        for (const p of STAGE_PATHS) revalidatePath(p);
+        return {};
+    } catch (err) {
+        return {
+            error: err instanceof Error ? err.message : 'No se pudo actualizar el reporte.'
         };
     }
 }

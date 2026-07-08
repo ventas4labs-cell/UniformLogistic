@@ -34,6 +34,7 @@ import { CollapsibleSearch } from '@/components/admin/collapsible-search';
 import { InsumoPrepEditor } from '@/components/admin/insumo-prep-editor';
 import { OrderProductsSummary } from '@/components/admin/order-products-summary';
 import type { InsumoPreparation } from '@/lib/services/insumo-preparations';
+import { MissingReportsHistoryButton } from '@/components/admin/missing-report-controls';
 
 const completionKey = (orderId: string, insumoName: string) =>
     `${orderId}|${insumoName}`;
@@ -725,6 +726,7 @@ export function OperatorBoard({
                         companyFilter={companyFilter}
                         setCompanyFilter={setCompanyFilter}
                     />
+                    <MissingReportsHistoryButton />
                     <button
                         onClick={() => router.refresh()}
                         className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"

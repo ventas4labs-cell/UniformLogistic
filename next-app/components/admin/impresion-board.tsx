@@ -11,6 +11,10 @@ import { StageBoardFilters } from '@/components/admin/stage-board-filters';
 import { CollapsibleSearch } from '@/components/admin/collapsible-search';
 import { OrderLogosButton } from '@/components/admin/order-logos-modal';
 import { OrderProductsSummary } from '@/components/admin/order-products-summary';
+import {
+    OrderReportButton,
+    MissingReportsHistoryButton
+} from '@/components/admin/missing-report-controls';
 
 // Cards are uniform: at most this many item rows show, with a
 // min-height so short orders match; longer orders collapse behind an
@@ -134,6 +138,11 @@ function OrderCard({
                         </button>
                     )}
                 </div>
+                {order.uuid && (
+                    <div className="border-t border-gray-100 dark:border-zinc-800 px-4 py-3">
+                        <OrderReportButton orderId={order.uuid} />
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -216,6 +225,7 @@ export function ImpresionBoard({
                         companyFilter={companyFilter}
                         setCompanyFilter={setCompanyFilter}
                     />
+                    <MissingReportsHistoryButton />
                     <button
                         onClick={() => router.refresh()}
                         className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"

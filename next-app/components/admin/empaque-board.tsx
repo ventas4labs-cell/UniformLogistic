@@ -16,6 +16,10 @@ import { StageBoardFilters } from '@/components/admin/stage-board-filters';
 import { DispatchModal } from '@/components/admin/dispatch-modal';
 import { CollapsibleSearch } from '@/components/admin/collapsible-search';
 import { OrderProductsSummary } from '@/components/admin/order-products-summary';
+import {
+    OrderReportButton,
+    MissingReportsHistoryButton
+} from '@/components/admin/missing-report-controls';
 
 interface Props {
     initialOrders: Order[];
@@ -200,6 +204,11 @@ function OrderCard({
                         </>
                     )}
                 </button>
+                {order.uuid && (
+                    <div className="mt-3">
+                        <OrderReportButton orderId={order.uuid} />
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -323,6 +332,7 @@ export function EmpaqueBoard({
                         companyFilter={companyFilter}
                         setCompanyFilter={setCompanyFilter}
                     />
+                    <MissingReportsHistoryButton />
                     <button
                         onClick={() => router.refresh()}
                         className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"
