@@ -20,6 +20,7 @@ import type { ItemProgress } from '@/lib/services/stage-item-progress';
 import type { Logo, LogoCategory } from '@/lib/services/logos';
 import { CollapsibleSearch } from '@/components/admin/collapsible-search';
 import { OrderLogosButton } from '@/components/admin/order-logos-modal';
+import { OrderProductsSummary } from '@/components/admin/order-products-summary';
 import { StagePartialEditor } from '@/components/admin/stage-partial-editor';
 
 // Generic stage board for stages whose UI is just "list of orders with
@@ -134,6 +135,8 @@ function OrderCard({
                         onLocalChange={onLocalChange}
                     />
                 </div>
+
+                <OrderProductsSummary items={order.items} />
 
                 <div className="flex items-center gap-3 mt-3 flex-wrap">
                     <span className="bg-orange-100 dark:bg-orange-950/50 text-orange-800 dark:text-orange-300 text-xs font-bold px-2 py-1 rounded-full">

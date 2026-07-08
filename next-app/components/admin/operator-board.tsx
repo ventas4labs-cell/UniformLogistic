@@ -32,6 +32,7 @@ import type { StageTab } from '@/components/admin/stage-tab-bar';
 import { StageBoardFilters } from '@/components/admin/stage-board-filters';
 import { CollapsibleSearch } from '@/components/admin/collapsible-search';
 import { InsumoPrepEditor } from '@/components/admin/insumo-prep-editor';
+import { OrderProductsSummary } from '@/components/admin/order-products-summary';
 import type { InsumoPreparation } from '@/lib/services/insumo-preparations';
 
 const completionKey = (orderId: string, insumoName: string) =>
@@ -278,6 +279,8 @@ function OrderCard({
                         {stationNames.join(', ')}
                     </p>
                 )}
+
+                <OrderProductsSummary items={order.items} />
 
                 <div className="flex items-center gap-3 mt-3">
                     <span className="bg-orange-100 dark:bg-orange-950/50 text-orange-800 dark:text-orange-300 text-xs font-bold px-2 py-1 rounded-full">

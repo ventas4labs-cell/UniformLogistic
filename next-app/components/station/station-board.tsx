@@ -10,6 +10,7 @@ import { StageCompleteToggle } from '@/components/admin/stage-complete-toggle';
 import { StageTabBar, type StageTab } from '@/components/admin/stage-tab-bar';
 import type { StageKey } from '@/lib/services/stage-completions';
 import { SubmitInvoiceModal } from '@/components/station/submit-invoice-modal';
+import { OrderProductsSummary } from '@/components/admin/order-products-summary';
 
 interface StationInfo {
     id: string;
@@ -212,6 +213,8 @@ function OrderCard({
                         onLocalChange={onLocalChange}
                     />
                 </div>
+
+                <OrderProductsSummary items={order.items} />
 
                 <div className="flex items-center gap-3 mt-3 flex-wrap">
                     <span className="bg-orange-100 dark:bg-orange-950/50 text-orange-800 dark:text-orange-300 text-xs font-bold px-2 py-1 rounded-full">

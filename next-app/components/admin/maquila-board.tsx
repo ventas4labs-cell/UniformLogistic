@@ -22,6 +22,7 @@ import {
     completionKey,
     useToggleInsumoCompletion
 } from '@/components/admin/insumo-row';
+import { OrderProductsSummary } from '@/components/admin/order-products-summary';
 
 type Tab = StageTab;
 
@@ -76,6 +77,8 @@ function OrderCard({
                         onLocalChange={onLocalChange}
                     />
                 </div>
+
+                <OrderProductsSummary items={order.items} />
 
                 <div className="flex items-center gap-3 mt-3 flex-wrap">
                     <span className="bg-orange-100 dark:bg-orange-950/50 text-orange-800 dark:text-orange-300 text-xs font-bold px-2 py-1 rounded-full">

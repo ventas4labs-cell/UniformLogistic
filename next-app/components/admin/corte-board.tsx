@@ -18,6 +18,7 @@ import type { StageTab } from '@/components/admin/stage-tab-bar';
 import { StageBoardFilters } from '@/components/admin/stage-board-filters';
 import { CollapsibleSearch } from '@/components/admin/collapsible-search';
 import { addCorteExtraItemAction } from '@/app/(admin)/admin/_stage-actions';
+import { OrderProductsSummary } from '@/components/admin/order-products-summary';
 import type { CartItem } from '@/lib/types';
 
 
@@ -194,6 +195,8 @@ function OrderCard({
                         onLocalChange={onLocalCompletionChange}
                     />
                 </div>
+
+                <OrderProductsSummary items={items} />
 
                 <div className="flex items-center gap-3 mt-3">
                     <span className="bg-orange-100 dark:bg-orange-950/50 text-orange-800 dark:text-orange-300 text-xs font-bold px-2 py-1 rounded-full">
