@@ -60,3 +60,10 @@ modify_psd*.py
 /Resources/
 /*.mov
 /*.mp4
+
+# 3D model staging folder (large raw .glb + zips). Synced to Supabase
+# Storage via `npm run sync:3d`; never committed. Optimized models live
+# in the models-3d bucket, not git.
+/3D MODELS/
+**/*.glb
+**/*.zip
