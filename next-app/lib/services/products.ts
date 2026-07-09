@@ -274,7 +274,9 @@ const audienceColumns = (input: ProductInput) => {
         gender: genders[0],
         genders,
         images_json: images,
-        image_url: input.imageUrl || firstImage(images) || null
+        // Galleries drive the primary thumbnail; fall back to a legacy
+        // single imageUrl only when no gallery pictures exist.
+        image_url: firstImage(images) || input.imageUrl || null
     };
 };
 

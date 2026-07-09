@@ -21,7 +21,7 @@ export const fetchCatalogForCompany = async (
         .select(
             `
             id, product_code, name, description, image_url,
-            product_type, type_label, gender, sizes_json, fabric_type, is_active, bom_json, codigo_cabys,
+            product_type, type_label, gender, genders, images_json, sizes_json, fabric_type, is_active, bom_json, codigo_cabys,
             links:company_products ( id, company_id )
         `
         )

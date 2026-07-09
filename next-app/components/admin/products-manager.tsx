@@ -17,6 +17,7 @@ import {
     Printer
 } from 'lucide-react';
 import type { AdminProduct, ProductInput, BomItem } from '@/lib/services/products';
+import type { ProductGender } from '@/lib/types';
 import type { Company } from '@/lib/services/companies';
 import type { Logo } from '@/lib/services/logos';
 import {
@@ -41,7 +42,8 @@ const emptyForm: ProductInput = {
     imageUrl: '',
     productType: 'shirt',
     typeLabel: '',
-    gender: 'unisex',
+    genders: ['unisex'],
+    images: {},
     sizes: { men: [], women: [], waist: [], inseam: [] },
     fabricType: '',
     isActive: true,
@@ -52,6 +54,95 @@ const emptyForm: ProductInput = {
     // product doesn't need.
     stages: [...STAGE_ORDER]
 };
+
+// Audience options for the multi-select + the per-gallery labels.
+const GENDER_OPTIONS: { value: ProductGender; label: string }[] = [
+    { value: 'men', label: 'Hombre' },
+    { value: 'women', label: 'Mujer' },
+    { value: 'unisex', label: 'Unisex' }
+];
+const GENDER_LABEL: Record<ProductGender, string> = {
+    men: 'Hombre',
+    women: 'Mujer',
+    unisex: 'Unisex'
+};
+
+// One picture gallery for a single audience: an "add pictures" tile
+// (multi-file) plus thumbnails with remove. Multiple pictures per
+// men / women / unisex variant.
+function GenderImageGallery({
+    label,
+    urls,
+    uploading,
+    onInput,
+    onRemove,
+    onPreview
+}: {
+    label: string;
+    urls: string[];
+    uploading: boolean;
+    onInput: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    onRemove: (url: string) => void;
+    onPreview: (src: string) => void;
+}) {
+    return (
+        <div className="rounded-lg border border-gray-200 dark:border-zinc-800 p-3">
+            <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-zinc-400">
+                    {label}
+                </span>
+                <span className="text-[11px] text-gray-400 dark:text-zinc-500">
+                    {urls.length} {urls.length === 1 ? 'imagen' : 'imágenes'}
+                </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+                {urls.map((url) => (
+                    <div
+                        key={url}
+                        className="relative w-16 h-16 rounded-md overflow-hidden border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 group"
+                    >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                            src={url}
+                            alt={label}
+                            className="w-full h-full object-cover cursor-pointer"
+                            onClick={() => onPreview(url)}
+                        />
+                        <button
+                            type="button"
+                            onClick={() => onRemove(url)}
+                            className="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                            aria-label="Quitar imagen"
+                        >
+                            <X size={12} />
+                        </button>
+                    </div>
+                ))}
+                <label
+                    className={`w-16 h-16 rounded-md border-2 border-dashed flex items-center justify-center cursor-pointer transition-colors ${
+                        uploading
+                            ? 'border-orange-400 bg-orange-50 dark:bg-orange-950/30'
+                            : 'border-gray-300 dark:border-zinc-700 hover:border-orange-400 hover:bg-orange-50/50'
+                    }`}
+                >
+                    {uploading ? (
+                        <Loader2 className="animate-spin text-gray-400 dark:text-zinc-500" size={18} />
+                    ) : (
+                        <Upload className="text-gray-400 dark:text-zinc-500" size={18} />
+                    )}
+                    <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={onInput}
+                        disabled={uploading}
+                        className="hidden"
+                    />
+                </label>
+            </div>
+        </div>
+    );
+}
 
 // Measurement units offered for a BOM line. `value` is stored on the
 // BomItem; `label` is what the dropdown shows. Default is "u" (per-piece
@@ -194,8 +285,8 @@ export function ProductsManager({
     }>(emptySizesText);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [uploadingImage, setUploadingImage] = useState(false);
-    const [dragging, setDragging] = useState(false);
+    // Which audience gallery is mid-upload (shows its spinner); null when idle.
+    const [uploadingGender, setUploadingGender] = useState<ProductGender | null>(null);
     const [previewImage, setPreviewImage] = useState<{ src: string; alt: string } | null>(null);
     // Which BOM rows have their per-size override panel expanded. Index-
     // keyed so this resets naturally when the form is reopened.
@@ -210,37 +301,63 @@ export function ProductsManager({
         inseam: (s.inseam || []).join(', ')
     });
 
-    const handleImageFile = async (file: File) => {
-        setUploadingImage(true);
+    // Upload one or more pictures into a given audience gallery. Files
+    // are resized in the browser first (a 12 MP phone photo → ~400-800 KB,
+    // under the Next.js/Vercel body limits and the bucket's 5 MB cap),
+    // then appended to form.images[gender].
+    const handleImageFiles = async (gender: ProductGender, files: FileList) => {
+        if (files.length === 0) return;
+        setUploadingGender(gender);
         setError(null);
         try {
-            // Resize + re-encode in the browser before sending to the
-            // server action. A 12 MP phone photo (8-15 MB) lands around
-            // 400-800 KB after this, well under the Next.js / Vercel
-            // body limits and the bucket's 5 MB cap.
-            const { file: optimized } = await resizeImageFile(file);
-            const fd = new FormData();
-            fd.append('file', optimized);
-            const url = await uploadProductImageAction(fd);
-            setForm((f) => ({ ...f, imageUrl: url }));
+            const urls: string[] = [];
+            for (const file of Array.from(files)) {
+                const { file: optimized } = await resizeImageFile(file);
+                const fd = new FormData();
+                fd.append('file', optimized);
+                urls.push(await uploadProductImageAction(fd));
+            }
+            setForm((f) => {
+                const current = f.images?.[gender] ?? [];
+                return {
+                    ...f,
+                    images: { ...f.images, [gender]: [...current, ...urls] }
+                };
+            });
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Error al subir la imagen');
         } finally {
-            setUploadingImage(false);
+            setUploadingGender(null);
         }
     };
 
-    const handleImageInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) handleImageFile(file);
+    const handleImageInput = (
+        gender: ProductGender,
+        e: React.ChangeEvent<HTMLInputElement>
+    ) => {
+        if (e.target.files) handleImageFiles(gender, e.target.files);
         e.target.value = '';
     };
 
-    const handleImageDrop = (e: React.DragEvent<HTMLLabelElement>) => {
-        e.preventDefault();
-        setDragging(false);
-        const file = e.dataTransfer.files?.[0];
-        if (file) handleImageFile(file);
+    const removeImage = (gender: ProductGender, url: string) => {
+        setForm((f) => {
+            const current = f.images?.[gender] ?? [];
+            return {
+                ...f,
+                images: { ...f.images, [gender]: current.filter((u) => u !== url) }
+            };
+        });
+    };
+
+    // Toggle an audience in the multi-select, never leaving the set empty.
+    const toggleGender = (gender: ProductGender) => {
+        setForm((f) => {
+            const has = (f.genders ?? []).includes(gender);
+            const next = has
+                ? (f.genders ?? []).filter((g) => g !== gender)
+                : [...(f.genders ?? []), gender];
+            return { ...f, genders: next.length > 0 ? next : f.genders };
+        });
     };
 
     const startCreate = () => {
@@ -261,6 +378,8 @@ export function ProductsManager({
         setForm({
             ...emptyForm,
             ...patch,
+            // Voice parses a single gender — fold it into the audience set.
+            genders: patch.genders ?? (patch.gender ? [patch.gender] : emptyForm.genders),
             // Merge sizes per-bucket so a partial sizes patch doesn't blow
             // away keys the patch didn't touch.
             sizes: mergedSizes
@@ -309,7 +428,11 @@ export function ProductsManager({
             imageUrl: p.image,
             productType: p.type,
             typeLabel: p.typeLabel || '',
-            gender: p.category === 'Men' ? 'men' : p.category === 'Women' ? 'women' : 'unisex',
+            genders:
+                p.genders && p.genders.length > 0
+                    ? p.genders
+                    : [p.category === 'Men' ? 'men' : p.category === 'Women' ? 'women' : 'unisex'],
+            images: p.images ?? {},
             sizes: p.sizes,
             fabricType: p.fabricType,
             isActive: p.isActive,
@@ -449,7 +572,12 @@ export function ProductsManager({
                                             {p.typeLabel || (p.type === 'shirt' ? 'Camisa' : 'Pantalón')}
                                         </span>
                                     </td>
-                                    <td className="p-4 text-gray-600 dark:text-zinc-400 text-sm">{p.category}</td>
+                                    <td className="p-4 text-gray-600 dark:text-zinc-400 text-sm">
+                                        {(p.genders && p.genders.length > 0
+                                            ? p.genders.map((g) => GENDER_LABEL[g])
+                                            : [p.category]
+                                        ).join(' · ')}
+                                    </td>
                                     <td className="p-4 text-gray-600 dark:text-zinc-400 text-sm">{p.fabricType || '—'}</td>
                                     <td className="p-4">
                                         {p.codigoCabys ? (
@@ -634,21 +762,27 @@ export function ProductsManager({
                                         </select>
                                     </label>
                                 </Field>
-                                <Field label="Género *">
-                                    <select
-                                        value={form.gender}
-                                        onChange={(e) =>
-                                            setForm({
-                                                ...form,
-                                                gender: e.target.value as 'men' | 'women' | 'unisex'
-                                            })
-                                        }
-                                        className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none"
-                                    >
-                                        <option value="men">Hombre</option>
-                                        <option value="women">Mujer</option>
-                                        <option value="unisex">Unisex</option>
-                                    </select>
+                                <Field label="Género * (uno o varios)">
+                                    <div className="flex flex-wrap gap-2">
+                                        {GENDER_OPTIONS.map((g) => {
+                                            const active = (form.genders ?? []).includes(g.value);
+                                            return (
+                                                <button
+                                                    key={g.value}
+                                                    type="button"
+                                                    onClick={() => toggleGender(g.value)}
+                                                    aria-pressed={active}
+                                                    className={`px-3.5 py-2.5 rounded-lg text-sm font-semibold border transition-colors ${
+                                                        active
+                                                            ? 'bg-orange-600 border-orange-600 text-white'
+                                                            : 'bg-white dark:bg-zinc-900 border-gray-300 dark:border-zinc-700 text-gray-600 dark:text-zinc-300 hover:border-orange-400'
+                                                    }`}
+                                                >
+                                                    {g.label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                 </Field>
                                 <Field label="Tela">
                                     <input
@@ -660,76 +794,26 @@ export function ProductsManager({
                                     />
                                 </Field>
                             </div>
-                            <Field label="Imagen del producto">
-                                <label
-                                    onDragOver={(e) => {
-                                        e.preventDefault();
-                                        setDragging(true);
-                                    }}
-                                    onDragLeave={() => setDragging(false)}
-                                    onDrop={handleImageDrop}
-                                    className={`flex items-center gap-3 border-2 border-dashed rounded-lg p-4 cursor-pointer transition-colors ${
-                                        dragging
-                                            ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/30'
-                                            : form.imageUrl
-                                              ? 'border-green-300 bg-green-50/40 dark:bg-green-950/30 hover:border-orange-400'
-                                              : 'border-gray-300 dark:border-zinc-700 hover:border-orange-400 hover:bg-orange-50/50'
-                                    }`}
-                                >
-                                    {uploadingImage ? (
-                                        <Loader2 className="animate-spin text-gray-400 dark:text-zinc-500 shrink-0" size={20} />
-                                    ) : form.imageUrl ? (
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        <img
-                                            src={form.imageUrl}
-                                            alt="Vista previa"
-                                            className="w-14 h-14 object-cover rounded-md border border-gray-200 dark:border-zinc-800 shrink-0 bg-white dark:bg-zinc-900"
+                            <Field label="Imágenes del producto">
+                                <p className="text-xs text-gray-500 dark:text-zinc-400 -mt-1 mb-2">
+                                    Subí varias fotos por variante. La primera se usa
+                                    como imagen principal. PNG, JPG, WEBP · máx. 5 MB c/u.
+                                </p>
+                                <div className="space-y-3">
+                                    {(form.genders ?? []).map((g) => (
+                                        <GenderImageGallery
+                                            key={g}
+                                            label={GENDER_LABEL[g]}
+                                            urls={form.images?.[g] ?? []}
+                                            uploading={uploadingGender === g}
+                                            onInput={(e) => handleImageInput(g, e)}
+                                            onRemove={(url) => removeImage(g, url)}
+                                            onPreview={(src) =>
+                                                setPreviewImage({ src, alt: form.name || 'Producto' })
+                                            }
                                         />
-                                    ) : (
-                                        <Upload className="text-gray-400 dark:text-zinc-500 shrink-0" size={20} />
-                                    )}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 flex items-center gap-1.5">
-                                            {form.imageUrl ? (
-                                                <>
-                                                    <CheckCircle2 className="text-green-600 dark:text-green-400" size={14} />
-                                                    Imagen cargada
-                                                </>
-                                            ) : (
-                                                <>Arrastra una imagen o haz clic para seleccionar</>
-                                            )}
-                                        </div>
-                                        <div className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
-                                            {form.imageUrl ? (
-                                                <span className="font-mono truncate block">
-                                                    {form.imageUrl.split('/').pop()}
-                                                </span>
-                                            ) : (
-                                                'PNG, JPG, WEBP, GIF o SVG · máx. 5 MB'
-                                            )}
-                                        </div>
-                                    </div>
-                                    {form.imageUrl && !uploadingImage && (
-                                        <button
-                                            type="button"
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                setForm({ ...form, imageUrl: '' });
-                                            }}
-                                            className="p-1.5 text-gray-400 dark:text-zinc-500 hover:text-red-600 hover:bg-red-50 rounded-md shrink-0"
-                                            aria-label="Quitar imagen"
-                                        >
-                                            <X size={16} />
-                                        </button>
-                                    )}
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={handleImageInput}
-                                        disabled={uploadingImage}
-                                        className="hidden"
-                                    />
-                                </label>
+                                    ))}
+                                </div>
                             </Field>
 
                             <Field label="Código CABYS (Hacienda) — 13 dígitos">

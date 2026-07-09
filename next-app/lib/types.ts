@@ -1,6 +1,17 @@
 export type ProductType = 'shirt' | 'pant';
 export type Gender = 'Men' | 'Women';
 
+// Audience a product targets. A product can carry several of these.
+export type ProductGender = 'men' | 'women' | 'unisex';
+
+// Per-audience picture galleries. A product may hold multiple pictures
+// for its men and women (and unisex) variants.
+export interface ProductImages {
+    men?: string[];
+    women?: string[];
+    unisex?: string[];
+}
+
 export interface Product {
     id: string;
     name: string;
@@ -21,7 +32,14 @@ export interface Product {
     typeLabel: string;
     image: string;
     description: string;
+    // Primary/legacy audience, derived from `genders[0]`. Kept so older
+    // readers (catalog cards, PDF section headers) keep working.
     category: 'Men' | 'Women' | 'Unisex';
+    // Full audience set the product targets (Hombre / Mujer / Unisex).
+    genders?: ProductGender[];
+    // Per-audience picture galleries (multiple pictures per variant).
+    // `image` remains the primary thumbnail.
+    images?: ProductImages;
     sizes: {
         men?: string[];
         women?: string[];
