@@ -7,21 +7,33 @@ import {
     updateCatalogItem,
     deleteCatalogItem,
     uploadCatalogImage,
+    type CatalogItem,
     type CatalogItemInput
 } from '@/lib/services/catalog-items';
 
 const REVAL_PATHS = ['/admin/catalogo-default', '/admin/cotizador', '/cotizar'];
 
-export async function createCatalogItemAction(input: CatalogItemInput) {
+// Returns the created row so the client can hold the REAL id (and real
+// timestamps). Previously this returned void and the client fabricated
+// a crypto.randomUUID() id — which made the next edit run
+// update(...).eq('id', fakeId), matching 0 rows and throwing PGRST116.
+export async function createCatalogItemAction(
+    input: CatalogItemInput
+): Promise<CatalogItem> {
     const supabase = await createClient();
-    await createCatalogItem(supabase, input);
+    const item = await createCatalogItem(supabase, input);
     for (const p of REVAL_PATHS) revalidatePath(p);
+    return item;
 }
 
-export async function updateCatalogItemAction(id: string, input: CatalogItemInput) {
+export async function updateCatalogItemAction(
+    id: string,
+    input: CatalogItemInput
+): Promise<CatalogItem> {
     const supabase = await createClient();
-    await updateCatalogItem(supabase, id, input);
+    const item = await updateCatalogItem(supabase, id, input);
     for (const p of REVAL_PATHS) revalidatePath(p);
+    return item;
 }
 
 export async function deleteCatalogItemAction(id: string) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     Plus,
@@ -114,6 +114,14 @@ export function DefaultCatalogManager({
     initialItems: CatalogItem[];
 }) {
     const [items, setItems] = useState<CatalogItem[]>(initialItems);
+    // Reconcile with server truth after every router.refresh(). Without
+    // this, the useState above only runs its initializer on mount, so
+    // the list could keep stale optimistic rows (e.g. one carrying a
+    // fabricated id) even after a refresh — which is what let a saved
+    // item be edited under a non-existent id.
+    useEffect(() => {
+        setItems(initialItems);
+    }, [initialItems]);
     const [formOpen, setFormOpen] = useState(false);
     const [editing, setEditing] = useState<CatalogItem | null>(null);
     const [deletingItem, setDeletingItem] = useState<CatalogItem | null>(null);
@@ -488,23 +496,15 @@ function CatalogItemFormModal({
         setSaving(true);
         setError(null);
         try {
+            // Both actions return the canonical DB row — use it so the
+            // client always holds the real id (a fabricated id made the
+            // next edit update 0 rows → PGRST116).
             if (existing) {
-                await updateCatalogItemAction(existing.id, form);
-                onSaved({ ...existing, ...form } as CatalogItem, false);
+                const saved = await updateCatalogItemAction(existing.id, form);
+                onSaved(saved, false);
             } else {
-                await createCatalogItemAction(form);
-                // Server returns void; we rebuild a plausible client-side
-                // record and let router.refresh() reconcile the true one
-                // (mainly needed to get the real id/timestamps).
-                onSaved(
-                    {
-                        ...(form as unknown as CatalogItem),
-                        id: crypto.randomUUID(),
-                        createdAt: new Date().toISOString(),
-                        updatedAt: new Date().toISOString()
-                    },
-                    true
-                );
+                const saved = await createCatalogItemAction(form);
+                onSaved(saved, true);
             }
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Error al guardar');
