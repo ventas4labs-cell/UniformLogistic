@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { Suspense, useState } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { Trash2, MousePointerClick } from 'lucide-react';
 import { CenteredGLTF } from '@/components/three-d/centered-gltf';
+import { ModelCanvas } from '@/components/three-d/model-canvas';
 import type { ZoneDef } from '@/lib/services/three-d-models';
 
 // ─── Admin zone editor ──────────────────────────────────────────────
@@ -45,18 +45,20 @@ export function ModelZoneEditor({
     return (
         <div className="grid grid-cols-1 md:grid-cols-[1fr_260px] gap-3">
             <div className="relative h-80 rounded-xl overflow-hidden bg-gradient-to-b from-zinc-100 to-zinc-200 dark:from-zinc-800 dark:to-zinc-900">
-                <Canvas camera={{ position: [0, 0, 4], fov: 35 }} dpr={[1, 2]}>
+                <ModelCanvas camera={{ position: [0, 0, 4], fov: 35 }}>
                     <ambientLight intensity={0.75} />
                     <directionalLight position={[3, 5, 4]} intensity={1.1} />
                     <directionalLight position={[-4, 2, -3]} intensity={0.4} />
-                    <CenteredGLTF
-                        url={url}
-                        onPick={addZone}
-                        markers={zones}
-                        activeZoneId={active ?? undefined}
-                    />
+                    <Suspense fallback={null}>
+                        <CenteredGLTF
+                            url={url}
+                            onPick={addZone}
+                            markers={zones}
+                            activeZoneId={active ?? undefined}
+                        />
+                    </Suspense>
                     <OrbitControls makeDefault enablePan={false} />
-                </Canvas>
+                </ModelCanvas>
                 <div className="pointer-events-none absolute bottom-2 left-2 flex items-center gap-1.5 rounded-lg bg-black/60 px-2.5 py-1.5 text-[11px] font-medium text-white">
                     <MousePointerClick size={13} />
                     Clic en el modelo para agregar una zona
