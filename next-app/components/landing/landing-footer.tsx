@@ -8,9 +8,12 @@ export function LandingFooter() {
                 <div className="grid gap-14 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)]">
                     <div>
                         <div className="flex items-center gap-3">
-                            <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#EA580C] text-sm font-extrabold text-[#F7F4EE]">
-                                UL
-                            </span>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                                src="/ul-logo.png"
+                                alt="Uniform Logistic"
+                                className="h-9 w-9 rounded-xl bg-white object-contain"
+                            />
                             <span className="text-base font-bold tracking-tight">
                                 Uniform Logistic
                             </span>

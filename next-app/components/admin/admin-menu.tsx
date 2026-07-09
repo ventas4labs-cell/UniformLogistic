@@ -78,14 +78,15 @@ export function AdminMenu() {
                 aria-expanded={open}
                 className="group relative w-11 h-11 rounded-xl bg-zinc-900 dark:bg-zinc-800 text-white shadow-md ring-1 ring-black/5 dark:ring-white/10 hover:ring-orange-500/40 transition-all active:scale-95"
             >
-                {/* Monogram (rest state) */}
-                <span
-                    className={`absolute inset-0 flex items-center justify-center font-extrabold tracking-tight text-orange-500 transition-opacity duration-200 ${
+                {/* Logo (rest state) */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                    src="/ul-logo.png"
+                    alt="Uniform Logistic"
+                    className={`absolute inset-0 h-full w-full rounded-xl object-cover transition-opacity duration-200 ${
                         open ? 'opacity-0' : 'opacity-100 group-hover:opacity-0'
                     }`}
-                >
-                    UL
-                </span>
+                />
                 {/* Dot grid (hover / open state) */}
                 <span
                     className={`absolute inset-0 grid grid-cols-3 gap-[3px] place-content-center justify-items-center transition-opacity duration-200 ${
