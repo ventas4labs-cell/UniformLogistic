@@ -26,9 +26,13 @@ interface Props {
     actingCompany?: { id: string; name: string } | null;
 }
 
+type Source = 'own' | 'basic';
+
 export function CatalogGrid({ catalog, basics, companyLogos, actingCompany }: Props) {
     const router = useRouter();
     const [categoryFilter, setCategoryFilter] = useState<Category>('All');
+    // Which catalog to show — one at a time, chosen via the category tabs.
+    const [source, setSource] = useState<Source>(catalog.length > 0 ? 'own' : 'basic');
     const [query, setQuery] = useState('');
     const [active, setActive] = useState<Product | null>(null);
     const [activeBasic, setActiveBasic] = useState<BasicItem | null>(null);
@@ -53,7 +57,7 @@ export function CatalogGrid({ catalog, basics, companyLogos, actingCompany }: Pr
     };
     const ownFiltered = catalog.filter(match);
     const basicsFiltered = basics.filter((b) => match(b.product));
-    const nothing = ownFiltered.length === 0 && basicsFiltered.length === 0;
+    const activeList = source === 'own' ? ownFiltered : basicsFiltered;
 
     return (
         <div className="pb-24 max-w-6xl mx-auto">
@@ -107,6 +111,33 @@ export function CatalogGrid({ catalog, basics, companyLogos, actingCompany }: Pr
                             </button>
                         )}
                     </div>
+
+                    {/* Category tabs — show one catalog at a time. Only a
+                        real toggle when the company has both kinds. */}
+                    {catalog.length > 0 && basics.length > 0 && (
+                        <div className="flex gap-1.5">
+                            {(['own', 'basic'] as const).map((s) => (
+                                <button
+                                    key={s}
+                                    onClick={() => setSource(s)}
+                                    className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-colors inline-flex items-center justify-center gap-1.5 ${
+                                        source === s
+                                            ? 'bg-orange-600 text-white shadow-md shadow-orange-500/20'
+                                            : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'
+                                    }`}
+                                >
+                                    {s === 'own' ? (
+                                        'Productos Propios'
+                                    ) : (
+                                        <>
+                                            <Sparkles size={14} /> Basic
+                                        </>
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
                     <div className="flex gap-1.5">
                         {(['All', 'Men', 'Women'] as const).map((cat) => (
                             <button
@@ -125,49 +156,50 @@ export function CatalogGrid({ catalog, basics, companyLogos, actingCompany }: Pr
                 </div>
             </div>
 
-            {/* Productos Propios */}
-            {ownFiltered.length > 0 && (
-                <Section title="Productos Propios">
-                    {ownFiltered.map((product) => (
-                        <ProductCard
-                            key={product.uuid}
-                            product={product}
-                            failed={imgFailed[product.uuid]}
-                            onError={() =>
-                                setImgFailed((p) => (p[product.uuid] ? p : { ...p, [product.uuid]: true }))
-                            }
-                            qtyInCart={cart.filter((c) => c.productId === product.id).reduce((s, i) => s + i.quantity, 0)}
-                            cta="Ver Detalles"
-                            onSelect={() => setActive(product)}
-                        />
-                    ))}
-                </Section>
-            )}
-
-            {/* Basic (3D) */}
-            {basicsFiltered.length > 0 && (
-                <Section title="Basic" badge="3D">
-                    {basicsFiltered.map((b) => (
-                        <ProductCard
-                            key={b.product.uuid}
-                            product={b.product}
-                            failed={imgFailed[b.product.uuid]}
-                            onError={() =>
-                                setImgFailed((p) => (p[b.product.uuid] ? p : { ...p, [b.product.uuid]: true }))
-                            }
-                            basic
-                            cta="Personalizar 3D"
-                            onSelect={() => setActiveBasic(b)}
-                        />
-                    ))}
-                </Section>
-            )}
-
-            {nothing && (
+            {/* Active catalog only (chosen via the category tabs) */}
+            {activeList.length > 0 ? (
+                <div className="px-4 mb-8">
+                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-8">
+                        {source === 'own'
+                            ? ownFiltered.map((product) => (
+                                  <ProductCard
+                                      key={product.uuid}
+                                      product={product}
+                                      failed={imgFailed[product.uuid]}
+                                      onError={() =>
+                                          setImgFailed((p) => (p[product.uuid] ? p : { ...p, [product.uuid]: true }))
+                                      }
+                                      qtyInCart={cart
+                                          .filter((c) => c.productId === product.id)
+                                          .reduce((s, i) => s + i.quantity, 0)}
+                                      cta="Ver Detalles"
+                                      onSelect={() => setActive(product)}
+                                  />
+                              ))
+                            : basicsFiltered.map((b) => (
+                                  <ProductCard
+                                      key={b.product.uuid}
+                                      product={b.product}
+                                      failed={imgFailed[b.product.uuid]}
+                                      onError={() =>
+                                          setImgFailed((p) => (p[b.product.uuid] ? p : { ...p, [b.product.uuid]: true }))
+                                      }
+                                      basic
+                                      cta="Personalizar 3D"
+                                      onSelect={() => setActiveBasic(b)}
+                                  />
+                              ))}
+                    </div>
+                </div>
+            ) : (
                 <div className="px-4 py-16 text-center">
                     <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100 mb-1">Sin resultados</h3>
                     <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                        {query ? `No encontramos uniformes para "${query}".` : 'No hay uniformes en esta categoría.'}
+                        {query
+                            ? `No encontramos uniformes para "${query}".`
+                            : source === 'basic'
+                                ? 'No hay productos básicos disponibles.'
+                                : 'No hay productos en esta categoría.'}
                     </p>
                     {(query || categoryFilter !== 'All') && (
                         <button
@@ -208,32 +240,6 @@ export function CatalogGrid({ catalog, basics, companyLogos, actingCompany }: Pr
                     onClose={() => setActiveBasic(null)}
                 />
             )}
-        </div>
-    );
-}
-
-function Section({
-    title,
-    badge,
-    children
-}: {
-    title: string;
-    badge?: string;
-    children: React.ReactNode;
-}) {
-    return (
-        <div className="px-4 mb-8">
-            <h2 className="flex items-center gap-2 text-lg font-extrabold text-zinc-900 dark:text-zinc-100 mb-4">
-                {title}
-                {badge && (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide bg-orange-100 dark:bg-orange-950/50 text-orange-700 dark:text-orange-300 px-2 py-0.5 rounded-full">
-                        <Sparkles size={11} /> {badge}
-                    </span>
-                )}
-            </h2>
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-8">
-                {children}
-            </div>
         </div>
     );
 }
