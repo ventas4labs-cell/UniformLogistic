@@ -1,10 +1,15 @@
 // ─── 3D model sync ──────────────────────────────────────────────────
-// Walks the repo-root `3D MODELS/<Product>/*_pbr.glb` staging folder,
-// compresses each new/changed model (meshopt geometry + webp textures,
-// ~27 MB → single-digit MB), uploads it to the `models-3d` Supabase
-// bucket, and upserts a `three_d_models` row keyed by a slug of the
-// folder name. Admin-authored fields (zones, allow_logo_placement,
-// name, assignments) are preserved on re-sync — only model_url refreshes.
+// Ingests every model in the repo-root `3D MODELS/` staging folder into
+// the models-3d bucket + three_d_models table. It handles all shapes the
+// folder shows up in:
+//   • `<Product>/*_pbr.glb`  — an extracted export folder
+//   • `<Product>.zip`        — auto-extracted to `<Product>/` first
+//   • `<Name>.glb`           — a loose top-level model file
+// Each is compressed (meshopt geometry + webp textures, ~27 MB → single-
+// digit MB), uploaded, and upserted as a three_d_models row keyed by a
+// slug of the folder/file name. Admin-authored fields (zones,
+// allow_logo_placement, name, assignments) are preserved on re-sync —
+// only model_url refreshes.
 //
 // Run:  npm run sync:3d
 // Idempotent: a manifest of source hashes skips unchanged files.
@@ -16,6 +21,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
@@ -131,63 +137,95 @@ async function upsertModel(slug, name, modelUrl) {
     return 'inserted';
 }
 
+// Auto-extract any top-level *.zip into a same-named folder (unless the
+// folder already exists). Uses the system `unzip` (local operator tool).
+function extractZips() {
+    const zips = fs.readdirSync(MODELS_DIR, { withFileTypes: true })
+        .filter((d) => d.isFile() && d.name.toLowerCase().endsWith('.zip'));
+    for (const z of zips) {
+        const base = z.name.replace(/\.zip$/i, '');
+        const target = path.join(MODELS_DIR, base);
+        if (fs.existsSync(target)) continue;
+        try {
+            console.log(`⇲ extracting ${z.name} → ${base}/`);
+            execSync(`unzip -o -q ${JSON.stringify(path.join(MODELS_DIR, z.name))} -d ${JSON.stringify(target)}`);
+        } catch (e) {
+            console.warn(`  ⚠ could not extract ${z.name}: ${e.message}`);
+        }
+    }
+}
+
+async function processSource(src, manifest, counts) {
+    const { name, slug, srcPath } = src;
+    const srcBytes = fs.readFileSync(srcPath);
+    const hash = sha256(srcBytes);
+
+    if (manifest[slug]?.hash === hash) {
+        console.log(`• ${name} (${slug}) — unchanged, skipped`);
+        counts.skipped++;
+        return;
+    }
+    try {
+        console.log(`↻ ${name} (${slug}) — ${path.basename(srcPath)} @ ${mb(srcBytes.length)} MB`);
+        const out = await compress(srcPath);
+        const ratio = ((1 - out.length / srcBytes.length) * 100).toFixed(0);
+        console.log(`  compressed → ${mb(out.length)} MB (${ratio}% smaller)`);
+
+        const key = `${slug}.glb`;
+        const { error: upErr } = await supabase.storage
+            .from(BUCKET)
+            .upload(key, out, { contentType: 'model/gltf-binary', upsert: true });
+        if (upErr) throw upErr;
+        const modelUrl = supabase.storage.from(BUCKET).getPublicUrl(key).data.publicUrl;
+
+        const result = await upsertModel(slug, name, modelUrl);
+        console.log(`  row ${result} · ${modelUrl}`);
+        result === 'inserted' ? counts.added++ : counts.updated++;
+
+        manifest[slug] = { hash, source: path.basename(srcPath), bytes: out.length, at: new Date().toISOString() };
+        writeManifest(manifest);
+    } catch (e) {
+        console.error(`✗ ${name}: ${e.message}`);
+        counts.failed++;
+    }
+}
+
 // ── main ────────────────────────────────────────────────────────────
 async function main() {
     if (!fs.existsSync(MODELS_DIR)) {
         console.error(`✗ Folder not found: ${MODELS_DIR}`);
         process.exit(1);
     }
+    extractZips();
+
     const manifest = readManifest();
-    const subdirs = fs.readdirSync(MODELS_DIR, { withFileTypes: true })
-        .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
-        .map((d) => d.name);
+    const entries = fs.readdirSync(MODELS_DIR, { withFileTypes: true });
+    const sources = [];
 
-    let added = 0, updated = 0, skipped = 0, failed = 0;
-
-    for (const folder of subdirs) {
-        const dir = path.join(MODELS_DIR, folder);
+    // Export folders — <Product>/*_pbr.glb
+    for (const d of entries.filter((e) => e.isDirectory() && !e.name.startsWith('.'))) {
+        const dir = path.join(MODELS_DIR, d.name);
         const glb = pickGlb(dir);
-        if (!glb) { console.warn(`⚠ ${folder}: no .glb found — skipping`); continue; }
-        const slug = slugify(folder);
-        const name = titleize(folder);
-        const srcPath = path.join(dir, glb);
-        const srcBytes = fs.readFileSync(srcPath);
-        const hash = sha256(srcBytes);
-
-        if (manifest[slug]?.hash === hash) {
-            console.log(`• ${folder} (${slug}) — unchanged, skipped`);
-            skipped++;
-            continue;
-        }
-
-        try {
-            console.log(`↻ ${folder} (${slug}) — ${glb} @ ${mb(srcBytes.length)} MB`);
-            const out = await compress(srcPath);
-            const ratio = ((1 - out.length / srcBytes.length) * 100).toFixed(0);
-            console.log(`  compressed → ${mb(out.length)} MB (${ratio}% smaller)`);
-
-            const key = `${slug}.glb`;
-            const { error: upErr } = await supabase.storage
-                .from(BUCKET)
-                .upload(key, out, { contentType: 'model/gltf-binary', upsert: true });
-            if (upErr) throw upErr;
-            const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(key);
-            const modelUrl = pub.publicUrl;
-
-            const result = await upsertModel(slug, name, modelUrl);
-            console.log(`  row ${result} · ${modelUrl}`);
-            result === 'inserted' ? added++ : updated++;
-
-            manifest[slug] = { hash, source: glb, bytes: out.length, at: new Date().toISOString() };
-            writeManifest(manifest);
-        } catch (e) {
-            console.error(`✗ ${folder}: ${e.message}`);
-            failed++;
-        }
+        if (!glb) { console.warn(`⚠ ${d.name}: no .glb found — skipping`); continue; }
+        sources.push({ name: titleize(d.name), slug: slugify(d.name), srcPath: path.join(dir, glb) });
+    }
+    // Loose top-level model files — <Name>.glb
+    for (const f of entries.filter((e) => e.isFile() && e.name.toLowerCase().endsWith('.glb'))) {
+        const base = f.name.replace(/\.glb$/i, '');
+        sources.push({ name: titleize(base), slug: slugify(base), srcPath: path.join(MODELS_DIR, f.name) });
     }
 
-    console.log(`\nDone — ${added} added, ${updated} updated, ${skipped} skipped, ${failed} failed.`);
-    if (failed > 0) process.exit(1);
+    // Dedupe by slug (a folder export wins over a loose file of the same name).
+    const seen = new Set();
+    const unique = sources.filter((s) => (seen.has(s.slug) ? false : (seen.add(s.slug), true)));
+
+    const counts = { added: 0, updated: 0, skipped: 0, failed: 0 };
+    for (const s of unique) await processSource(s, manifest, counts);
+
+    console.log(
+        `\nDone — ${counts.added} added, ${counts.updated} updated, ${counts.skipped} skipped, ${counts.failed} failed.`
+    );
+    if (counts.failed > 0) process.exit(1);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
