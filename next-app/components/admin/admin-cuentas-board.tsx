@@ -7,11 +7,14 @@ import {
     ChevronDown,
     ChevronRight,
     Clock,
+    Loader2,
+    MailWarning,
     Receipt,
     Wallet
 } from 'lucide-react';
 import type { CompanyInvoiceGroup, InvoiceRow } from '@/lib/services/invoices';
 import { CollapsibleSearch } from '@/components/admin/collapsible-search';
+import { sendOverdueRemindersAction } from '@/app/(admin)/admin/cuentas/actions';
 
 const fmtCRC = (n: number) =>
     new Intl.NumberFormat('es-CR', {
@@ -28,6 +31,31 @@ export function AdminCuentasBoard({ groups }: { groups: CompanyInvoiceGroup[] })
     const [query, setQuery] = useState('');
     const [filter, setFilter] = useState<Filter>('all');
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
+    const [sendingReminders, setSendingReminders] = useState(false);
+    const [reminderMsg, setReminderMsg] = useState<string | null>(null);
+
+    const handleSendReminders = async () => {
+        setSendingReminders(true);
+        setReminderMsg(null);
+        try {
+            const r = await sendOverdueRemindersAction();
+            if (r.error) {
+                setReminderMsg(`Error: ${r.error}`);
+            } else if (r.companiesWithOverdue === 0) {
+                setReminderMsg('No hay facturas vencidas por recordar.');
+            } else {
+                const parts = [`${r.sent} recordatorio${r.sent === 1 ? '' : 's'} enviado${r.sent === 1 ? '' : 's'}`];
+                if (r.skippedNoEmail > 0)
+                    parts.push(`${r.skippedNoEmail} sin correo`);
+                if (r.failed > 0) parts.push(`${r.failed} con error`);
+                setReminderMsg(parts.join(' · '));
+            }
+        } catch (e) {
+            setReminderMsg(e instanceof Error ? e.message : 'Error al enviar');
+        } finally {
+            setSendingReminders(false);
+        }
+    };
 
     // Apply invoice-level filter inside each group, recompute summary.
     const filteredGroups = useMemo(() => {
@@ -149,6 +177,23 @@ export function AdminCuentasBoard({ groups }: { groups: CompanyInvoiceGroup[] })
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                     <button
+                        onClick={handleSendReminders}
+                        disabled={sendingReminders || totals.overdueCount === 0}
+                        title={
+                            totals.overdueCount === 0
+                                ? 'No hay facturas vencidas'
+                                : 'Enviar recordatorio por correo a las empresas con facturas vencidas'
+                        }
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 text-white font-bold hover:bg-red-700 disabled:bg-gray-300 dark:disabled:bg-zinc-700 disabled:cursor-not-allowed"
+                    >
+                        {sendingReminders ? (
+                            <Loader2 size={15} className="animate-spin" />
+                        ) : (
+                            <MailWarning size={15} />
+                        )}
+                        Enviar recordatorios
+                    </button>
+                    <button
                         onClick={expandAll}
                         className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-zinc-800 text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 font-semibold"
                     >
@@ -162,6 +207,19 @@ export function AdminCuentasBoard({ groups }: { groups: CompanyInvoiceGroup[] })
                     </button>
                 </div>
             </div>
+
+            {reminderMsg && (
+                <div className="mb-4 text-sm bg-blue-50 dark:bg-blue-950/30 text-blue-800 dark:text-blue-300 border border-blue-100 dark:border-blue-900/50 rounded-lg px-4 py-2.5 flex items-center justify-between gap-3">
+                    <span>{reminderMsg}</span>
+                    <button
+                        onClick={() => setReminderMsg(null)}
+                        className="text-blue-400 hover:text-blue-600 font-bold"
+                        aria-label="Cerrar"
+                    >
+                        ✕
+                    </button>
+                </div>
+            )}
 
             {/* KPI strip */}
             <section className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">

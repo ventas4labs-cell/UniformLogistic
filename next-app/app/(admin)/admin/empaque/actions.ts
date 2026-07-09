@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/utils/supabase/server';
 import { createDispatch, DispatchLineInput } from '@/lib/services/dispatches';
 import { markStageComplete } from '@/lib/services/stage-completions';
+import { sendOrderCompletedEmail } from '@/lib/email/notifications';
 
 /**
  * Record a partial (or full) dispatch from Empaque. After inserting,
@@ -46,6 +47,9 @@ export async function createDispatchAction(
     );
     if (fullyShipped && orderedTotals.length > 0) {
         await markStageComplete(supabase, orderUuid, 'empaque', user.id);
+        // The order just became fully delivered — notify the customer.
+        // Best-effort; never throws.
+        await sendOrderCompletedEmail(supabase, orderUuid);
     }
 
     revalidatePath('/admin/empaque');

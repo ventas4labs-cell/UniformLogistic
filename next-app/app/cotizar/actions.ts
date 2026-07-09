@@ -2,6 +2,7 @@
 
 import { createServiceClient } from '@/utils/supabase/server';
 import { createQuote, type QuoteLineInput } from '@/lib/services/quotes';
+import { sendQuoteEmails } from '@/lib/email/notifications';
 
 export interface CustomerContact {
     clientName: string;
@@ -70,6 +71,10 @@ export async function submitCustomerQuoteAction(
             cleanItems,
             null
         );
+        // Auto-reply to the customer + notify the admin. Best-effort:
+        // sendQuoteEmails never throws, so a mail hiccup can't fail the
+        // already-saved quote.
+        await sendQuoteEmails(quote);
         return { ok: true, quoteId: quote.id, quoteRef: quote.quoteRef };
     } catch (e) {
         return {
