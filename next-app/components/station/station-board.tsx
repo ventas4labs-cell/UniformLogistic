@@ -11,6 +11,8 @@ import { StageTabBar, type StageTab } from '@/components/admin/stage-tab-bar';
 import type { StageKey } from '@/lib/services/stage-completions';
 import { SubmitInvoiceModal } from '@/components/station/submit-invoice-modal';
 import { OrderProductsSummary } from '@/components/admin/order-products-summary';
+import { StagePartialEditor } from '@/components/admin/stage-partial-editor';
+import type { ItemProgress } from '@/lib/services/stage-item-progress';
 
 interface StationInfo {
     id: string;
@@ -23,13 +25,15 @@ interface Props {
     station: StationInfo;
     initialOrders: Order[];
     initialCompletedOrderIds: string[];
+    /** Board-wide map of order_item_id → qty done, for the per-line tracker. */
+    initialProgress?: ItemProgress;
 }
 
 // External station shell — same per-card pattern as the admin stage
 // boards but stripped down: no insumo aggregation, no notification
 // bells, no admin nav. The station user marks their stage complete
 // per order from here.
-export function StationBoard({ station, initialOrders, initialCompletedOrderIds }: Props) {
+export function StationBoard({ station, initialOrders, initialCompletedOrderIds, initialProgress }: Props) {
     const router = useRouter();
     const [orders] = useState<Order[]>(initialOrders);
     const [completed, setCompleted] = useState<Set<string>>(
@@ -157,6 +161,7 @@ export function StationBoard({ station, initialOrders, initialCompletedOrderIds 
                             stage={station.stage}
                             isCompleted={!!order.uuid && completed.has(order.uuid)}
                             onLocalChange={handleLocalChange}
+                            initialProgress={initialProgress}
                         />
                     ))}
                 </div>
@@ -169,12 +174,14 @@ function OrderCard({
     order,
     stage,
     isCompleted,
-    onLocalChange
+    onLocalChange,
+    initialProgress
 }: {
     order: Order;
     stage: StageKey;
     isCompleted: boolean;
     onLocalChange: (uuid: string, next: boolean) => void;
+    initialProgress?: ItemProgress;
 }) {
     const [expanded, setExpanded] = useState(true);
     // Product image the station operator tapped to enlarge — lets a
@@ -233,6 +240,19 @@ function OrderCard({
                         {order.notes}
                     </p>
                 )}
+            </div>
+
+            {/* Per-line progress tracker — same as the admin boards, so an
+                outsourced workshop records how many pieces of each line it
+                has finished. The photo reference list stays collapsible below. */}
+            <div className="border-t border-gray-100 dark:border-zinc-800 p-4">
+                <StagePartialEditor
+                    order={order}
+                    stage={stage}
+                    initialProgress={initialProgress || {}}
+                    isCompleted={isCompleted}
+                    onCompletedChange={onLocalChange}
+                />
             </div>
 
             <button

@@ -3,6 +3,7 @@ import { fetchStationUser } from '@/lib/services/station-users';
 import { fetchOrderIdsAssignedTo } from '@/lib/services/station-assignments';
 import { fetchOrdersByIds } from '@/lib/services/orders';
 import { fetchStageCompletions, STAGE_LABELS } from '@/lib/services/stage-completions';
+import { fetchStageItemProgress } from '@/lib/services/stage-item-progress';
 import { StationBoard } from '@/components/station/station-board';
 
 // Restricted dashboard shown to external station users (corte /
@@ -19,9 +20,10 @@ export default async function StationPage() {
     if (!station) return null;
 
     const orderIds = await fetchOrderIdsAssignedTo(supabase, user.id);
-    const [orders, completedSet] = await Promise.all([
+    const [orders, completedSet, progress] = await Promise.all([
         fetchOrdersByIds(supabase, orderIds),
-        fetchStageCompletions(supabase, station.stage)
+        fetchStageCompletions(supabase, station.stage),
+        fetchStageItemProgress(supabase, station.stage)
     ]);
 
     return (
@@ -36,6 +38,7 @@ export default async function StationPage() {
             initialCompletedOrderIds={Array.from(completedSet).filter((id) =>
                 orderIds.includes(id)
             )}
+            initialProgress={progress}
         />
     );
 }
