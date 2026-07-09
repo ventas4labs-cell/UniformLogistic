@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useGLTF } from '@react-three/drei';
+import { useEffect, useMemo, useRef } from 'react';
+import { useGLTF, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import type { ZoneDef } from '@/lib/services/three-d-models';
 
@@ -10,17 +10,16 @@ import type { ZoneDef } from '@/lib/services/three-d-models';
 // box so zone coordinates captured in the admin editor line up in the
 // customer viewer (both render this same component). Optionally recolors
 // the garment, reports surface picks (editor), draws zone markers
-// (editor), and projects logo planes at zones (viewer).
-//
-// Logos are rendered as normal-oriented planes floating just off the
-// surface — robust across any model transform. (Surface-conforming
-// <Decal> is a future upgrade.)
+// (editor), and — in the viewer — marks each placed logo with a small
+// pin + a name label (not the logo artwork itself, which reads badly
+// slapped flat on a curved garment).
 
-const LOGO_OFFSET = 0.012; // lift the plane slightly off the surface
+const PIN_OFFSET = 0.03; // lift the pin slightly off the surface
 
 export interface PlacedLogo {
     zone: ZoneDef;
-    url: string;
+    /** Logo display name shown on the pointer. */
+    name: string;
 }
 
 interface Props {
@@ -33,60 +32,32 @@ interface Props {
     markers?: ZoneDef[];
     /** Editor: highlight this zone id. */
     activeZoneId?: string;
-    /** Viewer: logo textures to project at their zones. */
+    /** Viewer: logo pointers (pin + name) to place at their zones. */
     logos?: PlacedLogo[];
 }
 
-function LogoPlane({ zone, url }: PlacedLogo) {
-    // Load imperatively (not useTexture) so a failing/oversized/CORS
-    // logo simply doesn't render instead of blanking the whole model.
-    // crossOrigin keeps the canvas untainted so the preview snapshot
-    // (toDataURL) still works.
-    const [texture, setTexture] = useState<THREE.Texture | null>(null);
-    useEffect(() => {
-        let cancelled = false;
-        const loader = new THREE.TextureLoader();
-        loader.setCrossOrigin('anonymous');
-        loader.load(
-            url,
-            (t) => {
-                if (cancelled) return;
-                t.colorSpace = THREE.SRGBColorSpace;
-                setTexture(t);
-            },
-            undefined,
-            () => {
-                /* ignore — logo just won't show */
-            }
-        );
-        return () => {
-            cancelled = true;
-        };
-    }, [url]);
-
-    const { position, quaternion } = useMemo(() => {
+// A pin dot (rendered into the WebGL scene, so it's in the preview
+// snapshot) plus a floating DOM label with the logo name.
+function LogoPointer({ zone, name }: PlacedLogo) {
+    const position = useMemo(() => {
         const n = new THREE.Vector3(...zone.normal);
         if (n.lengthSq() === 0) n.set(0, 0, 1);
         n.normalize();
-        const pos = new THREE.Vector3(...zone.position).addScaledVector(n, LOGO_OFFSET);
-        const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), n);
-        return { position: pos, quaternion: q };
+        return new THREE.Vector3(...zone.position).addScaledVector(n, PIN_OFFSET);
     }, [zone]);
 
-    if (!texture) return null;
-
     return (
-        <mesh position={position} quaternion={quaternion} renderOrder={2}>
-            <planeGeometry args={[zone.scale, zone.scale]} />
-            <meshBasicMaterial
-                map={texture}
-                transparent
-                alphaTest={0.02}
-                depthWrite={false}
-                toneMapped={false}
-                side={THREE.DoubleSide}
-            />
-        </mesh>
+        <group position={position}>
+            <mesh renderOrder={3}>
+                <sphereGeometry args={[0.03, 16, 16]} />
+                <meshBasicMaterial color="#ea580c" toneMapped={false} depthTest={false} />
+            </mesh>
+            <Html center zIndexRange={[20, 0]} style={{ pointerEvents: 'none' }}>
+                <div className="-translate-y-5 whitespace-nowrap rounded-full bg-[#ea580c] px-2.5 py-1 text-xs font-bold text-white shadow-lg ring-2 ring-white/70">
+                    {name}
+                </div>
+            </Html>
+        </group>
     );
 }
 
@@ -162,7 +133,7 @@ export function CenteredGLTF({ url, color, onPick, markers = [], activeZoneId, l
             ))}
 
             {logos.map((l) => (
-                <LogoPlane key={l.zone.id} zone={l.zone} url={l.url} />
+                <LogoPointer key={l.zone.id} zone={l.zone} name={l.name} />
             ))}
         </group>
     );

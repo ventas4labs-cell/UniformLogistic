@@ -53,7 +53,7 @@ export function CustomOrderStudio({
         if (!model.allowLogoPlacement) return [];
         return model.zones.flatMap((z) => {
             const logo = logos.find((l) => l.id === zoneLogos[z.id]);
-            return logo?.imageUrl ? [{ zone: z, url: logo.imageUrl }] : [];
+            return logo ? [{ zone: z, name: logo.name }] : [];
         });
     }, [model, logos, zoneLogos]);
 
