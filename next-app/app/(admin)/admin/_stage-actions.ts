@@ -29,8 +29,9 @@ import { isAdminEmail } from '@/lib/admin-acting-company';
 import {
     createMissingReport,
     fetchAllReports,
-    resolveReport,
-    unresolveReport,
+    markReportPurchased,
+    markReportReceived,
+    reopenReport,
     type MissingInsumoReport
 } from '@/lib/services/missing-insumos';
 
@@ -255,7 +256,8 @@ export async function reportMissingItemAction(
     orderUuid: string,
     itemName: string,
     missingQty: number,
-    notes?: string
+    notes?: string,
+    stage?: string
 ): Promise<{ error?: string }> {
     const supabase = await createClient();
     const {
@@ -273,7 +275,8 @@ export async function reportMissingItemAction(
             required_qty: 0,
             missing_qty: missingQty,
             reported_by: user.id,
-            notes: notes?.trim() || undefined
+            notes: notes?.trim() || undefined,
+            stage: stage?.trim() || undefined
         });
         for (const p of STAGE_PATHS) revalidatePath(p);
         return {};
@@ -296,9 +299,10 @@ export async function fetchMissingReportsAction(): Promise<MissingInsumoReport[]
     return fetchAllReports(supabase);
 }
 
-export async function resolveMissingReportAction(
-    reportId: string,
-    resolved: boolean
+// Admin buys the insumo (open → purchased). Lives here so both the
+// pedidos notifications panel and any board can call it.
+export async function markReportPurchasedAction(
+    reportId: string
 ): Promise<{ error?: string }> {
     const supabase = await createClient();
     const {
@@ -306,13 +310,52 @@ export async function resolveMissingReportAction(
     } = await supabase.auth.getUser();
     if (!user) return { error: 'No autenticado.' };
     try {
-        if (resolved) await resolveReport(supabase, reportId);
-        else await unresolveReport(supabase, reportId);
+        await markReportPurchased(supabase, reportId, user.id);
         for (const p of STAGE_PATHS) revalidatePath(p);
         return {};
     } catch (err) {
         return {
-            error: err instanceof Error ? err.message : 'No se pudo actualizar el reporte.'
+            error: err instanceof Error ? err.message : 'No se pudo marcar como comprado.'
+        };
+    }
+}
+
+// The raising board received the insumo (purchased → received → closed).
+export async function markReportReceivedAction(
+    reportId: string
+): Promise<{ error?: string }> {
+    const supabase = await createClient();
+    const {
+        data: { user }
+    } = await supabase.auth.getUser();
+    if (!user) return { error: 'No autenticado.' };
+    try {
+        await markReportReceived(supabase, reportId, user.id);
+        for (const p of STAGE_PATHS) revalidatePath(p);
+        return {};
+    } catch (err) {
+        return {
+            error: err instanceof Error ? err.message : 'No se pudo marcar como recibido.'
+        };
+    }
+}
+
+// Undo — send a report back to the open queue.
+export async function reopenMissingReportAction(
+    reportId: string
+): Promise<{ error?: string }> {
+    const supabase = await createClient();
+    const {
+        data: { user }
+    } = await supabase.auth.getUser();
+    if (!user) return { error: 'No autenticado.' };
+    try {
+        await reopenReport(supabase, reportId);
+        for (const p of STAGE_PATHS) revalidatePath(p);
+        return {};
+    } catch (err) {
+        return {
+            error: err instanceof Error ? err.message : 'No se pudo reabrir el reporte.'
         };
     }
 }

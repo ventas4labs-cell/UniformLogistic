@@ -206,7 +206,7 @@ function OrderCard({
                 </button>
                 {order.uuid && (
                     <div className="mt-3">
-                        <OrderReportButton orderId={order.uuid} />
+                        <OrderReportButton orderId={order.uuid} stage="empaque" />
                     </div>
                 )}
             </div>
@@ -332,7 +332,7 @@ export function EmpaqueBoard({
                         companyFilter={companyFilter}
                         setCompanyFilter={setCompanyFilter}
                     />
-                    <MissingReportsHistoryButton />
+                    <MissingReportsHistoryButton stage="empaque" />
                     <button
                         onClick={() => router.refresh()}
                         className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"

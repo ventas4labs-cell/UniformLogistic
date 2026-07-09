@@ -140,7 +140,7 @@ function OrderCard({
                 </div>
                 {order.uuid && (
                     <div className="border-t border-gray-100 dark:border-zinc-800 px-4 py-3">
-                        <OrderReportButton orderId={order.uuid} />
+                        <OrderReportButton orderId={order.uuid} stage="impresion" />
                     </div>
                 )}
             </div>
@@ -225,7 +225,7 @@ export function ImpresionBoard({
                         companyFilter={companyFilter}
                         setCompanyFilter={setCompanyFilter}
                     />
-                    <MissingReportsHistoryButton />
+                    <MissingReportsHistoryButton stage="impresion" />
                     <button
                         onClick={() => router.refresh()}
                         className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
-import { Download, Search, RefreshCw, Loader2, Eye, Receipt, Pencil, Trash2, Filter, Calendar, User, Building2, Bell, X, AlertTriangle, CheckCircle2, Undo2, Plus, History } from 'lucide-react';
+import { Download, Search, RefreshCw, Loader2, Eye, Receipt, Pencil, Trash2, Filter, Calendar, User, Building2, Bell, X, AlertTriangle, CheckCircle2, Undo2, Plus, History, ShoppingCart, Clock } from 'lucide-react';
 import type { Order } from '@/lib/types';
 import type { AdminProduct } from '@/lib/services/products';
 import type { MissingInsumoReport } from '@/lib/services/missing-insumos';
@@ -11,13 +11,13 @@ import type { OrderStatus } from '@/lib/services/orders';
 import type { DeletedOrderHistoryEntry } from '@/lib/services/deleted-orders';
 import {
     updateOrderStatusAction,
-    deleteOrderAction,
-    resolveOrderReportAction,
-    unresolveOrderReportAction
+    deleteOrderAction
 } from '@/app/(admin)/admin/orders/actions';
 import {
     acknowledgeStageNotificationAction,
-    unacknowledgeStageNotificationAction
+    unacknowledgeStageNotificationAction,
+    markReportPurchasedAction,
+    reopenMissingReportAction
 } from '@/app/(admin)/admin/_stage-actions';
 import { StageControlPanel } from '@/components/admin/stage-control-panel';
 import { type StageKey } from '@/lib/services/stage-completions';
@@ -171,6 +171,8 @@ export function OrdersTable({
     const [showDeletedHistory, setShowDeletedHistory] = useState(false);
     // Which order's notification popover is currently open.
     const [notifOrder, setNotifOrder] = useState<Order | null>(null);
+    // Global notifications panel (all orders at once).
+    const [showAllNotifs, setShowAllNotifs] = useState(false);
     const router = useRouter();
 
     // Bucket reports + stage notifications by order_id so card rendering
@@ -189,49 +191,59 @@ export function OrdersTable({
         else stageNotifsByOrder.set(n.orderId, [n]);
     }
 
-    // Bell badge count combines unresolved missing-insumo reports +
-    // unacknowledged stage notifications so the admin sees a single
-    // attention indicator per order.
+    // Bell badge count = reports still waiting for the admin to buy
+    // (status 'open') + unacknowledged stage notifications. Purchased
+    // reports are waiting on the raising board, not on the admin, so
+    // they don't inflate the admin's attention indicator.
     const unresolvedCountFor = (uuid: string | undefined): number => {
         if (!uuid) return 0;
         const rs = reportsByOrder.get(uuid) || [];
         const ns = stageNotifsByOrder.get(uuid) || [];
         return (
-            rs.filter((r) => !r.resolved).length +
+            rs.filter((r) => r.status === 'open').length +
             ns.filter((n) => !n.acknowledgedAt).length
         );
     };
 
-    const handleResolveReport = (reportId: string) => {
-        // Optimistic flip
+    // Admin buys a reported insumo: open → purchased. The raising board
+    // then confirms receipt to close it.
+    const handleMarkPurchased = (reportId: string) => {
         setReports((prev) =>
             prev.map((r) =>
                 r.id === reportId
-                    ? { ...r, resolved: true, resolved_at: new Date().toISOString() }
+                    ? { ...r, status: 'purchased', purchased_at: new Date().toISOString() }
                     : r
             )
         );
         startTransition(async () => {
-            try {
-                await resolveOrderReportAction(reportId);
-            } catch {
-                alert('Error al resolver');
+            const res = await markReportPurchasedAction(reportId);
+            if (res.error) {
+                alert(res.error);
                 router.refresh();
             }
         });
     };
 
-    const handleUnresolveReport = (reportId: string) => {
+    // Undo — send a report back to the open (por comprar) queue.
+    const handleReopenReport = (reportId: string) => {
         setReports((prev) =>
             prev.map((r) =>
-                r.id === reportId ? { ...r, resolved: false, resolved_at: null } : r
+                r.id === reportId
+                    ? {
+                          ...r,
+                          status: 'open',
+                          resolved: false,
+                          resolved_at: null,
+                          purchased_at: null,
+                          received_at: null
+                      }
+                    : r
             )
         );
         startTransition(async () => {
-            try {
-                await unresolveOrderReportAction(reportId);
-            } catch {
-                alert('Error al reabrir');
+            const res = await reopenMissingReportAction(reportId);
+            if (res.error) {
+                alert(res.error);
                 router.refresh();
             }
         });
@@ -392,6 +404,29 @@ export function OrdersTable({
                         {(bucketFilter !== 'all' || companyFilter !== 'all') && (
                             <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-orange-600 ring-2 ring-white dark:ring-zinc-950" />
                         )}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setShowAllNotifs(true)}
+                        className="relative p-2 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg transition-colors"
+                        title="Notificaciones"
+                        aria-label="Notificaciones"
+                    >
+                        <Bell size={18} />
+                        {(() => {
+                            const openReports = reports.filter(
+                                (r) => r.status === 'open'
+                            ).length;
+                            const pendingNotifs = stageNotifications.filter(
+                                (n) => !n.acknowledgedAt
+                            ).length;
+                            const total = openReports + pendingNotifs;
+                            return total > 0 ? (
+                                <span className="absolute -top-0.5 -right-0.5 min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center leading-none ring-2 ring-white dark:ring-zinc-950">
+                                    {total > 99 ? '99+' : total}
+                                </span>
+                            ) : null;
+                        })()}
                     </button>
                     <button
                         type="button"
@@ -794,8 +829,21 @@ export function OrdersTable({
                             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
                     )}
                     onClose={() => setNotifOrder(null)}
-                    onResolve={handleResolveReport}
-                    onReopen={handleUnresolveReport}
+                    onPurchase={handleMarkPurchased}
+                    onReopen={handleReopenReport}
+                    onAcknowledgeStage={handleAcknowledgeStageNotif}
+                    onUnacknowledgeStage={handleUnacknowledgeStageNotif}
+                    pending={pending}
+                />
+            )}
+
+            {showAllNotifs && (
+                <AllNotificationsModal
+                    reports={reports}
+                    stageNotifications={stageNotifications}
+                    onClose={() => setShowAllNotifs(false)}
+                    onPurchase={handleMarkPurchased}
+                    onReopen={handleReopenReport}
                     onAcknowledgeStage={handleAcknowledgeStageNotif}
                     onUnacknowledgeStage={handleUnacknowledgeStageNotif}
                     pending={pending}
@@ -1009,15 +1057,144 @@ const STAGE_LABEL: Record<string, string> = {
     corte: 'Corte',
     maquila: 'Maquila',
     impresion: 'Impresión',
-    empaque: 'Empaque'
+    bordado: 'Bordado',
+    empaque: 'Empaque',
+    ploter: 'Ploter'
 };
+
+// Shared body for both the per-order popover and the global panel:
+// stage-finished notifications + missing-item reports bucketed by
+// lifecycle status (por comprar → comprados → recibidos).
+function NotificationSections({
+    reports,
+    stageNotifs,
+    onPurchase,
+    onReopen,
+    onAcknowledgeStage,
+    onUnacknowledgeStage,
+    pending,
+    showOrder = false
+}: {
+    reports: MissingInsumoReport[];
+    stageNotifs: StageNotification[];
+    onPurchase: (id: string) => void;
+    onReopen: (id: string) => void;
+    onAcknowledgeStage: (id: string) => void;
+    onUnacknowledgeStage: (id: string) => void;
+    pending: boolean;
+    showOrder?: boolean;
+}) {
+    const open = reports.filter((r) => r.status === 'open');
+    const purchased = reports.filter((r) => r.status === 'purchased');
+    const received = reports.filter((r) => r.status === 'received');
+    const stagePending = stageNotifs.filter((n) => !n.acknowledgedAt);
+    const stageDone = stageNotifs.filter((n) => n.acknowledgedAt);
+
+    return (
+        <div className="overflow-y-auto flex-1 p-4 space-y-4">
+            {stagePending.length > 0 && (
+                <section className="space-y-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wide text-green-700 dark:text-green-400">
+                        Etapas terminadas ({stagePending.length})
+                    </h4>
+                    {stagePending.map((n) => (
+                        <StageNotifRow
+                            key={n.id}
+                            notif={n}
+                            onAcknowledge={onAcknowledgeStage}
+                            onUnacknowledge={onUnacknowledgeStage}
+                            pending={pending}
+                        />
+                    ))}
+                </section>
+            )}
+
+            {open.length > 0 && (
+                <section className="space-y-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wide text-red-600 dark:text-red-400">
+                        Faltantes por comprar ({open.length})
+                    </h4>
+                    {open.map((r) => (
+                        <ReportRow
+                            key={r.id}
+                            report={r}
+                            onPurchase={onPurchase}
+                            onReopen={onReopen}
+                            pending={pending}
+                            showOrder={showOrder}
+                        />
+                    ))}
+                </section>
+            )}
+
+            {purchased.length > 0 && (
+                <section className="space-y-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wide text-blue-600 dark:text-blue-400">
+                        Comprados · esperando recibir ({purchased.length})
+                    </h4>
+                    {purchased.map((r) => (
+                        <ReportRow
+                            key={r.id}
+                            report={r}
+                            onPurchase={onPurchase}
+                            onReopen={onReopen}
+                            pending={pending}
+                            showOrder={showOrder}
+                        />
+                    ))}
+                </section>
+            )}
+
+            {received.length > 0 && (
+                <section className="space-y-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-zinc-500">
+                        Recibidos ({received.length})
+                    </h4>
+                    {received.map((r) => (
+                        <ReportRow
+                            key={r.id}
+                            report={r}
+                            onPurchase={onPurchase}
+                            onReopen={onReopen}
+                            pending={pending}
+                            showOrder={showOrder}
+                        />
+                    ))}
+                </section>
+            )}
+
+            {stageDone.length > 0 && (
+                <section className="space-y-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-zinc-500">
+                        Etapas vistas ({stageDone.length})
+                    </h4>
+                    {stageDone.map((n) => (
+                        <StageNotifRow
+                            key={n.id}
+                            notif={n}
+                            onAcknowledge={onAcknowledgeStage}
+                            onUnacknowledge={onUnacknowledgeStage}
+                            pending={pending}
+                        />
+                    ))}
+                </section>
+            )}
+
+            {reports.length === 0 && stageNotifs.length === 0 && (
+                <p className="text-sm text-gray-500 dark:text-zinc-400 text-center py-8">
+                    Sin notificaciones.
+                </p>
+            )}
+        </div>
+    );
+}
 
 function NotificationsPopover({
     order,
     reports,
     stageNotifs,
     onClose,
-    onResolve,
+    onPurchase,
     onReopen,
     onAcknowledgeStage,
     onUnacknowledgeStage,
@@ -1027,17 +1204,12 @@ function NotificationsPopover({
     reports: MissingInsumoReport[];
     stageNotifs: StageNotification[];
     onClose: () => void;
-    onResolve: (id: string) => void;
+    onPurchase: (id: string) => void;
     onReopen: (id: string) => void;
     onAcknowledgeStage: (id: string) => void;
     onUnacknowledgeStage: (id: string) => void;
     pending: boolean;
 }) {
-    const unresolved = reports.filter((r) => !r.resolved);
-    const resolved = reports.filter((r) => r.resolved);
-    const stagePending = stageNotifs.filter((n) => !n.acknowledgedAt);
-    const stageDone = stageNotifs.filter((n) => n.acknowledgedAt);
-
     return (
         <div
             className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
@@ -1069,81 +1241,86 @@ function NotificationsPopover({
                     </button>
                 </div>
 
-                <div className="overflow-y-auto flex-1 p-4 space-y-4">
-                    {stagePending.length > 0 && (
-                        <section className="space-y-2">
-                            <h4 className="text-xs font-bold uppercase tracking-wide text-green-700 dark:text-green-400">
-                                Etapas terminadas ({stagePending.length})
-                            </h4>
-                            {stagePending.map((n) => (
-                                <StageNotifRow
-                                    key={n.id}
-                                    notif={n}
-                                    onAcknowledge={onAcknowledgeStage}
-                                    onUnacknowledge={onUnacknowledgeStage}
-                                    pending={pending}
-                                />
-                            ))}
-                        </section>
-                    )}
+                <NotificationSections
+                    reports={reports}
+                    stageNotifs={stageNotifs}
+                    onPurchase={onPurchase}
+                    onReopen={onReopen}
+                    onAcknowledgeStage={onAcknowledgeStage}
+                    onUnacknowledgeStage={onUnacknowledgeStage}
+                    pending={pending}
+                />
+            </div>
+        </div>
+    );
+}
 
-                    {unresolved.length > 0 && (
-                        <section className="space-y-2">
-                            <h4 className="text-xs font-bold uppercase tracking-wide text-red-600 dark:text-red-400">
-                                Faltantes pendientes ({unresolved.length})
-                            </h4>
-                            {unresolved.map((r) => (
-                                <ReportRow
-                                    key={r.id}
-                                    report={r}
-                                    onResolve={onResolve}
-                                    onReopen={onReopen}
-                                    pending={pending}
-                                />
-                            ))}
-                        </section>
-                    )}
+// Global notifications panel — every order's reports + stage
+// notifications in one place, reached from the header bell.
+function AllNotificationsModal({
+    reports,
+    stageNotifications,
+    onClose,
+    onPurchase,
+    onReopen,
+    onAcknowledgeStage,
+    onUnacknowledgeStage,
+    pending
+}: {
+    reports: MissingInsumoReport[];
+    stageNotifications: StageNotification[];
+    onClose: () => void;
+    onPurchase: (id: string) => void;
+    onReopen: (id: string) => void;
+    onAcknowledgeStage: (id: string) => void;
+    onUnacknowledgeStage: (id: string) => void;
+    pending: boolean;
+}) {
+    const sorted = reports
+        .slice()
+        .sort(
+            (a, b) =>
+                new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+    const sortedNotifs = stageNotifications
+        .slice()
+        .sort(
+            (a, b) =>
+                new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
 
-                    {resolved.length > 0 && (
-                        <section className="space-y-2">
-                            <h4 className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-zinc-500">
-                                Faltantes resueltos ({resolved.length})
-                            </h4>
-                            {resolved.map((r) => (
-                                <ReportRow
-                                    key={r.id}
-                                    report={r}
-                                    onResolve={onResolve}
-                                    onReopen={onReopen}
-                                    pending={pending}
-                                />
-                            ))}
-                        </section>
-                    )}
-
-                    {stageDone.length > 0 && (
-                        <section className="space-y-2">
-                            <h4 className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-zinc-500">
-                                Etapas vistas ({stageDone.length})
-                            </h4>
-                            {stageDone.map((n) => (
-                                <StageNotifRow
-                                    key={n.id}
-                                    notif={n}
-                                    onAcknowledge={onAcknowledgeStage}
-                                    onUnacknowledge={onUnacknowledgeStage}
-                                    pending={pending}
-                                />
-                            ))}
-                        </section>
-                    )}
-
-                    {reports.length === 0 && stageNotifs.length === 0 && (
-                        <p className="text-sm text-gray-500 dark:text-zinc-400 text-center py-8">
-                            Sin notificaciones.
-                        </p>
-                    )}
+    return (
+        <div
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={onClose}
+        >
+            <div
+                className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-zinc-800">
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-zinc-100 flex items-center gap-2">
+                        <Bell size={18} className="text-red-500" />
+                        Notificaciones
+                    </h3>
+                    <button
+                        onClick={onClose}
+                        className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"
+                    >
+                        <X size={18} />
+                    </button>
                 </div>
+
+                <NotificationSections
+                    reports={sorted}
+                    stageNotifs={sortedNotifs}
+                    onPurchase={onPurchase}
+                    onReopen={onReopen}
+                    onAcknowledgeStage={onAcknowledgeStage}
+                    onUnacknowledgeStage={onUnacknowledgeStage}
+                    pending={pending}
+                    showOrder
+                />
             </div>
         </div>
     );
@@ -1229,53 +1406,90 @@ function StageNotifRow({
 
 function ReportRow({
     report,
-    onResolve,
+    onPurchase,
     onReopen,
-    pending
+    pending,
+    showOrder = false
 }: {
     report: MissingInsumoReport;
-    onResolve: (id: string) => void;
+    onPurchase: (id: string) => void;
     onReopen: (id: string) => void;
     pending: boolean;
+    // In the global panel each row also names its order.
+    showOrder?: boolean;
 }) {
-    const isResolved = report.resolved;
+    const isOpen = report.status === 'open';
+    const isPurchased = report.status === 'purchased';
+    const stageLabel = report.stage ? STAGE_LABEL[report.stage] ?? report.stage : null;
+
+    const tone = isOpen
+        ? 'bg-red-50 dark:bg-red-950/30 border-red-100 dark:border-red-900/50'
+        : isPurchased
+          ? 'bg-blue-50 dark:bg-blue-950/25 border-blue-100 dark:border-blue-900/50'
+          : 'bg-gray-50 dark:bg-zinc-800/40 border-gray-100 dark:border-zinc-800';
+
     return (
-        <div
-            className={`rounded-lg p-3 border ${
-                isResolved
-                    ? 'bg-gray-50 dark:bg-zinc-800/40 border-gray-100 dark:border-zinc-800'
-                    : 'bg-red-50 dark:bg-red-950/30 border-red-100 dark:border-red-900/50'
-            }`}
-        >
+        <div className={`rounded-lg p-3 border ${tone}`}>
             <div className="flex items-start gap-2">
                 <AlertTriangle
                     size={16}
                     className={`mt-0.5 shrink-0 ${
-                        isResolved
-                            ? 'text-gray-400 dark:text-zinc-500'
-                            : 'text-red-500 dark:text-red-400'
+                        isOpen
+                            ? 'text-red-500 dark:text-red-400'
+                            : isPurchased
+                              ? 'text-blue-500 dark:text-blue-400'
+                              : 'text-gray-400 dark:text-zinc-500'
                     }`}
                 />
                 <div className="flex-1 min-w-0">
+                    {showOrder && (
+                        <p className="text-[11px] font-mono font-bold text-orange-600 dark:text-orange-400">
+                            {report.order_ref || 'Orden'}
+                            {report.company_name ? (
+                                <span className="text-gray-500 dark:text-zinc-400 font-sans font-normal">
+                                    {' · '}
+                                    {report.company_name}
+                                </span>
+                            ) : null}
+                        </p>
+                    )}
                     <p
                         className={`font-bold text-sm ${
-                            isResolved
+                            report.status === 'received'
                                 ? 'text-gray-700 dark:text-zinc-300 line-through'
-                                : 'text-red-800 dark:text-red-200'
+                                : 'text-gray-900 dark:text-zinc-100'
                         }`}
                     >
                         {report.insumo_name}
+                        <span className="ml-2 font-mono text-xs font-bold text-red-600 dark:text-red-400">
+                            −{report.missing_qty}
+                        </span>
                     </p>
-                    <p
-                        className={`text-xs mt-0.5 ${
-                            isResolved
-                                ? 'text-gray-500 dark:text-zinc-500'
-                                : 'text-red-700 dark:text-red-300'
+                    {/* Lifecycle status chip */}
+                    <span
+                        className={`inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                            isOpen
+                                ? 'text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/40'
+                                : isPurchased
+                                  ? 'text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-950/40'
+                                  : 'text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-950/40'
                         }`}
                     >
-                        Necesita: <strong>{report.required_qty}</strong> · Faltan:{' '}
-                        <strong>{report.missing_qty}</strong>
-                    </p>
+                        {isOpen ? (
+                            <>
+                                <Clock size={11} /> Por comprar
+                            </>
+                        ) : isPurchased ? (
+                            <>
+                                <ShoppingCart size={11} /> Comprado · recibir
+                                {stageLabel ? ` en ${stageLabel}` : ''}
+                            </>
+                        ) : (
+                            <>
+                                <CheckCircle2 size={11} /> Recibido
+                            </>
+                        )}
+                    </span>
                     {report.notes && (
                         <p className="text-xs text-gray-600 dark:text-zinc-400 italic mt-1">
                             {report.notes}
@@ -1285,7 +1499,16 @@ function ReportRow({
                         {new Date(report.created_at).toLocaleString()}
                     </p>
                 </div>
-                {isResolved ? (
+                {isOpen ? (
+                    <button
+                        onClick={() => onPurchase(report.id)}
+                        disabled={pending}
+                        className="shrink-0 inline-flex items-center gap-1 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded transition-colors disabled:opacity-50"
+                        title="Marcar como comprado"
+                    >
+                        <ShoppingCart size={12} /> Comprar
+                    </button>
+                ) : (
                     <button
                         onClick={() => onReopen(report.id)}
                         disabled={pending}
@@ -1293,15 +1516,6 @@ function ReportRow({
                         title="Reabrir"
                     >
                         <Undo2 size={12} /> Reabrir
-                    </button>
-                ) : (
-                    <button
-                        onClick={() => onResolve(report.id)}
-                        disabled={pending}
-                        className="shrink-0 inline-flex items-center gap-1 text-xs font-bold text-white bg-green-600 hover:bg-green-700 px-2 py-1 rounded transition-colors disabled:opacity-50"
-                        title="Marcar resuelto"
-                    >
-                        <CheckCircle2 size={12} /> Resolver
                     </button>
                 )}
             </div>

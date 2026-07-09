@@ -167,6 +167,7 @@ function OrderCard({
                                                 ins={ins}
                                                 orderUuid={order.uuid}
                                                 isCompleted={done}
+                                                stage="maquila"
                                                 onToggleComplete={(completed) =>
                                                     order.uuid &&
                                                     onToggleInsumo(order.uuid, ins.name, completed)
@@ -274,7 +275,7 @@ export function MaquilaBoard({
                         companyFilter={companyFilter}
                         setCompanyFilter={setCompanyFilter}
                     />
-                    <MissingReportsHistoryButton />
+                    <MissingReportsHistoryButton stage="maquila" />
                     <button
                         onClick={() => router.refresh()}
                         className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"

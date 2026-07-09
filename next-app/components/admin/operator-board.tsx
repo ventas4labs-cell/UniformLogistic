@@ -66,7 +66,8 @@ function ReportMissingForm({
                     insumoName,
                     requiredQty,
                     qty,
-                    notes || undefined
+                    notes || undefined,
+                    'bodega'
                 );
                 onSent();
             } catch {
@@ -726,7 +727,7 @@ export function OperatorBoard({
                         companyFilter={companyFilter}
                         setCompanyFilter={setCompanyFilter}
                     />
-                    <MissingReportsHistoryButton />
+                    <MissingReportsHistoryButton stage="bodega" />
                     <button
                         onClick={() => router.refresh()}
                         className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"

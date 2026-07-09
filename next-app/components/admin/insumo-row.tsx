@@ -17,6 +17,9 @@ interface Props {
     orderUuid: string | undefined;
     isCompleted: boolean;
     onToggleComplete: (completed: boolean) => void;
+    /** Board raising the report — recorded so the receive step can be
+     * surfaced back on the right board. */
+    stage?: string;
 }
 
 /**
@@ -26,7 +29,7 @@ interface Props {
  * `missing_insumo_reports`). Shared by the operator and maquila boards
  * so both stages can act on the same insumo state.
  */
-export function InsumoRow({ ins, orderUuid, isCompleted, onToggleComplete }: Props) {
+export function InsumoRow({ ins, orderUuid, isCompleted, onToggleComplete, stage }: Props) {
     const [reporting, setReporting] = useState(false);
     const [sent, setSent] = useState(false);
 
@@ -91,6 +94,7 @@ export function InsumoRow({ ins, orderUuid, isCompleted, onToggleComplete }: Pro
                     orderId={orderUuid}
                     insumoName={ins.name}
                     requiredQty={ins.totalQty}
+                    stage={stage}
                     onClose={() => setReporting(false)}
                     onSent={() => {
                         setReporting(false);
@@ -106,12 +110,14 @@ function ReportMissingForm({
     orderId,
     insumoName,
     requiredQty,
+    stage,
     onClose,
     onSent
 }: {
     orderId: string;
     insumoName: string;
     requiredQty: number;
+    stage?: string;
     onClose: () => void;
     onSent: () => void;
 }) {
@@ -129,7 +135,8 @@ function ReportMissingForm({
                     insumoName,
                     requiredQty,
                     qty,
-                    notes || undefined
+                    notes || undefined,
+                    stage
                 );
                 onSent();
             } catch {

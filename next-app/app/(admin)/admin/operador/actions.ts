@@ -21,7 +21,8 @@ export async function reportMissingInsumoAction(
     insumoName: string,
     requiredQty: number,
     missingQty: number,
-    notes?: string
+    notes?: string,
+    stage?: string
 ) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -34,6 +35,7 @@ export async function reportMissingInsumoAction(
         missing_qty: missingQty,
         reported_by: user.id,
         notes,
+        stage,
     });
 
     revalidatePath('/admin/operador');

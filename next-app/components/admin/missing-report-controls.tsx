@@ -3,17 +3,22 @@
 import { useEffect, useState, useTransition } from 'react';
 import {
     AlertTriangle,
+    Check,
     CheckCircle2,
+    Clock,
     History,
     Loader2,
+    PackageCheck,
     RotateCcw,
     Send,
+    ShoppingCart,
     X
 } from 'lucide-react';
 import {
     fetchMissingReportsAction,
-    reportMissingItemAction,
-    resolveMissingReportAction
+    markReportReceivedAction,
+    reopenMissingReportAction,
+    reportMissingItemAction
 } from '@/app/(admin)/admin/_stage-actions';
 import type { MissingInsumoReport } from '@/lib/services/missing-insumos';
 
@@ -26,9 +31,13 @@ import type { MissingInsumoReport } from '@/lib/services/missing-insumos';
 // stages that only see finished order lines.
 export function OrderReportButton({
     orderId,
+    stage,
     defaultItemName = ''
 }: {
     orderId: string;
+    /** Board raising the report, recorded so the receive step can be
+     * surfaced back here later. */
+    stage?: string;
     defaultItemName?: string;
 }) {
     const [open, setOpen] = useState(false);
@@ -57,6 +66,7 @@ export function OrderReportButton({
             {open && (
                 <ReportMissingForm
                     orderId={orderId}
+                    stage={stage}
                     defaultItemName={defaultItemName}
                     onClose={() => setOpen(false)}
                     onSent={() => {
@@ -71,11 +81,13 @@ export function OrderReportButton({
 
 function ReportMissingForm({
     orderId,
+    stage,
     defaultItemName,
     onClose,
     onSent
 }: {
     orderId: string;
+    stage?: string;
     defaultItemName: string;
     onClose: () => void;
     onSent: () => void;
@@ -102,7 +114,8 @@ function ReportMissingForm({
                 orderId,
                 itemName,
                 qty,
-                notes || undefined
+                notes || undefined,
+                stage
             );
             if (res.error) {
                 setError(res.error);
@@ -189,11 +202,13 @@ function ReportMissingForm({
     );
 }
 
-// ─── Top-right "Historial de reportes" affordance ───────────────────
-// One button per board header. Opens a modal that lazily fetches every
-// missing-item report (resolved and pending) so operators can review
-// past shortages and mark them resolved.
-export function MissingReportsHistoryButton() {
+// ─── Top-right "Reportes de faltantes" affordance ───────────────────
+// One button per board header. Opens a modal that lazily fetches the
+// missing-item reports this board raised. Once the admin has bought a
+// reported insumo (status "purchased"), the board confirms arrival here
+// with "Marcar recibido", which closes the report. A badge flags how
+// many are waiting to be received on this board.
+export function MissingReportsHistoryButton({ stage }: { stage?: string }) {
     const [open, setOpen] = useState(false);
 
     return (
@@ -202,17 +217,46 @@ export function MissingReportsHistoryButton() {
                 type="button"
                 onClick={() => setOpen(true)}
                 className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"
-                title="Historial de reportes de faltantes"
-                aria-label="Historial de reportes de faltantes"
+                title="Reportes de faltantes"
+                aria-label="Reportes de faltantes"
             >
                 <History size={18} />
             </button>
-            {open && <ReportsHistoryModal onClose={() => setOpen(false)} />}
+            {open && (
+                <ReportsHistoryModal stage={stage} onClose={() => setOpen(false)} />
+            )}
         </>
     );
 }
 
-function ReportsHistoryModal({ onClose }: { onClose: () => void }) {
+const STATUS_META: Record<
+    MissingInsumoReport['status'],
+    { label: string; Icon: typeof Clock; cls: string }
+> = {
+    open: {
+        label: 'Pendiente de compra',
+        Icon: Clock,
+        cls: 'text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/40'
+    },
+    purchased: {
+        label: 'Comprado · por recibir',
+        Icon: ShoppingCart,
+        cls: 'text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-950/40'
+    },
+    received: {
+        label: 'Recibido',
+        Icon: CheckCircle2,
+        cls: 'text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-950/40'
+    }
+};
+
+function ReportsHistoryModal({
+    stage,
+    onClose
+}: {
+    stage?: string;
+    onClose: () => void;
+}) {
     const [reports, setReports] = useState<MissingInsumoReport[] | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [, startTransition] = useTransition();
@@ -235,27 +279,32 @@ function ReportsHistoryModal({ onClose }: { onClose: () => void }) {
         };
     }, []);
 
-    const toggleResolved = (report: MissingInsumoReport) => {
-        const next = !report.resolved;
-        // Optimistic update.
+    // Show only the reports this board raised. Legacy reports without a
+    // stage fall through to whichever board opens the modal so they're
+    // never orphaned.
+    const scoped = (reports || []).filter(
+        (r) => !stage || !r.stage || r.stage === stage
+    );
+
+    // Optimistically move a report to a new status, run the action, roll
+    // back on failure.
+    const transition = (
+        report: MissingInsumoReport,
+        next: MissingInsumoReport['status'],
+        run: () => Promise<{ error?: string }>
+    ) => {
+        const prevStatus = report.status;
         setReports((prev) =>
             (prev || []).map((r) =>
-                r.id === report.id
-                    ? {
-                          ...r,
-                          resolved: next,
-                          resolved_at: next ? new Date().toISOString() : null
-                      }
-                    : r
+                r.id === report.id ? { ...r, status: next } : r
             )
         );
         startTransition(async () => {
-            const res = await resolveMissingReportAction(report.id, next);
+            const res = await run();
             if (res.error) {
-                // Roll back on failure.
                 setReports((prev) =>
                     (prev || []).map((r) =>
-                        r.id === report.id ? { ...r, resolved: !next } : r
+                        r.id === report.id ? { ...r, status: prevStatus } : r
                     )
                 );
             }
@@ -263,7 +312,7 @@ function ReportsHistoryModal({ onClose }: { onClose: () => void }) {
     };
 
     const loading = reports === null && !error;
-    const pending = (reports || []).filter((r) => !r.resolved).length;
+    const awaiting = scoped.filter((r) => r.status === 'purchased').length;
 
     return (
         <div
@@ -283,9 +332,9 @@ function ReportsHistoryModal({ onClose }: { onClose: () => void }) {
                         <h3 className="text-sm font-bold text-gray-900 dark:text-zinc-100">
                             Reportes de faltantes
                         </h3>
-                        {!loading && pending > 0 && (
-                            <span className="text-xs font-bold text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-950/50 px-2 py-0.5 rounded-full">
-                                {pending} sin resolver
+                        {!loading && awaiting > 0 && (
+                            <span className="text-xs font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-950/50 px-2 py-0.5 rounded-full">
+                                {awaiting} por recibir
                             </span>
                         )}
                     </div>
@@ -309,69 +358,94 @@ function ReportsHistoryModal({ onClose }: { onClose: () => void }) {
                         <p className="py-12 text-center text-sm text-red-600 dark:text-red-400">
                             {error}
                         </p>
-                    ) : (reports?.length ?? 0) === 0 ? (
+                    ) : scoped.length === 0 ? (
                         <p className="py-12 text-center text-sm text-gray-500 dark:text-zinc-400">
                             No hay reportes de faltantes todavía.
                         </p>
                     ) : (
-                        reports?.map((r) => (
-                            <div
-                                key={r.id}
-                                className={`rounded-lg border p-3 ${
-                                    r.resolved
-                                        ? 'border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-800/40'
-                                        : 'border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/20'
-                                }`}
-                            >
-                                <div className="flex items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                        <p
-                                            className={`text-sm font-bold ${
-                                                r.resolved
-                                                    ? 'text-gray-500 dark:text-zinc-400 line-through'
-                                                    : 'text-gray-900 dark:text-zinc-100'
-                                            }`}
-                                        >
-                                            {r.insumo_name}
-                                            <span className="ml-2 font-mono text-xs font-bold text-red-600 dark:text-red-400">
-                                                −{r.missing_qty}
-                                            </span>
-                                        </p>
-                                        <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
-                                            {r.order_ref || 'Orden'}
-                                            {r.company_name ? ` · ${r.company_name}` : ''}
-                                            {' · '}
-                                            {new Date(r.created_at).toLocaleDateString()}
-                                        </p>
-                                        {r.notes && (
-                                            <p className="text-xs text-gray-600 dark:text-zinc-300 mt-1 italic">
-                                                {r.notes}
+                        scoped.map((r) => {
+                            const meta = STATUS_META[r.status];
+                            const closed = r.status === 'received';
+                            return (
+                                <div
+                                    key={r.id}
+                                    className={`rounded-lg border p-3 ${
+                                        closed
+                                            ? 'border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-800/40'
+                                            : 'border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/20'
+                                    }`}
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <p
+                                                className={`text-sm font-bold ${
+                                                    closed
+                                                        ? 'text-gray-500 dark:text-zinc-400 line-through'
+                                                        : 'text-gray-900 dark:text-zinc-100'
+                                                }`}
+                                            >
+                                                {r.insumo_name}
+                                                <span className="ml-2 font-mono text-xs font-bold text-red-600 dark:text-red-400">
+                                                    −{r.missing_qty}
+                                                </span>
                                             </p>
-                                        )}
+                                            <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
+                                                {r.order_ref || 'Orden'}
+                                                {r.company_name ? ` · ${r.company_name}` : ''}
+                                                {' · '}
+                                                {new Date(r.created_at).toLocaleDateString()}
+                                            </p>
+                                            <span
+                                                className={`inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold ${meta.cls}`}
+                                            >
+                                                <meta.Icon size={11} />
+                                                {meta.label}
+                                            </span>
+                                            {r.notes && (
+                                                <p className="text-xs text-gray-600 dark:text-zinc-300 mt-1 italic">
+                                                    {r.notes}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <div className="shrink-0">
+                                            {r.status === 'purchased' && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        transition(r, 'received', () =>
+                                                            markReportReceivedAction(r.id)
+                                                        )
+                                                    }
+                                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-950/50 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors"
+                                                    title="Marcar como recibido"
+                                                >
+                                                    <PackageCheck size={12} /> Marcar recibido
+                                                </button>
+                                            )}
+                                            {r.status === 'received' && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        transition(r, 'open', () =>
+                                                            reopenMissingReportAction(r.id)
+                                                        )
+                                                    }
+                                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-gray-500 dark:text-zinc-400 hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors"
+                                                    title="Reabrir"
+                                                >
+                                                    <RotateCcw size={12} /> Reabrir
+                                                </button>
+                                            )}
+                                            {r.status === 'open' && (
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-400 dark:text-zinc-500">
+                                                    <Check size={12} /> Esperando compra
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => toggleResolved(r)}
-                                        className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
-                                            r.resolved
-                                                ? 'text-gray-500 dark:text-zinc-400 hover:bg-gray-200 dark:hover:bg-zinc-700'
-                                                : 'text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-950/50 hover:bg-green-200 dark:hover:bg-green-900/50'
-                                        }`}
-                                        title={r.resolved ? 'Marcar como pendiente' : 'Marcar como resuelto'}
-                                    >
-                                        {r.resolved ? (
-                                            <>
-                                                <RotateCcw size={12} /> Reabrir
-                                            </>
-                                        ) : (
-                                            <>
-                                                <CheckCircle2 size={12} /> Resolver
-                                            </>
-                                        )}
-                                    </button>
                                 </div>
-                            </div>
-                        ))
+                            );
+                        })
                     )}
                 </div>
             </div>
