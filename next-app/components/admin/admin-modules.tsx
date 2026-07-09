@@ -15,6 +15,7 @@ import {
     Sparkles,
     PackageCheck,
     PenTool,
+    Box,
     type LucideIcon
 } from 'lucide-react';
 
@@ -45,6 +46,7 @@ export const ADMIN_MODULES: AdminModule[] = [
     { id: 'catalogo-default', label: 'Catálogo default', href: '/admin/catalogo-default', Icon: Boxes, group: 'principal' },
     { id: 'cotizador', label: 'Cotizador', href: '/admin/cotizador', Icon: FileText, group: 'principal' },
     { id: 'logos', label: 'Logos', href: '/admin/logos', Icon: Sticker, group: 'principal' },
+    { id: '3d-models', label: 'Modelos 3D', href: '/admin/3d-models', Icon: Box, group: 'principal' },
     { id: 'station-users', label: 'Estaciones', href: '/admin/station-users', Icon: HardHat, group: 'principal' },
     { id: 'station-invoices', label: 'Facturas a pagar', href: '/admin/station-invoices', Icon: FileText, group: 'principal' },
     { id: 'facturacion', label: 'Facturación', href: '/admin/facturacion', Icon: Receipt, group: 'principal' },
