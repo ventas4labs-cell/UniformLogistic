@@ -31,6 +31,10 @@ import {
 
 const IVA_PCT = 13;
 
+// Quick-pick order sizes for the configurator. The +/- stepper still
+// lets a customer land on an in-between quantity without typing.
+const QTY_PRESETS = [25, 50, 100, 300, 500];
+
 const formatCRC = (n: number) =>
     new Intl.NumberFormat('es-CR', {
         style: 'currency',
@@ -557,7 +561,7 @@ function ConfigDrawer({
                             key={shownImage}
                             src={shownImage}
                             alt={`${item.name}${color ? ' — ' + color : ''}`}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-contain p-2"
                         />
                     ) : (
                         <div className="w-full h-full flex items-center justify-center">
@@ -651,17 +655,49 @@ function ConfigDrawer({
                         </div>
                     )}
 
-                    {/* Quantity */}
+                    {/* Quantity — preset buttons + fine +/- (no typing) */}
                     <div className="mt-5">
                         <p className="text-xs font-bold uppercase tracking-wide text-[#16130F]/50 mb-2">
                             Cantidad
                         </p>
-                        <Stepper
-                            value={quantity}
-                            min={1}
-                            max={100000}
-                            onChange={setQuantity}
-                        />
+                        <div className="flex flex-wrap gap-2">
+                            {QTY_PRESETS.map((q) => (
+                                <button
+                                    key={q}
+                                    onClick={() => setQuantity(q)}
+                                    className={`px-4 py-2 rounded-full text-sm font-bold border transition-colors ${
+                                        quantity === q
+                                            ? 'bg-[#EA580C] text-white border-[#EA580C]'
+                                            : 'bg-white text-[#16130F] border-[#16130F]/20 hover:border-[#16130F]'
+                                    }`}
+                                >
+                                    {q}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="mt-3 flex items-center gap-3">
+                            <div className="inline-flex items-center border border-[#16130F]/15 rounded-full">
+                                <button
+                                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                                    disabled={quantity <= 1}
+                                    className="p-2.5 hover:text-[#EA580C] disabled:opacity-30"
+                                    aria-label="Menos"
+                                >
+                                    <Minus size={16} />
+                                </button>
+                                <span className="w-16 text-center font-bold">{quantity}</span>
+                                <button
+                                    onClick={() => setQuantity(quantity + 1)}
+                                    className="p-2.5 hover:text-[#EA580C]"
+                                    aria-label="Más"
+                                >
+                                    <Plus size={16} />
+                                </button>
+                            </div>
+                            <span className="text-[11px] text-[#16130F]/40">
+                                o ajustá la cantidad exacta
+                            </span>
+                        </div>
                     </div>
                 </div>
 
