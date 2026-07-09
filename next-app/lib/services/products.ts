@@ -106,6 +106,7 @@ export interface ProductRow {
     sizes_json: Product['sizes'] | null;
     fabric_type: string | null;
     is_active: boolean | null;
+    is_basic: boolean | null;
     bom_json: BomItem[] | null;
     codigo_cabys: string | null;
     stages_json: StageKey[] | null;
@@ -121,6 +122,8 @@ export interface AdminProduct extends Product {
     uuid: string;
     fabricType: string;
     isActive: boolean;
+    /** Shared "basic" item shown to every empresa; carries a 3D model. */
+    isBasic: boolean;
     bom: BomItem[];
     codigoCabys: string;
     /** UUIDs of companies the product is currently assigned to. */
@@ -159,6 +162,7 @@ export const mapProductRow = (
     sizes: row.sizes_json || {},
     fabricType: row.fabric_type || '',
     isActive: row.is_active !== false,
+    isBasic: row.is_basic === true,
     bom: (row.bom_json as BomItem[]) || [],
     codigoCabys: row.codigo_cabys || '',
     companyIds,
@@ -174,7 +178,7 @@ export const fetchCatalogForCompany = async (
         .select(`
             product:products (
                 id, product_code, name, description, image_url,
-                product_type, type_label, gender, genders, images_json, sizes_json, fabric_type, is_active, bom_json, codigo_cabys, stages_json
+                product_type, type_label, gender, genders, images_json, sizes_json, fabric_type, is_active, is_basic, bom_json, codigo_cabys, stages_json
             )
         `)
         .eq('company_id', companyId)
@@ -202,6 +206,21 @@ export const fetchCatalogForUser = async (
     if (linkError) throw linkError;
     if (!link?.company_id) return [];
     return fetchCatalogForCompany(supabase, link.company_id);
+};
+
+// Basic (default) products are shown to every empresa, so they're not
+// gated by company_products — just is_basic + is_active.
+export const fetchBasicProducts = async (
+    supabase: SupabaseClient
+): Promise<AdminProduct[]> => {
+    const { data, error } = await supabase
+        .from('products')
+        .select(PRODUCT_SELECT)
+        .eq('is_basic', true)
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+    if (error) throw error;
+    return (data as ProductRow[]).map((r) => mapProductRow(r));
 };
 
 export const fetchUserCompanyId = async (
@@ -243,6 +262,8 @@ export interface ProductInput {
     sizes: Product['sizes'];
     fabricType?: string;
     isActive?: boolean;
+    /** Shared "basic" 3D item shown to every empresa. */
+    isBasic?: boolean;
     bom?: BomItem[];
     codigoCabys?: string;
     /**
@@ -257,7 +278,7 @@ export interface ProductInput {
 }
 
 const PRODUCT_SELECT =
-    'id, product_code, name, description, image_url, product_type, type_label, gender, genders, images_json, sizes_json, fabric_type, is_active, bom_json, codigo_cabys, stages_json';
+    'id, product_code, name, description, image_url, product_type, type_label, gender, genders, images_json, sizes_json, fabric_type, is_active, is_basic, bom_json, codigo_cabys, stages_json';
 
 // Normalize the audience fields from a ProductInput into the DB columns.
 // The single `gender` column stays populated (= first audience) so
@@ -356,6 +377,7 @@ export const createProduct = async (
             sizes_json: input.sizes,
             fabric_type: input.fabricType || null,
             is_active: input.isActive ?? true,
+            is_basic: input.isBasic ?? false,
             bom_json: input.bom || [],
             codigo_cabys: input.codigoCabys || null,
             stages_json: input.stages ?? []
@@ -388,6 +410,7 @@ export const updateProduct = async (
             sizes_json: input.sizes,
             fabric_type: input.fabricType || null,
             is_active: input.isActive ?? true,
+            is_basic: input.isBasic ?? false,
             bom_json: input.bom || [],
             codigo_cabys: input.codigoCabys || null,
             stages_json: input.stages ?? []

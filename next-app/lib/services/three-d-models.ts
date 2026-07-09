@@ -214,6 +214,23 @@ export async function reconcileCompanyAssignments(
     }
 }
 
+// The active 3D model linked to a product (basic items reach the studio
+// through their product, not via a company_three_d_models assignment).
+export async function fetchModelByProductId(
+    supabase: SupabaseClient,
+    productId: string
+): Promise<ThreeDModel | null> {
+    const { data, error } = await supabase
+        .from('three_d_models')
+        .select(MODEL_SELECT)
+        .eq('product_id', productId)
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+    if (error) throw error;
+    return data ? mapModel(data as unknown as ModelRow) : null;
+}
+
 // ── Customer-facing scoping ─────────────────────────────────────────
 export async function fetchModelsForCompany(
     supabase: SupabaseClient,

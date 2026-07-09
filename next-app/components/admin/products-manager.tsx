@@ -47,6 +47,7 @@ const emptyForm: ProductInput = {
     sizes: { men: [], women: [], waist: [], inseam: [] },
     fabricType: '',
     isActive: true,
+    isBasic: false,
     bom: [],
     codigoCabys: '',
     companyIds: [],
@@ -436,6 +437,7 @@ export function ProductsManager({
             sizes: p.sizes,
             fabricType: p.fabricType,
             isActive: p.isActive,
+            isBasic: p.isBasic,
             bom: p.bom || [],
             codigoCabys: p.codigoCabys || '',
             companyIds: p.companyIds || [],
@@ -1268,15 +1270,26 @@ export function ProductsManager({
                                 })}
                             </div>
 
-                            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-zinc-300">
-                                <input
-                                    type="checkbox"
-                                    checked={form.isActive ?? true}
-                                    onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
-                                    className="w-4 h-4 text-orange-600 dark:text-orange-400 rounded"
-                                />
-                                Producto activo
-                            </label>
+                            <div className="flex flex-wrap gap-4">
+                                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-zinc-300">
+                                    <input
+                                        type="checkbox"
+                                        checked={form.isActive ?? true}
+                                        onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
+                                        className="w-4 h-4 text-orange-600 dark:text-orange-400 rounded"
+                                    />
+                                    Producto activo
+                                </label>
+                                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-zinc-300">
+                                    <input
+                                        type="checkbox"
+                                        checked={form.isBasic ?? false}
+                                        onChange={(e) => setForm({ ...form, isBasic: e.target.checked })}
+                                        className="w-4 h-4 text-orange-600 dark:text-orange-400 rounded"
+                                    />
+                                    Producto básico (3D, visible para todos)
+                                </label>
+                            </div>
                             {error && (
                                 <div className="bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 p-3 rounded-lg text-sm border border-red-100 dark:border-red-900/50">
                                     {error}
