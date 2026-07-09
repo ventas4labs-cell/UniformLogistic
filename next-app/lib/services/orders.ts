@@ -320,11 +320,26 @@ export const fetchUserOrders = async (
     supabase: SupabaseClient,
     userId: string
 ): Promise<Order[]> => {
-    const { data, error } = await supabase
-        .from('orders')
-        .select(NESTED_SELECT)
-        .eq('created_by', userId)
-        .order('created_at', { ascending: false });
+    // A customer must see ALL of their company's orders, not only the
+    // ones they personally created. Orders placed by the admin on the
+    // company's behalf (the "place on behalf of" flow) have
+    // created_by = admin, so a created_by-only filter hid them and the
+    // customer's dashboard showed 0 orders. Resolve the company first,
+    // then match company_id OR created_by (the latter covers a rare
+    // user who has orders but no company link yet).
+    const { data: link } = await supabase
+        .from('company_users')
+        .select('company_id')
+        .eq('user_id', userId)
+        .maybeSingle();
+    const companyId = link?.company_id as string | undefined;
+
+    let query = supabase.from('orders').select(NESTED_SELECT);
+    query = companyId
+        ? query.or(`company_id.eq.${companyId},created_by.eq.${userId}`)
+        : query.eq('created_by', userId);
+
+    const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) throw error;
     const orders = ((data || []) as unknown as RawOrderRow[]).map(mapRowToOrder);

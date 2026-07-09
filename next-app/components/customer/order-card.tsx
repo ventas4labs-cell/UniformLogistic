@@ -1,35 +1,43 @@
-import Link from 'next/link';
-import { ArrowRight, Calendar, CheckCircle2, Clock, Package } from 'lucide-react';
+import {
+    Calendar,
+    CheckCircle2,
+    Clock,
+    Factory,
+    Truck,
+    XCircle
+} from 'lucide-react';
 import type { Order } from '@/lib/types';
+import type { CustomerOrderProgress, CustomerBucket } from '@/lib/customer-order-status';
+import { OrderDetailsButton } from '@/components/customer/order-details-modal';
 
-const PRODUCTION_STAGES = [
-    { key: 'bodega', label: 'Bodega' },
-    { key: 'corte', label: 'Corte' },
-    { key: 'maquila', label: 'Maquila' },
-    { key: 'impresion', label: 'Impresión' },
-    { key: 'empaque', label: 'Empaque' }
-] as const;
+// Status is derived from real production progress (order_stage_completions
+// + order_dispatches), NOT the legacy orders.status column — see
+// lib/customer-order-status.ts. The parallel stages render as an
+// independent completion strip (each segment fills when its stage is
+// done), so the bar reflects true progress rather than a fake pipeline.
 
-type StageKey = (typeof PRODUCTION_STAGES)[number]['key'];
-
-const stageIndex = (status: string): number => {
-    if (status === 'pending') return -1;
-    const idx = PRODUCTION_STAGES.findIndex((s) => s.key === status);
-    return idx;
-};
-
-export function OrderCard({ order, variant }: { order: Order; variant: 'production' | 'ready' | 'completed' }) {
-    const totalPieces = order.items.reduce((s, i) => s + i.quantity, 0);
-    const status = (order.status || 'pending') as StageKey | 'pending' | 'completed' | 'cancelled';
-    const isCompleted = status === 'completed';
-    const activeIdx = isCompleted ? PRODUCTION_STAGES.length - 1 : stageIndex(status);
+export function OrderCard({
+    order,
+    progress
+}: {
+    order: Order;
+    progress: CustomerOrderProgress;
+}) {
+    const { bucket, statusLabel, stages, doneCount, totalStages, totalPieces, deliveredPieces } =
+        progress;
+    const partiallyDelivered =
+        bucket !== 'completed' && deliveredPieces > 0 && deliveredPieces < totalPieces;
 
     const accent =
-        variant === 'ready'
+        bucket === 'ready'
             ? 'border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/40 dark:bg-emerald-950/20'
-            : variant === 'completed'
+            : bucket === 'completed'
               ? 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900'
-              : 'border-orange-200 dark:border-orange-900/50 bg-orange-50/40 dark:bg-orange-950/15';
+              : bucket === 'cancelled'
+                ? 'border-red-200 dark:border-red-900/50 bg-red-50/40 dark:bg-red-950/15'
+                : 'border-orange-200 dark:border-orange-900/50 bg-orange-50/40 dark:bg-orange-950/15';
+
+    const showStrip = bucket === 'production' || bucket === 'ready';
 
     return (
         <div className={`rounded-2xl border ${accent} p-4 sm:p-5 hover:shadow-md transition-shadow`}>
@@ -41,45 +49,34 @@ export function OrderCard({ order, variant }: { order: Order; variant: 'producti
                         {order.items.length === 1 ? '' : 's'}
                     </div>
                 </div>
-                <StatusBadge status={status} />
+                <StatusBadge bucket={bucket} label={statusLabel} />
             </div>
 
-            {/* Stage progress (hidden when completed-already-delivered or cancelled) */}
-            {variant !== 'completed' && status !== 'cancelled' && (
+            {/* Parallel stage completion strip */}
+            {showStrip && totalStages > 0 && (
                 <div className="mt-4">
                     <div className="flex items-center gap-1">
-                        {PRODUCTION_STAGES.map((stage, idx) => {
-                            const reached = idx <= activeIdx;
-                            const current = idx === activeIdx;
-                            return (
-                                <div
-                                    key={stage.key}
-                                    className={`flex-1 h-1.5 rounded-full ${
-                                        current
-                                            ? 'bg-orange-500'
-                                            : reached
-                                              ? 'bg-orange-300 dark:bg-orange-700'
-                                              : 'bg-zinc-200 dark:bg-zinc-700'
-                                    }`}
-                                />
-                            );
-                        })}
-                    </div>
-                    <div className="mt-1.5 flex justify-between text-[10px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                        {PRODUCTION_STAGES.map((stage, idx) => (
-                            <span
-                                key={stage.key}
-                                className={
-                                    idx === activeIdx
-                                        ? 'text-orange-600 dark:text-orange-400 font-bold'
-                                        : idx < activeIdx
-                                          ? 'text-zinc-700 dark:text-zinc-300'
-                                          : ''
-                                }
-                            >
-                                {stage.label}
-                            </span>
+                        {stages.map((s) => (
+                            <div
+                                key={s.key}
+                                title={`${s.label}${s.done ? ' · completado' : ' · pendiente'}`}
+                                className={`flex-1 h-1.5 rounded-full ${
+                                    s.done ? 'bg-emerald-500' : 'bg-zinc-200 dark:bg-zinc-700'
+                                }`}
+                            />
                         ))}
+                    </div>
+                    <div className="mt-1.5 flex items-center justify-between text-[10px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                        <span>
+                            {doneCount}/{totalStages} etapas
+                        </span>
+                        <span className="truncate ml-2">
+                            {stages
+                                .filter((s) => !s.done)
+                                .map((s) => s.label)
+                                .slice(0, 3)
+                                .join(' · ') || 'Todas listas'}
+                        </span>
                     </div>
                 </div>
             )}
@@ -96,37 +93,48 @@ export function OrderCard({ order, variant }: { order: Order; variant: 'producti
                             Entrega {order.deliveryDate}
                         </span>
                     )}
+                    {partiallyDelivered && (
+                        <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
+                            <Truck size={13} />
+                            {deliveredPieces}/{totalPieces} entregadas
+                        </span>
+                    )}
                 </div>
-                <Link
-                    href="/orders"
-                    className="inline-flex items-center gap-1 text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300 font-semibold"
-                >
-                    Detalles <ArrowRight size={13} />
-                </Link>
+                <OrderDetailsButton order={order} progress={progress} />
             </div>
         </div>
     );
 }
 
-function StatusBadge({ status }: { status: string }) {
-    const map: Record<string, { label: string; cls: string; Icon: React.ComponentType<{ size?: number }> }> = {
-        pending: { label: 'Pendiente', cls: 'bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300', Icon: Clock },
-        bodega: { label: 'Bodega', cls: 'bg-purple-100 text-purple-800 dark:bg-purple-950/50 dark:text-purple-300', Icon: Package },
-        corte: { label: 'Corte', cls: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950/50 dark:text-yellow-300', Icon: Package },
-        maquila: { label: 'Maquila', cls: 'bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-300', Icon: Package },
-        impresion: { label: 'Impresión', cls: 'bg-pink-100 text-pink-800 dark:bg-pink-950/50 dark:text-pink-300', Icon: Package },
-        empaque: { label: 'Empaque · Listo', cls: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300', Icon: CheckCircle2 },
-        completed: { label: 'Completado', cls: 'bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-300', Icon: CheckCircle2 },
-        cancelled: { label: 'Cancelado', cls: 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300', Icon: Clock }
+function StatusBadge({ bucket, label }: { bucket: CustomerBucket; label: string }) {
+    const map: Record<
+        CustomerBucket,
+        { cls: string; Icon: React.ComponentType<{ size?: number }> }
+    > = {
+        production: {
+            cls: 'bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-300',
+            Icon: Factory
+        },
+        ready: {
+            cls: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300',
+            Icon: Truck
+        },
+        completed: {
+            cls: 'bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-300',
+            Icon: CheckCircle2
+        },
+        cancelled: {
+            cls: 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300',
+            Icon: XCircle
+        }
     };
-    const entry = map[status] || map.pending;
-    const Icon = entry.Icon;
+    const { cls, Icon } = map[bucket];
     return (
         <span
-            className={`shrink-0 inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full ${entry.cls}`}
+            className={`shrink-0 inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap ${cls}`}
         >
             <Icon size={12} />
-            {entry.label}
+            {label}
         </span>
     );
 }

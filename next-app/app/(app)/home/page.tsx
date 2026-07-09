@@ -15,6 +15,9 @@ import { createClient } from '@/utils/supabase/server';
 import { isAdminEmail } from '@/lib/admin-acting-company';
 import { signOutAction } from '@/app/login/actions';
 import { fetchUserOrders } from '@/lib/services/orders';
+import { fetchStageCompletionsForOrders } from '@/lib/services/stage-completions';
+import { fetchDispatchTotalsForOrders } from '@/lib/services/dispatches';
+import { deriveOrderProgress, type CustomerOrderProgress } from '@/lib/customer-order-status';
 import { fetchStockForUser, summarizeStock } from '@/lib/services/stock';
 import { fetchInvoicesForUser, summarizeInvoices } from '@/lib/services/invoices';
 import { OrderCard } from '@/components/customer/order-card';
@@ -23,10 +26,6 @@ import type { Order } from '@/lib/types';
 
 const fmtCRC = (n: number) =>
     new Intl.NumberFormat('es-CR', { style: 'currency', currency: 'CRC', maximumFractionDigits: 0 }).format(n);
-
-const PRODUCTION_STATUSES = new Set(['pending', 'bodega', 'corte', 'maquila', 'impresion']);
-const READY_STATUSES = new Set(['empaque']);
-const COMPLETED_STATUSES = new Set(['completed']);
 
 const Mini = ({
     label,
@@ -75,9 +74,26 @@ export default async function HomePage() {
     const stockSummary = summarizeStock(stockRows);
     const invoiceSummary = summarizeInvoices(invoices);
 
-    const inProduction = allOrders.filter((o) => PRODUCTION_STATUSES.has(o.status || 'pending'));
-    const readyToDispatch = allOrders.filter((o) => READY_STATUSES.has(o.status || ''));
-    const completed = allOrders.filter((o) => COMPLETED_STATUSES.has(o.status || ''));
+    // Real production progress lives in order_stage_completions (parallel
+    // stages) + order_dispatches (delivery) — not orders.status. Derive
+    // each order's true bucket from those.
+    const orderIds = allOrders.map((o) => o.uuid).filter((id): id is string => !!id);
+    const [completions, dispatchTotals] = await Promise.all([
+        fetchStageCompletionsForOrders(supabase, orderIds),
+        fetchDispatchTotalsForOrders(supabase, orderIds)
+    ]);
+    const progressByOrder = new Map<string, CustomerOrderProgress>();
+    for (const o of allOrders) {
+        if (o.uuid) {
+            progressByOrder.set(o.uuid, deriveOrderProgress(o, completions, dispatchTotals));
+        }
+    }
+    const bucketOf = (o: Order) =>
+        o.uuid ? progressByOrder.get(o.uuid)?.bucket : undefined;
+
+    const inProduction = allOrders.filter((o) => bucketOf(o) === 'production');
+    const readyToDispatch = allOrders.filter((o) => bucketOf(o) === 'ready');
+    const completed = allOrders.filter((o) => bucketOf(o) === 'completed');
 
     const piecesInProduction = inProduction.reduce(
         (s, o) => s + o.items.reduce((a, i) => a + i.quantity, 0),
@@ -175,8 +191,8 @@ export default async function HomePage() {
                     Icon={Factory}
                     accent="orange"
                     orders={inProduction}
+                    progressByOrder={progressByOrder}
                     empty="Ningún pedido en producción ahora mismo."
-                    variant="production"
                 />
                 <Column
                     title="Listos para despacho"
@@ -184,8 +200,8 @@ export default async function HomePage() {
                     Icon={Truck}
                     accent="emerald"
                     orders={readyToDispatch}
+                    progressByOrder={progressByOrder}
                     empty="Aún no hay pedidos listos para despacho."
-                    variant="ready"
                 />
             </section>
 
@@ -301,13 +317,12 @@ export default async function HomePage() {
                         </Link>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {completed.slice(0, 4).map((o) => (
-                            <OrderCard
-                                key={o.uuid || o.id}
-                                order={o}
-                                variant="completed"
-                            />
-                        ))}
+                        {completed.slice(0, 4).map((o) => {
+                            const p = o.uuid ? progressByOrder.get(o.uuid) : undefined;
+                            return p ? (
+                                <OrderCard key={o.uuid || o.id} order={o} progress={p} />
+                            ) : null;
+                        })}
                     </div>
                 </section>
             )}
@@ -324,16 +339,16 @@ function Column({
     Icon,
     accent,
     orders,
-    empty,
-    variant
+    progressByOrder,
+    empty
 }: {
     title: string;
     subtitle: string;
     Icon: React.ComponentType<{ size?: number; className?: string }>;
     accent: 'orange' | 'emerald';
     orders: Order[];
+    progressByOrder: Map<string, CustomerOrderProgress>;
     empty: string;
-    variant: 'production' | 'ready';
 }) {
     const headerCls =
         accent === 'orange'
@@ -358,9 +373,12 @@ function Column({
                         {empty}
                     </div>
                 ) : (
-                    orders.map((o) => (
-                        <OrderCard key={o.uuid || o.id} order={o} variant={variant} />
-                    ))
+                    orders.map((o) => {
+                        const p = o.uuid ? progressByOrder.get(o.uuid) : undefined;
+                        return p ? (
+                            <OrderCard key={o.uuid || o.id} order={o} progress={p} />
+                        ) : null;
+                    })
                 )}
             </div>
         </div>
