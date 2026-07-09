@@ -25,6 +25,7 @@ import {
     updateModelAction,
     deleteModelAction,
     updateDesignStatusAction,
+    acceptDesignRequestAction,
     setCompanyCustomOrderEnabledAction
 } from '@/app/(admin)/admin/3d-models/actions';
 
@@ -457,7 +458,10 @@ function RequestsList({
 
 function RequestCard({ request: r, onChanged }: { request: DesignRequest; onChanged: () => void }) {
     const [busy, setBusy] = useState<DesignStatus | null>(null);
+    const [accepting, setAccepting] = useState(false);
+    const [acceptErr, setAcceptErr] = useState<string | null>(null);
     const badge = DESIGN_STATUS.find((s) => s.value === r.status) || DESIGN_STATUS[0];
+    const totalPieces = r.items.reduce((s, i) => s + i.quantity, 0);
 
     const setStatus = async (status: DesignStatus) => {
         setBusy(status);
@@ -467,6 +471,18 @@ function RequestCard({ request: r, onChanged }: { request: DesignRequest; onChan
         } finally {
             setBusy(null);
         }
+    };
+
+    const accept = async () => {
+        setAccepting(true);
+        setAcceptErr(null);
+        const res = await acceptDesignRequestAction(r.id);
+        setAccepting(false);
+        if (res.error) {
+            setAcceptErr(res.error);
+            return;
+        }
+        onChanged();
     };
 
     return (
@@ -527,11 +543,40 @@ function RequestCard({ request: r, onChanged }: { request: DesignRequest; onChan
                             ))}
                         </ul>
                     )}
+                    {r.items.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                            {r.items.map((it, i) => (
+                                <span
+                                    key={i}
+                                    className="text-[11px] font-bold px-1.5 py-0.5 rounded bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-zinc-200"
+                                >
+                                    {it.size} ×{it.quantity}
+                                </span>
+                            ))}
+                            <span className="text-[11px] font-bold px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-950/50 text-orange-800 dark:text-orange-300">
+                                {totalPieces} pzas
+                            </span>
+                        </div>
+                    )}
                     {r.notes && (
                         <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1 italic line-clamp-2">{r.notes}</p>
                     )}
-                    <div className="flex gap-1.5 mt-3">
-                        {(['reviewed', 'converted', 'archived'] as DesignStatus[]).map((s) => {
+                    {acceptErr && (
+                        <p className="text-xs text-red-600 dark:text-red-400 mt-2">{acceptErr}</p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-1.5 mt-3">
+                        {r.status !== 'converted' && (
+                            <button
+                                onClick={accept}
+                                disabled={accepting || r.items.length === 0 || !r.productCode}
+                                title={!r.productCode ? 'La solicitud no tiene producto vinculado' : ''}
+                                className="text-xs font-bold px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white inline-flex items-center gap-1.5 disabled:opacity-40"
+                            >
+                                {accepting ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                                Aceptar y crear pedido
+                            </button>
+                        )}
+                        {(['reviewed', 'archived'] as DesignStatus[]).map((s) => {
                             const label = DESIGN_STATUS.find((d) => d.value === s)!.label;
                             return (
                                 <button

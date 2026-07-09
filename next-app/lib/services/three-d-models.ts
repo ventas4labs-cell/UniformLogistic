@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { SizeSelection } from '@/lib/types';
 
 // ─── 3D models + custom design requests ─────────────────────────────
 // Models are ingested by `npm run sync:3d` (uploads the .glb + inserts
@@ -214,6 +215,19 @@ export async function reconcileCompanyAssignments(
     }
 }
 
+export async function fetchModelById(
+    supabase: SupabaseClient,
+    id: string
+): Promise<ThreeDModel | null> {
+    const { data, error } = await supabase
+        .from('three_d_models')
+        .select(MODEL_SELECT)
+        .eq('id', id)
+        .maybeSingle();
+    if (error) throw error;
+    return data ? mapModel(data as unknown as ModelRow) : null;
+}
+
 // The active 3D model linked to a product (basic items reach the studio
 // through their product, not via a company_three_d_models assignment).
 export async function fetchModelByProductId(
@@ -229,6 +243,27 @@ export async function fetchModelByProductId(
         .maybeSingle();
     if (error) throw error;
     return data ? mapModel(data as unknown as ModelRow) : null;
+}
+
+// Active models linked to a set of products, keyed by product id. Used
+// by the catalog to attach each basic product's 3D model.
+export async function fetchModelsForProductIds(
+    supabase: SupabaseClient,
+    productIds: string[]
+): Promise<Record<string, ThreeDModel>> {
+    const out: Record<string, ThreeDModel> = {};
+    if (productIds.length === 0) return out;
+    const { data, error } = await supabase
+        .from('three_d_models')
+        .select(MODEL_SELECT)
+        .in('product_id', productIds)
+        .eq('is_active', true);
+    if (error) throw error;
+    for (const r of (data || []) as unknown as ModelRow[]) {
+        const m = mapModel(r);
+        if (m.productId) out[m.productId] = m;
+    }
+    return out;
 }
 
 // ── Customer-facing scoping ─────────────────────────────────────────
@@ -263,6 +298,13 @@ export interface DesignLogo {
     logoName: string;
 }
 
+// One size line the customer chose (drives the order on accept).
+export interface DesignItem {
+    size: string; // display label, e.g. "H · M"
+    quantity: number;
+    selection: SizeSelection;
+}
+
 export interface DesignRequest {
     id: string;
     requestNumber: number;
@@ -279,6 +321,7 @@ export interface DesignRequest {
     notes: string;
     previewUrl: string;
     createdAt: string;
+    items: DesignItem[];
     logos: DesignLogo[];
 }
 
@@ -300,6 +343,7 @@ export interface DesignRequestInput {
     colorName?: string;
     notes?: string;
     previewUrl?: string;
+    items?: DesignItem[];
 }
 
 interface DesignRow {
@@ -314,6 +358,7 @@ interface DesignRow {
     color_name: string | null;
     notes: string | null;
     preview_url: string | null;
+    items: DesignItem[] | null;
     created_at: string;
     company?: { name: string } | { name: string }[] | null;
     logos?: {
@@ -344,6 +389,7 @@ const mapDesign = (r: DesignRow): DesignRequest => ({
     notes: r.notes || '',
     previewUrl: r.preview_url || '',
     createdAt: r.created_at,
+    items: Array.isArray(r.items) ? r.items : [],
     logos: (r.logos || []).map((l) => ({
         id: l.id,
         zoneId: l.zone_id || '',
@@ -356,7 +402,7 @@ const mapDesign = (r: DesignRow): DesignRequest => ({
 
 const DESIGN_SELECT = `
     id, request_number, company_id, model_id, model_name, product_code, product_name,
-    status, color_name, notes, preview_url, created_at,
+    status, color_name, notes, preview_url, items, created_at,
     company:companies ( name ),
     logos:custom_design_logos ( id, zone_id, zone_label, logo_id, logo_image_url, logo_name )
 `;
@@ -370,6 +416,19 @@ export async function fetchDesignRequests(
         .order('created_at', { ascending: false });
     if (error) throw error;
     return ((data || []) as unknown as DesignRow[]).map(mapDesign);
+}
+
+export async function fetchDesignRequest(
+    supabase: SupabaseClient,
+    id: string
+): Promise<DesignRequest | null> {
+    const { data, error } = await supabase
+        .from('custom_design_requests')
+        .select(DESIGN_SELECT)
+        .eq('id', id)
+        .maybeSingle();
+    if (error) throw error;
+    return data ? mapDesign(data as unknown as DesignRow) : null;
 }
 
 export async function createDesignRequest(
@@ -391,7 +450,8 @@ export async function createDesignRequest(
             status: 'sent',
             color_name: header.colorName ?? null,
             notes: header.notes ?? null,
-            preview_url: header.previewUrl ?? null
+            preview_url: header.previewUrl ?? null,
+            items: header.items ?? []
         })
         .select('id, request_number')
         .single();

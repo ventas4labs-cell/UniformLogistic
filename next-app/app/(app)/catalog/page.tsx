@@ -2,74 +2,70 @@ import { AlertCircle, Package } from 'lucide-react';
 import { createClient } from '@/utils/supabase/server';
 import {
     fetchCatalogForCompany,
-    fetchCatalogForUser,
+    fetchBasicProducts,
     fetchUserCompanyId
 } from '@/lib/services/products';
 import { fetchCompanies, isCustomOrderEnabled } from '@/lib/services/companies';
-import { fetchModelsForCompany } from '@/lib/services/three-d-models';
+import { fetchModelsForProductIds } from '@/lib/services/three-d-models';
+import { fetchLogos } from '@/lib/services/logos';
 import { getActingCompanyId, isAdminEmail } from '@/lib/admin-acting-company';
 import { CatalogGrid } from './catalog-grid';
 import { CompanyPicker } from './company-picker';
-
-// Only surface the "Pedido 3D personalizado" entry when the feature is
-// enabled for the company AND it has at least one 3D model assigned.
-async function customOrderHref(
-    supabase: Awaited<ReturnType<typeof createClient>>,
-    companyId: string | null
-): Promise<string | null> {
-    if (!companyId) return null;
-    if (!(await isCustomOrderEnabled(supabase, companyId))) return null;
-    const models = await fetchModelsForCompany(supabase, companyId);
-    return models.length > 0 ? '/custom-order' : null;
-}
 
 export default async function CatalogPage() {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null; // layout already redirects
 
-    // ─── Admin branch ────────────────────────────────────────────────
-    // Admin doesn't have a company_users link; they choose which company
-    // to place the order for via a cookie set by the company picker.
+    // ─── Resolve the company we're shopping for ──────────────────────
+    let companyId: string;
+    let actingCompany: { id: string; name: string } | null = null;
+
     if (isAdminEmail(user.email)) {
         const companies = (await fetchCompanies(supabase)).filter((c) => c.isActive);
         const actingId = await getActingCompanyId();
-        const acting = actingId
-            ? companies.find((c) => c.id === actingId) || null
-            : null;
-
-        if (!acting) {
-            return <CompanyPicker companies={companies} />;
-        }
-
-        const catalog = await fetchCatalogForCompany(supabase, acting.id);
-        const custom3d = await customOrderHref(supabase, acting.id);
-
-        return (
-            <CatalogGrid
-                catalog={catalog}
-                actingCompany={{ id: acting.id, name: acting.name }}
-                customOrderHref={custom3d}
-            />
-        );
-    }
-
-    // ─── Customer branch (unchanged) ─────────────────────────────────
-    const catalog = await fetchCatalogForUser(supabase, user.id);
-
-    if (catalog.length === 0) {
-        const companyId = await fetchUserCompanyId(supabase, user.id);
-        if (!companyId) {
+        const acting = actingId ? companies.find((c) => c.id === actingId) || null : null;
+        if (!acting) return <CompanyPicker companies={companies} />;
+        companyId = acting.id;
+        actingCompany = { id: acting.id, name: acting.name };
+    } else {
+        const cid = await fetchUserCompanyId(supabase, user.id);
+        if (!cid) {
             return (
                 <div className="max-w-md mx-auto mt-10 bg-amber-50 border border-amber-200 text-amber-800 p-8 rounded-2xl text-center">
                     <AlertCircle className="mx-auto mb-4" size={40} />
                     <h3 className="text-xl font-bold mb-2">Cuenta pendiente de activación</h3>
                     <p className="text-sm">
-                        Tu cuenta aún no está vinculada a una empresa. Contacta al administrador para que te asigne y puedas comenzar a hacer pedidos.
+                        Tu cuenta aún no está vinculada a una empresa. Contacta al administrador
+                        para que te asigne y puedas comenzar a hacer pedidos.
                     </p>
                 </div>
             );
         }
+        companyId = cid;
+    }
+
+    // ─── Own products + Basic (default) items ────────────────────────
+    const [own, basics, enabled, allLogos] = await Promise.all([
+        fetchCatalogForCompany(supabase, companyId),
+        fetchBasicProducts(supabase),
+        isCustomOrderEnabled(supabase, companyId),
+        fetchLogos(supabase)
+    ]);
+
+    // Basics need a linked 3D model; hide the section if the empresa has
+    // the 3D custom-order feature disabled.
+    const modelByProduct = enabled
+        ? await fetchModelsForProductIds(supabase, basics.map((b) => b.uuid))
+        : {};
+    const basicItems = basics
+        .filter((b) => modelByProduct[b.uuid])
+        .map((b) => ({ product: b, model: modelByProduct[b.uuid] }));
+    const companyLogos = allLogos.filter(
+        (l) => l.isActive && l.companyIds.includes(companyId)
+    );
+
+    if (own.length === 0 && basicItems.length === 0) {
         return (
             <div className="max-w-md mx-auto mt-10 bg-zinc-50 border border-zinc-200 text-zinc-600 p-8 rounded-2xl text-center">
                 <Package className="mx-auto mb-4 opacity-40" size={40} />
@@ -81,7 +77,12 @@ export default async function CatalogPage() {
         );
     }
 
-    const companyId = await fetchUserCompanyId(supabase, user.id);
-    const custom3d = await customOrderHref(supabase, companyId);
-    return <CatalogGrid catalog={catalog} customOrderHref={custom3d} />;
+    return (
+        <CatalogGrid
+            catalog={own}
+            basics={basicItems}
+            companyLogos={companyLogos}
+            actingCompany={actingCompany}
+        />
+    );
 }

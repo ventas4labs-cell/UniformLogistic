@@ -8,9 +8,10 @@ import { getActingCompanyId, isAdminEmail } from '@/lib/admin-acting-company';
 import { fetchLogos } from '@/lib/services/logos';
 import { isCustomOrderEnabled } from '@/lib/services/companies';
 import {
-    fetchModelsForCompany,
+    fetchModelById,
     createDesignRequest,
-    type DesignLogoInput
+    type DesignLogoInput,
+    type DesignItem
 } from '@/lib/services/three-d-models';
 
 interface SubmitLogo {
@@ -30,6 +31,7 @@ interface SubmitInput {
     notes: string;
     previewDataUrl: string;
     logos: SubmitLogo[];
+    items: DesignItem[];
 }
 
 const ALLOWED_LOGO_MIME = ['image/jpeg', 'image/jpg', 'image/png'];
@@ -99,10 +101,12 @@ export async function submitCustomDesignAction(
         return { ok: false, error: 'El pedido 3D personalizado no está habilitado para tu empresa.' };
     }
 
-    // The model must actually be assigned to this company.
-    const models = await fetchModelsForCompany(supabase, companyId);
-    const model = models.find((m) => m.id === input.modelId);
-    if (!model) return { ok: false, error: 'Modelo no disponible para tu empresa.' };
+    // Resolve the model (basic-item models reach here via the product,
+    // not a company assignment). Must exist + be active.
+    const model = await fetchModelById(supabase, input.modelId);
+    if (!model || !model.isActive) {
+        return { ok: false, error: 'Modelo no disponible.' };
+    }
 
     // Only accept logos that belong to this company; snapshot name + url.
     const companyLogos = (await fetchLogos(supabase)).filter(
@@ -162,7 +166,8 @@ export async function submitCustomDesignAction(
                 productName: model.productName,
                 colorName: input.colorName,
                 notes: input.notes,
-                previewUrl
+                previewUrl,
+                items: input.items
             },
             logos,
             user.id
