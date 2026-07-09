@@ -9,8 +9,19 @@ import { fetchLogos } from '@/lib/services/logos';
 import { isCustomOrderEnabled } from '@/lib/services/companies';
 import {
     fetchModelsForCompany,
-    createDesignRequest
+    createDesignRequest,
+    type DesignLogoInput
 } from '@/lib/services/three-d-models';
+
+interface SubmitLogo {
+    zoneId: string;
+    zoneLabel: string;
+    /** Set for a company logo; null for a customer-uploaded custom logo. */
+    logoId: string | null;
+    /** Set for a custom logo — must be a models-3d bucket URL. */
+    customUrl?: string;
+    customName?: string;
+}
 
 interface SubmitInput {
     modelId: string;
@@ -18,7 +29,37 @@ interface SubmitInput {
     colorName: string;
     notes: string;
     previewDataUrl: string;
-    logos: { zoneId: string; zoneLabel: string; logoId: string }[];
+    logos: SubmitLogo[];
+}
+
+const ALLOWED_LOGO_MIME = ['image/jpeg', 'image/jpg', 'image/png'];
+
+// Customer uploads their own artwork for a zone (jpg/png only). Goes to
+// the models-3d bucket under custom-logos/. Returns the public URL.
+export async function uploadCustomLogoAction(
+    formData: FormData
+): Promise<{ url?: string; error?: string }> {
+    const supabase = await createClient();
+    const {
+        data: { user }
+    } = await supabase.auth.getUser();
+    if (!user) return { error: 'No autenticado.' };
+
+    const file = formData.get('file');
+    if (!(file instanceof File)) return { error: 'No se recibió el archivo.' };
+    if (!ALLOWED_LOGO_MIME.includes(file.type)) {
+        return { error: 'Solo se permiten imágenes JPG o PNG.' };
+    }
+    if (file.size > 6 * 1024 * 1024) {
+        return { error: 'La imagen no puede superar 6 MB.' };
+    }
+    const ext = file.type === 'image/png' ? 'png' : 'jpg';
+    const key = `custom-logos/${randomUUID()}.${ext}`;
+    const { error } = await supabase.storage
+        .from('models-3d')
+        .upload(key, file, { contentType: file.type, upsert: false });
+    if (error) return { error: 'No se pudo subir la imagen.' };
+    return { url: supabase.storage.from('models-3d').getPublicUrl(key).data.publicUrl };
 }
 
 // Upload the captured canvas snapshot (data URL) to models-3d/previews/.
@@ -69,20 +110,40 @@ export async function submitCustomDesignAction(
     );
     const logoById = new Map(companyLogos.map((l) => [l.id, l]));
     const validZoneIds = new Set(model.zones.map((z) => z.id));
+    const modelsBase = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/models-3d/`;
 
-    const logos = model.allowLogoPlacement
-        ? input.logos
-              .filter((l) => validZoneIds.has(l.zoneId) && logoById.has(l.logoId))
-              .map((l) => {
+    const logos: DesignLogoInput[] = model.allowLogoPlacement
+        ? input.logos.flatMap((l): DesignLogoInput[] => {
+              if (!validZoneIds.has(l.zoneId)) return [];
+              // Company logo.
+              if (l.logoId && logoById.has(l.logoId)) {
                   const logo = logoById.get(l.logoId)!;
-                  return {
+                  return [{
                       zoneId: l.zoneId,
                       zoneLabel: l.zoneLabel,
                       logoId: l.logoId,
                       logoImageUrl: logo.imageUrl,
                       logoName: logo.name
-                  };
-              })
+                  }];
+              }
+              // Custom (customer-uploaded) logo — only if the model allows it
+              // and the URL is one we minted in the models-3d bucket.
+              if (
+                  model.allowCustomLogo &&
+                  !l.logoId &&
+                  l.customUrl &&
+                  l.customUrl.startsWith(modelsBase)
+              ) {
+                  return [{
+                      zoneId: l.zoneId,
+                      zoneLabel: l.zoneLabel,
+                      logoId: null,
+                      logoImageUrl: l.customUrl,
+                      logoName: l.customName?.trim() || 'Logo personalizado'
+                  }];
+              }
+              return [];
+          })
         : [];
 
     try {
@@ -96,6 +157,9 @@ export async function submitCustomDesignAction(
                 companyId,
                 modelId: model.id,
                 modelName: input.modelName || model.name,
+                productId: model.productId,
+                productCode: model.productCode,
+                productName: model.productName,
                 colorName: input.colorName,
                 notes: input.notes,
                 previewUrl

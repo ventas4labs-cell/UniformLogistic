@@ -4,14 +4,16 @@ import {
     fetchDesignRequests
 } from '@/lib/services/three-d-models';
 import { fetchCompanies } from '@/lib/services/companies';
+import { fetchProducts } from '@/lib/services/products';
 import { ThreeDModelsManager } from '@/components/admin/three-d-models-manager';
 
 export default async function ThreeDModelsPage() {
     const supabase = await createClient();
-    const [models, companies, requests] = await Promise.all([
+    const [models, companies, requests, products] = await Promise.all([
         fetchThreeDModels(supabase),
         fetchCompanies(supabase),
-        fetchDesignRequests(supabase)
+        fetchDesignRequests(supabase),
+        fetchProducts(supabase)
     ]);
 
     return (
@@ -22,6 +24,7 @@ export default async function ThreeDModelsPage() {
                 name: c.name,
                 customOrderEnabled: c.customOrderEnabled
             }))}
+            products={products.map((p) => ({ id: p.uuid, name: p.name, code: p.id }))}
             initialRequests={requests}
         />
     );

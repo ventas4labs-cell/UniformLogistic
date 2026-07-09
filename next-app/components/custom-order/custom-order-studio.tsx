@@ -7,7 +7,16 @@ import { ArrowLeft, Loader2, Check, Sparkles, Rotate3d } from 'lucide-react';
 import type { ThreeDModel } from '@/lib/services/three-d-models';
 import type { Logo } from '@/lib/services/logos';
 import type { PlacedLogo } from '@/components/three-d/centered-gltf';
-import { submitCustomDesignAction } from '@/app/(app)/custom-order/actions';
+import {
+    submitCustomDesignAction,
+    uploadCustomLogoAction
+} from '@/app/(app)/custom-order/actions';
+
+type ZoneChoice =
+    | { type: 'company'; logoId: string }
+    | { type: 'custom'; url: string; name: string };
+
+const CUSTOM = '__custom__';
 
 const ModelViewer3D = dynamic(() => import('./model-viewer-3d'), {
     ssr: false,
@@ -39,26 +48,58 @@ export function CustomOrderStudio({
 }) {
     const [modelId, setModelId] = useState(models[0].id);
     const [color, setColor] = useState(COLORS[0]);
-    const [zoneLogos, setZoneLogos] = useState<Record<string, string>>({});
+    const [zoneLogos, setZoneLogos] = useState<Record<string, ZoneChoice>>({});
+    const [uploadingZone, setUploadingZone] = useState<string | null>(null);
     const [notes, setNotes] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [doneRef, setDoneRef] = useState<string | null>(null);
     const viewerRef = useRef<HTMLDivElement>(null);
+    const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
     const model = useMemo(() => models.find((m) => m.id === modelId) || models[0], [models, modelId]);
 
-    // Logo planes to render on the model.
+    // Logo pointers to render on the model.
     const placed: PlacedLogo[] = useMemo(() => {
         if (!model.allowLogoPlacement) return [];
         return model.zones.flatMap((z) => {
-            const logo = logos.find((l) => l.id === zoneLogos[z.id]);
+            const c = zoneLogos[z.id];
+            if (!c) return [];
+            if (c.type === 'custom') return [{ zone: z, name: c.name }];
+            const logo = logos.find((l) => l.id === c.logoId);
             return logo ? [{ zone: z, name: logo.name }] : [];
         });
     }, [model, logos, zoneLogos]);
 
-    const setZone = (zoneId: string, logoId: string) =>
-        setZoneLogos((prev) => ({ ...prev, [zoneId]: logoId }));
+    const clearZone = (zoneId: string) =>
+        setZoneLogos((prev) => {
+            const n = { ...prev };
+            delete n[zoneId];
+            return n;
+        });
+
+    const setCompanyLogo = (zoneId: string, logoId: string) =>
+        logoId
+            ? setZoneLogos((prev) => ({ ...prev, [zoneId]: { type: 'company', logoId } }))
+            : clearZone(zoneId);
+
+    const handleCustomFile = async (zoneId: string, file: File) => {
+        setError(null);
+        if (!['image/jpeg', 'image/jpg', 'image/png'].includes(file.type)) {
+            setError('Solo se permiten imágenes JPG o PNG.');
+            return;
+        }
+        setUploadingZone(zoneId);
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await uploadCustomLogoAction(fd);
+        setUploadingZone(null);
+        if (res.error || !res.url) {
+            setError(res.error || 'No se pudo subir la imagen.');
+            return;
+        }
+        setZoneLogos((prev) => ({ ...prev, [zoneId]: { type: 'custom', url: res.url!, name: file.name } }));
+    };
 
     const capturePreview = (): string => {
         const canvas = viewerRef.current?.querySelector('canvas');
@@ -73,9 +114,21 @@ export function CustomOrderStudio({
         setSubmitting(true);
         setError(null);
         const previewDataUrl = capturePreview();
-        const chosen = model.zones
-            .map((z) => ({ zoneId: z.id, zoneLabel: z.label, logoId: zoneLogos[z.id] || '' }))
-            .filter((l) => l.logoId);
+        type Chosen = {
+            zoneId: string;
+            zoneLabel: string;
+            logoId: string | null;
+            customUrl?: string;
+            customName?: string;
+        };
+        const chosen = model.zones.flatMap((z): Chosen[] => {
+            const c = zoneLogos[z.id];
+            if (!c) return [];
+            if (c.type === 'custom') {
+                return [{ zoneId: z.id, zoneLabel: z.label, logoId: null, customUrl: c.url, customName: c.name }];
+            }
+            return [{ zoneId: z.id, zoneLabel: z.label, logoId: c.logoId }];
+        });
         const res = await submitCustomDesignAction({
             modelId: model.id,
             modelName: model.name,
@@ -203,23 +256,28 @@ export function CustomOrderStudio({
                             <h2 className="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-2">
                                 Logos por zona
                             </h2>
-                            {logos.length === 0 ? (
+                            {logos.length === 0 && !model.allowCustomLogo ? (
                                 <p className="text-xs text-zinc-400 italic">
                                     Tu empresa no tiene logos cargados. Contactanos para agregarlos.
                                 </p>
                             ) : (
                                 <div className="space-y-2">
                                     {model.zones.map((z) => {
-                                        const sel = logos.find((l) => l.id === zoneLogos[z.id]);
+                                        const c = zoneLogos[z.id];
+                                        const isCustom = c?.type === 'custom';
+                                        const companyLogoId = c?.type === 'company' ? c.logoId : '';
+                                        const companyLogo =
+                                            c?.type === 'company' ? logos.find((l) => l.id === c.logoId) : undefined;
+                                        const thumb = isCustom ? c.url : companyLogo?.imageUrl;
                                         return (
                                             <div
                                                 key={z.id}
                                                 className="flex items-center gap-2 p-2 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800"
                                             >
                                                 <div className="w-9 h-9 shrink-0 rounded-md bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center overflow-hidden">
-                                                    {sel?.imageUrl ? (
+                                                    {thumb ? (
                                                         // eslint-disable-next-line @next/next/no-img-element
-                                                        <img src={sel.imageUrl} alt={sel.name} className="w-full h-full object-contain" />
+                                                        <img src={thumb} alt="logo" className="w-full h-full object-contain" />
                                                     ) : (
                                                         <span className="text-[9px] text-zinc-400">—</span>
                                                     )}
@@ -229,16 +287,46 @@ export function CustomOrderStudio({
                                                         {z.label}
                                                     </p>
                                                     <select
-                                                        value={zoneLogos[z.id] || ''}
-                                                        onChange={(e) => setZone(z.id, e.target.value)}
+                                                        value={isCustom ? CUSTOM : companyLogoId}
+                                                        onChange={(e) => {
+                                                            const v = e.target.value;
+                                                            if (v === CUSTOM) fileRefs.current[z.id]?.click();
+                                                            else setCompanyLogo(z.id, v);
+                                                        }}
                                                         className="mt-0.5 w-full text-sm bg-transparent outline-none text-zinc-900 dark:text-zinc-100"
                                                     >
                                                         <option value="">Sin logo</option>
                                                         {logos.map((l) => (
                                                             <option key={l.id} value={l.id}>{l.name}</option>
                                                         ))}
+                                                        {model.allowCustomLogo && (
+                                                            <option value={CUSTOM}>Subir logo personalizado…</option>
+                                                        )}
                                                     </select>
+                                                    {isCustom && (
+                                                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">
+                                                            {c.name}
+                                                        </p>
+                                                    )}
+                                                    {uploadingZone === z.id && (
+                                                        <p className="text-[11px] text-orange-600 dark:text-orange-400">
+                                                            Subiendo…
+                                                        </p>
+                                                    )}
                                                 </div>
+                                                <input
+                                                    type="file"
+                                                    accept="image/png,image/jpeg,image/jpg"
+                                                    className="hidden"
+                                                    ref={(el) => {
+                                                        fileRefs.current[z.id] = el;
+                                                    }}
+                                                    onChange={(e) => {
+                                                        const f = e.target.files?.[0];
+                                                        if (f) handleCustomFile(z.id, f);
+                                                        e.target.value = '';
+                                                    }}
+                                                />
                                             </div>
                                         );
                                     })}

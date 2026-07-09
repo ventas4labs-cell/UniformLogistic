@@ -11,6 +11,7 @@ import {
     Loader2,
     X,
     Building2,
+    Package,
     Check
 } from 'lucide-react';
 import type {
@@ -47,6 +48,12 @@ interface Company {
     customOrderEnabled?: boolean;
 }
 
+interface ProductOption {
+    id: string; // products.id (uuid)
+    name: string;
+    code: string;
+}
+
 const PRODUCT_TYPES: { value: ThreeDProductType; label: string }[] = [
     { value: 'shirt', label: 'Camisa' },
     { value: 'pant', label: 'Pantalón' },
@@ -63,10 +70,12 @@ const DESIGN_STATUS: { value: DesignStatus; label: string; cls: string }[] = [
 export function ThreeDModelsManager({
     initialModels,
     companies,
+    products,
     initialRequests
 }: {
     initialModels: ThreeDModel[];
     companies: Company[];
+    products: ProductOption[];
     initialRequests: DesignRequest[];
 }) {
     const router = useRouter();
@@ -194,6 +203,7 @@ export function ThreeDModelsManager({
                 <ModelEditModal
                     model={editing}
                     companies={companies}
+                    products={products}
                     onClose={() => setEditing(null)}
                     onSaved={() => {
                         setEditing(null);
@@ -209,17 +219,21 @@ export function ThreeDModelsManager({
 function ModelEditModal({
     model,
     companies,
+    products,
     onClose,
     onSaved
 }: {
     model: ThreeDModel;
     companies: Company[];
+    products: ProductOption[];
     onClose: () => void;
     onSaved: () => void;
 }) {
     const [name, setName] = useState(model.name);
     const [productType, setProductType] = useState<ThreeDProductType>(model.productType);
     const [allowLogo, setAllowLogo] = useState(model.allowLogoPlacement);
+    const [allowCustomLogo, setAllowCustomLogo] = useState(model.allowCustomLogo);
+    const [productId, setProductId] = useState<string>(model.productId || '');
     const [isActive, setIsActive] = useState(model.isActive);
     const [zones, setZones] = useState<ZoneDef[]>(model.zones);
     const [assigned, setAssigned] = useState<Set<string>>(new Set(model.companyIds));
@@ -241,6 +255,8 @@ function ModelEditModal({
                 name: name.trim() || model.code,
                 productType,
                 allowLogoPlacement: allowLogo,
+                allowCustomLogo,
+                productId: productId || null,
                 isActive,
                 zones,
                 companyIds: [...assigned]
@@ -288,10 +304,35 @@ function ModelEditModal({
                         </label>
                     </div>
 
+                    <label className="block">
+                        <span className="text-xs font-bold text-gray-600 dark:text-zinc-400">
+                            Producto vinculado
+                        </span>
+                        <select
+                            value={productId}
+                            onChange={(e) => setProductId(e.target.value)}
+                            className="mt-1 w-full p-2 border rounded-lg text-sm bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700 outline-none focus:ring-2 focus:ring-orange-500"
+                        >
+                            <option value="">Sin producto</option>
+                            {products.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                    {p.name} ({p.code})
+                                </option>
+                            ))}
+                        </select>
+                        <span className="text-[11px] text-gray-400 dark:text-zinc-500">
+                            Se guarda en la solicitud para crear el pedido fácilmente.
+                        </span>
+                    </label>
+
                     <div className="flex flex-wrap gap-4">
                         <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-zinc-300">
                             <input type="checkbox" checked={allowLogo} onChange={(e) => setAllowLogo(e.target.checked)} className="accent-orange-600 w-4 h-4" />
                             Permitir edición de logos
+                        </label>
+                        <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-zinc-300">
+                            <input type="checkbox" checked={allowCustomLogo} onChange={(e) => setAllowCustomLogo(e.target.checked)} className="accent-orange-600 w-4 h-4" />
+                            Permitir logo personalizado
                         </label>
                         <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-zinc-300">
                             <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="accent-orange-600 w-4 h-4" />
@@ -455,13 +496,33 @@ function RequestCard({ request: r, onChanged }: { request: DesignRequest; onChan
                         {r.modelName}{r.colorName ? ` · ${r.colorName}` : ''} ·{' '}
                         {new Date(r.createdAt).toLocaleDateString()}
                     </p>
+                    {r.productName && (
+                        <p className="text-xs mt-1 inline-flex items-center gap-1 font-semibold text-gray-700 dark:text-zinc-200 bg-gray-100 dark:bg-zinc-800 px-2 py-0.5 rounded">
+                            <Package size={12} /> {r.productName}
+                            {r.productCode ? ` (${r.productCode})` : ''}
+                        </p>
+                    )}
                     {r.logos.length > 0 && (
-                        <ul className="mt-2 space-y-0.5">
+                        <ul className="mt-2 space-y-1">
                             {r.logos.map((l) => (
-                                <li key={l.id} className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-zinc-300">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                                <li key={l.id} className="flex items-center gap-2 text-xs text-gray-600 dark:text-zinc-300">
+                                    {l.logoImageUrl ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img
+                                            src={l.logoImageUrl}
+                                            alt={l.logoName}
+                                            className="w-7 h-7 rounded object-contain bg-white border border-gray-200 dark:border-zinc-700 shrink-0"
+                                        />
+                                    ) : (
+                                        <span className="w-1.5 h-1.5 rounded-full bg-orange-500 shrink-0" />
+                                    )}
                                     <span className="font-medium">{l.zoneLabel}:</span>
                                     <span className="truncate">{l.logoName || '—'}</span>
+                                    {!l.logoId && l.logoImageUrl && (
+                                        <span className="text-[9px] font-bold uppercase text-amber-700 bg-amber-100 dark:bg-amber-950/50 dark:text-amber-300 px-1 rounded">
+                                            Personalizado
+                                        </span>
+                                    )}
                                 </li>
                             ))}
                         </ul>

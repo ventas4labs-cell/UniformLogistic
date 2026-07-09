@@ -35,6 +35,12 @@ export interface ThreeDModel {
     updatedAt: string;
     /** Company UUIDs this model is assigned to (admin view only). */
     companyIds: string[];
+    /** Linked real product (for turning a design request into an order). */
+    productId: string | null;
+    productCode: string;
+    productName: string;
+    /** Whether the customer may upload their own artwork for a zone. */
+    allowCustomLogo: boolean;
 }
 
 export interface ThreeDModelInput {
@@ -42,6 +48,9 @@ export interface ThreeDModelInput {
     description?: string;
     productType?: ThreeDProductType;
     allowLogoPlacement?: boolean;
+    allowCustomLogo?: boolean;
+    /** products.id to link, or null to unlink. */
+    productId?: string | null;
     zones?: ZoneDef[];
     isActive?: boolean;
     sortOrder?: number;
@@ -58,6 +67,9 @@ interface ModelRow {
     poster_url: string | null;
     product_type: string;
     allow_logo_placement: boolean;
+    allow_custom_logo: boolean | null;
+    product_id: string | null;
+    product: { product_code: string; name: string } | { product_code: string; name: string }[] | null;
     zones: ZoneDef[] | null;
     is_active: boolean;
     sort_order: number;
@@ -69,26 +81,38 @@ interface ModelRow {
 const asProductType = (t: string): ThreeDProductType =>
     t === 'pant' || t === 'other' ? t : 'shirt';
 
-const mapModel = (r: ModelRow): ThreeDModel => ({
-    id: r.id,
-    code: r.code,
-    name: r.name,
-    description: r.description || '',
-    modelUrl: r.model_url,
-    posterUrl: r.poster_url || '',
-    productType: asProductType(r.product_type),
-    allowLogoPlacement: r.allow_logo_placement,
-    zones: Array.isArray(r.zones) ? r.zones : [],
-    isActive: r.is_active,
-    sortOrder: r.sort_order,
-    createdAt: r.created_at,
-    updatedAt: r.updated_at,
-    companyIds: (r.links || []).map((l) => l.company_id)
-});
+const one = <T,>(v: T | T[] | null | undefined): T | null =>
+    Array.isArray(v) ? (v[0] ?? null) : (v ?? null);
+
+const mapModel = (r: ModelRow): ThreeDModel => {
+    const product = one(r.product);
+    return {
+        id: r.id,
+        code: r.code,
+        name: r.name,
+        description: r.description || '',
+        modelUrl: r.model_url,
+        posterUrl: r.poster_url || '',
+        productType: asProductType(r.product_type),
+        allowLogoPlacement: r.allow_logo_placement,
+        allowCustomLogo: r.allow_custom_logo !== false,
+        zones: Array.isArray(r.zones) ? r.zones : [],
+        isActive: r.is_active,
+        sortOrder: r.sort_order,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+        companyIds: (r.links || []).map((l) => l.company_id),
+        productId: r.product_id,
+        productCode: product?.product_code || '',
+        productName: product?.name || ''
+    };
+};
 
 const MODEL_SELECT = `
     id, code, name, description, model_url, poster_url, product_type,
-    allow_logo_placement, zones, is_active, sort_order, created_at, updated_at,
+    allow_logo_placement, allow_custom_logo, product_id, zones, is_active,
+    sort_order, created_at, updated_at,
+    product:products ( product_code, name ),
     links:company_three_d_models ( id, company_id )
 `;
 
@@ -115,6 +139,8 @@ export async function updateThreeDModel(
     if (input.description !== undefined) patch.description = input.description || null;
     if (input.productType !== undefined) patch.product_type = input.productType;
     if (input.allowLogoPlacement !== undefined) patch.allow_logo_placement = input.allowLogoPlacement;
+    if (input.allowCustomLogo !== undefined) patch.allow_custom_logo = input.allowCustomLogo;
+    if (input.productId !== undefined) patch.product_id = input.productId;
     if (input.zones !== undefined) patch.zones = input.zones;
     if (input.isActive !== undefined) patch.is_active = input.isActive;
     if (input.sortOrder !== undefined) patch.sort_order = input.sortOrder;
@@ -228,6 +254,9 @@ export interface DesignRequest {
     companyName: string;
     modelId: string | null;
     modelName: string;
+    /** Linked product snapshot (for creating the order). */
+    productCode: string;
+    productName: string;
     status: DesignStatus;
     colorName: string;
     notes: string;
@@ -248,6 +277,9 @@ export interface DesignRequestInput {
     companyId: string | null;
     modelId: string | null;
     modelName?: string;
+    productId?: string | null;
+    productCode?: string;
+    productName?: string;
     colorName?: string;
     notes?: string;
     previewUrl?: string;
@@ -259,6 +291,8 @@ interface DesignRow {
     company_id: string | null;
     model_id: string | null;
     model_name: string | null;
+    product_code: string | null;
+    product_name: string | null;
     status: string;
     color_name: string | null;
     notes: string | null;
@@ -286,6 +320,8 @@ const mapDesign = (r: DesignRow): DesignRequest => ({
     companyName: pickOne(r.company)?.name || '',
     modelId: r.model_id,
     modelName: r.model_name || '',
+    productCode: r.product_code || '',
+    productName: r.product_name || '',
     status: (r.status as DesignStatus) || 'sent',
     colorName: r.color_name || '',
     notes: r.notes || '',
@@ -302,8 +338,8 @@ const mapDesign = (r: DesignRow): DesignRequest => ({
 });
 
 const DESIGN_SELECT = `
-    id, request_number, company_id, model_id, model_name, status, color_name,
-    notes, preview_url, created_at,
+    id, request_number, company_id, model_id, model_name, product_code, product_name,
+    status, color_name, notes, preview_url, created_at,
     company:companies ( name ),
     logos:custom_design_logos ( id, zone_id, zone_label, logo_id, logo_image_url, logo_name )
 `;
@@ -332,6 +368,9 @@ export async function createDesignRequest(
             created_by: createdBy,
             model_id: header.modelId,
             model_name: header.modelName ?? null,
+            product_id: header.productId ?? null,
+            product_code: header.productCode ?? null,
+            product_name: header.productName ?? null,
             status: 'sent',
             color_name: header.colorName ?? null,
             notes: header.notes ?? null,
