@@ -554,17 +554,17 @@ function ConfigDrawer({
                     shown ? 'translate-x-0' : 'translate-x-full'
                 }`}
             >
-                <div className="relative h-56 sm:h-64 bg-[#F1EDE4] shrink-0">
+                <div className="relative bg-[#F1EDE4] shrink-0">
                     {shownImage ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                             key={shownImage}
                             src={shownImage}
                             alt={`${item.name}${color ? ' — ' + color : ''}`}
-                            className="w-full h-full object-contain p-2"
+                            className="block w-full h-auto max-h-[60vh] object-contain"
                         />
                     ) : (
-                        <div className="w-full h-full flex items-center justify-center">
+                        <div className="w-full h-56 sm:h-64 flex items-center justify-center">
                             <ImageIcon size={40} className="text-[#16130F]/20" />
                         </div>
                     )}
