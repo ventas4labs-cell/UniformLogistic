@@ -6,9 +6,21 @@ import {
     fetchUserCompanyId
 } from '@/lib/services/products';
 import { fetchCompanies } from '@/lib/services/companies';
+import { fetchModelsForCompany } from '@/lib/services/three-d-models';
 import { getActingCompanyId, isAdminEmail } from '@/lib/admin-acting-company';
 import { CatalogGrid } from './catalog-grid';
 import { CompanyPicker } from './company-picker';
+
+// Only surface the "Pedido 3D personalizado" entry when the company has
+// at least one 3D model assigned.
+async function customOrderHref(
+    supabase: Awaited<ReturnType<typeof createClient>>,
+    companyId: string | null
+): Promise<string | null> {
+    if (!companyId) return null;
+    const models = await fetchModelsForCompany(supabase, companyId);
+    return models.length > 0 ? '/custom-order' : null;
+}
 
 export default async function CatalogPage() {
     const supabase = await createClient();
@@ -30,20 +42,13 @@ export default async function CatalogPage() {
         }
 
         const catalog = await fetchCatalogForCompany(supabase, acting.id);
-
-        if (catalog.length === 0) {
-            return (
-                <CatalogGrid
-                    catalog={catalog}
-                    actingCompany={{ id: acting.id, name: acting.name }}
-                />
-            );
-        }
+        const custom3d = await customOrderHref(supabase, acting.id);
 
         return (
             <CatalogGrid
                 catalog={catalog}
                 actingCompany={{ id: acting.id, name: acting.name }}
+                customOrderHref={custom3d}
             />
         );
     }
@@ -75,5 +80,7 @@ export default async function CatalogPage() {
         );
     }
 
-    return <CatalogGrid catalog={catalog} />;
+    const companyId = await fetchUserCompanyId(supabase, user.id);
+    const custom3d = await customOrderHref(supabase, companyId);
+    return <CatalogGrid catalog={catalog} customOrderHref={custom3d} />;
 }

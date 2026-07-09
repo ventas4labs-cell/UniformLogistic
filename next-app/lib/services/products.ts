@@ -1,6 +1,17 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Product, ProductType } from '@/lib/types';
+import type { Product, ProductType, ProductGender, ProductImages } from '@/lib/types';
 import type { StageKey } from '@/lib/services/stage-completions';
+
+// First non-empty picture across the per-audience galleries — used as
+// the primary thumbnail (image_url) for back-compat readers.
+const firstImage = (images?: ProductImages | null): string | undefined => {
+    if (!images) return undefined;
+    for (const key of ['men', 'women', 'unisex'] as const) {
+        const arr = images[key];
+        if (arr && arr.length > 0) return arr[0];
+    }
+    return undefined;
+};
 
 export interface BomItem {
     name: string;
@@ -90,6 +101,8 @@ export interface ProductRow {
     product_type: 'shirt' | 'pant';
     type_label: string | null;
     gender: 'men' | 'women' | 'unisex';
+    genders: string[] | null;
+    images_json: ProductImages | null;
     sizes_json: Product['sizes'] | null;
     fabric_type: string | null;
     is_active: boolean | null;
@@ -134,9 +147,15 @@ export const mapProductRow = (
     name: row.name,
     type: row.product_type as ProductType,
     typeLabel: row.type_label?.trim() || defaultTypeLabel(row.product_type),
-    image: row.image_url || '',
+    image: row.image_url || firstImage(row.images_json) || '',
     description: row.description || '',
     category: genderToCategory(row.gender),
+    // Fall back to the single gender for rows created before the array
+    // existed, so the multi-select always shows at least one audience.
+    genders: (row.genders && row.genders.length > 0
+        ? row.genders
+        : [row.gender]) as ProductGender[],
+    images: row.images_json || {},
     sizes: row.sizes_json || {},
     fabricType: row.fabric_type || '',
     isActive: row.is_active !== false,
@@ -155,7 +174,7 @@ export const fetchCatalogForCompany = async (
         .select(`
             product:products (
                 id, product_code, name, description, image_url,
-                product_type, type_label, gender, sizes_json, fabric_type, is_active, bom_json, codigo_cabys, stages_json
+                product_type, type_label, gender, genders, images_json, sizes_json, fabric_type, is_active, bom_json, codigo_cabys, stages_json
             )
         `)
         .eq('company_id', companyId)
@@ -210,7 +229,17 @@ export interface ProductInput {
      * back to "Camisa" / "Pantalón" based on productType.
      */
     typeLabel?: string;
-    gender: 'men' | 'women' | 'unisex';
+    /**
+     * Legacy single audience. Optional now that `genders` carries the
+     * full set — kept so voice-dictation (which parses one gender) and
+     * older callers still type-check. The DB `gender` column is derived
+     * from `genders[0]` when present.
+     */
+    gender?: ProductGender;
+    /** Full audience set (Hombre / Mujer / Unisex). At least one. */
+    genders?: ProductGender[];
+    /** Per-audience picture galleries. */
+    images?: ProductImages;
     sizes: Product['sizes'];
     fabricType?: string;
     isActive?: boolean;
@@ -228,7 +257,26 @@ export interface ProductInput {
 }
 
 const PRODUCT_SELECT =
-    'id, product_code, name, description, image_url, product_type, type_label, gender, sizes_json, fabric_type, is_active, bom_json, codigo_cabys, stages_json';
+    'id, product_code, name, description, image_url, product_type, type_label, gender, genders, images_json, sizes_json, fabric_type, is_active, bom_json, codigo_cabys, stages_json';
+
+// Normalize the audience fields from a ProductInput into the DB columns.
+// The single `gender` column stays populated (= first audience) so
+// legacy readers keep working; `genders`/`images_json` hold the rich set.
+const audienceColumns = (input: ProductInput) => {
+    const genders =
+        input.genders && input.genders.length > 0
+            ? input.genders
+            : input.gender
+              ? [input.gender]
+              : ['unisex' as ProductGender];
+    const images = input.images ?? {};
+    return {
+        gender: genders[0],
+        genders,
+        images_json: images,
+        image_url: input.imageUrl || firstImage(images) || null
+    };
+};
 
 interface ProductRowWithLinks extends ProductRow {
     links: { company_id: string }[] | null;
@@ -299,11 +347,10 @@ export const createProduct = async (
             product_code: input.productCode,
             name: input.name,
             description: input.description,
-            image_url: input.imageUrl || null,
             product_type: input.productType,
             type_label:
                 input.typeLabel?.trim() || defaultTypeLabel(input.productType),
-            gender: input.gender,
+            ...audienceColumns(input),
             sizes_json: input.sizes,
             fabric_type: input.fabricType || null,
             is_active: input.isActive ?? true,
@@ -332,11 +379,10 @@ export const updateProduct = async (
             product_code: input.productCode,
             name: input.name,
             description: input.description,
-            image_url: input.imageUrl || null,
             product_type: input.productType,
             type_label:
                 input.typeLabel?.trim() || defaultTypeLabel(input.productType),
-            gender: input.gender,
+            ...audienceColumns(input),
             sizes_json: input.sizes,
             fabric_type: input.fabricType || null,
             is_active: input.isActive ?? true,

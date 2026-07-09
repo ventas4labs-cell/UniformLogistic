@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
-import { useGLTF, useTexture } from '@react-three/drei';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import type { ZoneDef } from '@/lib/services/three-d-models';
 
@@ -38,7 +38,32 @@ interface Props {
 }
 
 function LogoPlane({ zone, url }: PlacedLogo) {
-    const texture = useTexture(url);
+    // Load imperatively (not useTexture) so a failing/oversized/CORS
+    // logo simply doesn't render instead of blanking the whole model.
+    // crossOrigin keeps the canvas untainted so the preview snapshot
+    // (toDataURL) still works.
+    const [texture, setTexture] = useState<THREE.Texture | null>(null);
+    useEffect(() => {
+        let cancelled = false;
+        const loader = new THREE.TextureLoader();
+        loader.setCrossOrigin('anonymous');
+        loader.load(
+            url,
+            (t) => {
+                if (cancelled) return;
+                t.colorSpace = THREE.SRGBColorSpace;
+                setTexture(t);
+            },
+            undefined,
+            () => {
+                /* ignore — logo just won't show */
+            }
+        );
+        return () => {
+            cancelled = true;
+        };
+    }, [url]);
+
     const { position, quaternion } = useMemo(() => {
         const n = new THREE.Vector3(...zone.normal);
         if (n.lengthSq() === 0) n.set(0, 0, 1);
@@ -47,6 +72,8 @@ function LogoPlane({ zone, url }: PlacedLogo) {
         const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), n);
         return { position: pos, quaternion: q };
     }, [zone]);
+
+    if (!texture) return null;
 
     return (
         <mesh position={position} quaternion={quaternion} renderOrder={2}>

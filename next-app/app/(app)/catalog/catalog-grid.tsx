@@ -1,9 +1,10 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Building2, Repeat } from 'lucide-react';
+import { Building2, Repeat, Sparkles, ArrowRight } from 'lucide-react';
 import type { AdminProduct } from '@/lib/services/products';
 import type { Product } from '@/lib/types';
 import { useCart } from '@/components/cart-provider';
@@ -25,9 +26,12 @@ interface Props {
     // Renders the "Pedido para X · Cambiar" banner and exposes the cart
     // clear+cookie-clear flow.
     actingCompany?: { id: string; name: string } | null;
+    // When the company has ≥1 assigned 3D model, link to the 3D custom
+    // order studio (null hides the entry).
+    customOrderHref?: string | null;
 }
 
-export function CatalogGrid({ catalog, actingCompany }: Props) {
+export function CatalogGrid({ catalog, actingCompany, customOrderHref }: Props) {
     const router = useRouter();
     const [categoryFilter, setCategoryFilter] = useState<Category>('All');
     const [query, setQuery] = useState('');
@@ -98,6 +102,29 @@ export function CatalogGrid({ catalog, actingCompany }: Props) {
                             antes de hacer un pedido.
                         </p>
                     </div>
+                </div>
+            )}
+
+            {customOrderHref && (
+                <div className="px-4 pt-4">
+                    <Link
+                        href={customOrderHref}
+                        className="group max-w-3xl mx-auto flex items-center gap-3 p-4 rounded-2xl bg-gradient-to-r from-orange-600 to-orange-500 text-white shadow-md shadow-orange-500/20 hover:shadow-lg transition-shadow"
+                    >
+                        <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                            <Sparkles size={20} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="font-extrabold leading-tight">Pedido 3D personalizado</p>
+                            <p className="text-sm text-white/85">
+                                Visualizá el uniforme en 3D y colocá tus logos.
+                            </p>
+                        </div>
+                        <ArrowRight
+                            size={20}
+                            className="shrink-0 transition-transform group-hover:translate-x-1"
+                        />
+                    </Link>
                 </div>
             )}
 
