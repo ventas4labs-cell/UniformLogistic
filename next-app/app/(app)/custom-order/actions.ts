@@ -6,6 +6,7 @@ import { createClient } from '@/utils/supabase/server';
 import { fetchUserCompanyId } from '@/lib/services/products';
 import { getActingCompanyId, isAdminEmail } from '@/lib/admin-acting-company';
 import { fetchLogos } from '@/lib/services/logos';
+import { isCustomOrderEnabled } from '@/lib/services/companies';
 import {
     fetchModelsForCompany,
     createDesignRequest
@@ -51,6 +52,11 @@ export async function submitCustomDesignAction(
         ? await getActingCompanyId()
         : await fetchUserCompanyId(supabase, user.id);
     if (!companyId) return { ok: false, error: 'No se pudo determinar tu empresa.' };
+
+    // Master switch — reject if the feature is disabled for this empresa.
+    if (!(await isCustomOrderEnabled(supabase, companyId))) {
+        return { ok: false, error: 'El pedido 3D personalizado no está habilitado para tu empresa.' };
+    }
 
     // The model must actually be assigned to this company.
     const models = await fetchModelsForCompany(supabase, companyId);

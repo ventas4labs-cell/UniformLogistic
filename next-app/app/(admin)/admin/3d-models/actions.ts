@@ -9,6 +9,7 @@ import {
     type ThreeDModelInput,
     type DesignStatus
 } from '@/lib/services/three-d-models';
+import { setCompanyCustomOrderEnabled } from '@/lib/services/companies';
 
 // Route gate at (admin)/admin/layout.tsx already restricts these to the
 // admin email, same as the other admin modules (catalogo-default etc.).
@@ -30,4 +31,10 @@ export async function updateDesignStatusAction(id: string, status: DesignStatus)
     const supabase = await createClient();
     await updateDesignRequestStatus(supabase, id, status);
     revalidatePath('/admin/3d-models');
+}
+
+export async function setCompanyCustomOrderEnabledAction(companyId: string, enabled: boolean) {
+    const supabase = await createClient();
+    await setCompanyCustomOrderEnabled(supabase, companyId, enabled);
+    for (const p of REVAL_PATHS) revalidatePath(p);
 }

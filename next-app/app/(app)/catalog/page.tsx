@@ -5,19 +5,20 @@ import {
     fetchCatalogForUser,
     fetchUserCompanyId
 } from '@/lib/services/products';
-import { fetchCompanies } from '@/lib/services/companies';
+import { fetchCompanies, isCustomOrderEnabled } from '@/lib/services/companies';
 import { fetchModelsForCompany } from '@/lib/services/three-d-models';
 import { getActingCompanyId, isAdminEmail } from '@/lib/admin-acting-company';
 import { CatalogGrid } from './catalog-grid';
 import { CompanyPicker } from './company-picker';
 
-// Only surface the "Pedido 3D personalizado" entry when the company has
-// at least one 3D model assigned.
+// Only surface the "Pedido 3D personalizado" entry when the feature is
+// enabled for the company AND it has at least one 3D model assigned.
 async function customOrderHref(
     supabase: Awaited<ReturnType<typeof createClient>>,
     companyId: string | null
 ): Promise<string | null> {
     if (!companyId) return null;
+    if (!(await isCustomOrderEnabled(supabase, companyId))) return null;
     const models = await fetchModelsForCompany(supabase, companyId);
     return models.length > 0 ? '/custom-order' : null;
 }

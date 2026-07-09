@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server';
 import { fetchUserCompanyId } from '@/lib/services/products';
 import { fetchModelsForCompany } from '@/lib/services/three-d-models';
 import { fetchLogos } from '@/lib/services/logos';
+import { isCustomOrderEnabled } from '@/lib/services/companies';
 import { getActingCompanyId, isAdminEmail } from '@/lib/admin-acting-company';
 import { CustomOrderStudio } from '@/components/custom-order/custom-order-studio';
 
@@ -41,6 +42,13 @@ export default async function CustomOrderPage() {
     if (!companyId) {
         return (
             <EmptyState message="Tu cuenta aún no está vinculada a una empresa. Contactá a Uniform Logistic para activarla." />
+        );
+    }
+
+    // Master switch — admin can turn the feature off for this empresa.
+    if (!(await isCustomOrderEnabled(supabase, companyId))) {
+        return (
+            <EmptyState message="El pedido 3D personalizado no está habilitado para tu empresa. Escribinos si te interesa activarlo." />
         );
     }
 

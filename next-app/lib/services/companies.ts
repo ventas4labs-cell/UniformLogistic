@@ -16,6 +16,8 @@ export interface Company {
     orderUserId: string;
     /** That user's (synthetic) email, used for the server-side sign-in. */
     orderUserEmail: string;
+    /** Master switch for the 3D custom-order feature for this empresa. */
+    customOrderEnabled: boolean;
 }
 
 export interface CompanyInput {
@@ -41,6 +43,7 @@ interface CompanyRow {
     access_token: string | null;
     order_user_id: string | null;
     order_user_email: string | null;
+    custom_order_enabled: boolean | null;
 }
 
 const mapRow = (row: CompanyRow): Company => ({
@@ -55,11 +58,12 @@ const mapRow = (row: CompanyRow): Company => ({
     createdAt: row.created_at,
     accessToken: row.access_token || '',
     orderUserId: row.order_user_id || '',
-    orderUserEmail: row.order_user_email || ''
+    orderUserEmail: row.order_user_email || '',
+    customOrderEnabled: row.custom_order_enabled !== false
 });
 
 const SELECT =
-    'id, name, document_number, contact_name, email, phone, address, is_active, created_at, access_token, order_user_id, order_user_email';
+    'id, name, document_number, contact_name, email, phone, address, is_active, created_at, access_token, order_user_id, order_user_email, custom_order_enabled';
 
 export const fetchCompanies = async (
     supabase: SupabaseClient
@@ -135,6 +139,34 @@ export const deleteCompany = async (
 ): Promise<void> => {
     const { error } = await supabase.from('companies').delete().eq('id', id);
     if (error) throw error;
+};
+
+/** Flip the 3D custom-order feature on/off for one empresa. */
+export const setCompanyCustomOrderEnabled = async (
+    supabase: SupabaseClient,
+    id: string,
+    enabled: boolean
+): Promise<void> => {
+    const { error } = await supabase
+        .from('companies')
+        .update({ custom_order_enabled: enabled })
+        .eq('id', id);
+    if (error) throw error;
+};
+
+/** Cheap gate read: is the 3D custom-order feature enabled for a company?
+ *  Missing row or null column both resolve to enabled (feature-on default). */
+export const isCustomOrderEnabled = async (
+    supabase: SupabaseClient,
+    companyId: string
+): Promise<boolean> => {
+    const { data, error } = await supabase
+        .from('companies')
+        .select('custom_order_enabled')
+        .eq('id', companyId)
+        .maybeSingle();
+    if (error) throw error;
+    return (data?.custom_order_enabled ?? true) !== false;
 };
 
 // ─── Order-link helpers ──────────────────────────────────────────────

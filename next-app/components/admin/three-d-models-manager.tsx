@@ -23,7 +23,8 @@ import type {
 import {
     updateModelAction,
     deleteModelAction,
-    updateDesignStatusAction
+    updateDesignStatusAction,
+    setCompanyCustomOrderEnabledAction
 } from '@/app/(admin)/admin/3d-models/actions';
 
 // R3F is client-only + heavy — load the zone editor lazily so it never
@@ -43,6 +44,7 @@ const ModelZoneEditor = dynamic(
 interface Company {
     id: string;
     name: string;
+    customOrderEnabled?: boolean;
 }
 
 const PRODUCT_TYPES: { value: ThreeDProductType; label: string }[] = [
@@ -68,7 +70,7 @@ export function ThreeDModelsManager({
     initialRequests: DesignRequest[];
 }) {
     const router = useRouter();
-    const [tab, setTab] = useState<'models' | 'requests'>('models');
+    const [tab, setTab] = useState<'models' | 'requests' | 'companies'>('models');
     const [editing, setEditing] = useState<ThreeDModel | null>(null);
 
     const newCount = initialRequests.filter((r) => r.status === 'sent').length;
@@ -117,6 +119,16 @@ export function ThreeDModelsManager({
                             {newCount}
                         </span>
                     )}
+                </button>
+                <button
+                    onClick={() => setTab('companies')}
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+                        tab === 'companies'
+                            ? 'bg-orange-600 text-white shadow-sm'
+                            : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-300'
+                    }`}
+                >
+                    <Building2 size={16} /> Empresas
                 </button>
             </div>
 
@@ -172,8 +184,10 @@ export function ThreeDModelsManager({
                         ))}
                     </div>
                 )
-            ) : (
+            ) : tab === 'requests' ? (
                 <RequestsList requests={initialRequests} onChanged={() => router.refresh()} />
+            ) : (
+                <CompaniesToggleList companies={companies} />
             )}
 
             {editing && (
@@ -471,6 +485,76 @@ function RequestCard({ request: r, onChanged }: { request: DesignRequest; onChan
                         })}
                     </div>
                 </div>
+            </div>
+        </div>
+    );
+}
+
+// ── Empresas tab — per-company 3D feature toggle ────────────────────
+function CompaniesToggleList({ companies }: { companies: Company[] }) {
+    if (companies.length === 0) {
+        return (
+            <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm p-12 text-center text-gray-500 dark:text-zinc-400">
+                No hay empresas.
+            </div>
+        );
+    }
+    return (
+        <div className="bg-white dark:bg-zinc-900 rounded-xl border border-gray-200 dark:border-zinc-800 shadow-sm overflow-hidden">
+            <p className="px-4 py-3 text-sm text-gray-500 dark:text-zinc-400 border-b border-gray-100 dark:border-zinc-800">
+                Activá o desactivá el <span className="font-semibold">pedido 3D personalizado</span> por
+                empresa. Al desactivarlo, la empresa deja de ver la opción aunque tenga modelos asignados.
+            </p>
+            <div className="divide-y divide-gray-100 dark:divide-zinc-800">
+                {companies.map((c) => (
+                    <CompanyToggleRow key={c.id} company={c} />
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function CompanyToggleRow({ company }: { company: Company }) {
+    const [enabled, setEnabled] = useState(company.customOrderEnabled !== false);
+    const [busy, setBusy] = useState(false);
+
+    const toggle = async () => {
+        const next = !enabled;
+        setEnabled(next);
+        setBusy(true);
+        try {
+            await setCompanyCustomOrderEnabledAction(company.id, next);
+        } catch {
+            setEnabled(!next); // revert on failure
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return (
+        <div className="flex items-center justify-between gap-3 px-4 py-3">
+            <span className="font-medium text-gray-800 dark:text-zinc-200 truncate">{company.name}</span>
+            <div className="flex items-center gap-2 shrink-0">
+                <span className={`text-xs font-bold ${enabled ? 'text-orange-600 dark:text-orange-400' : 'text-gray-400 dark:text-zinc-500'}`}>
+                    {enabled ? 'Activo' : 'Desactivado'}
+                </span>
+                <button
+                    type="button"
+                    role="switch"
+                    aria-checked={enabled}
+                    aria-label={`Pedido 3D para ${company.name}`}
+                    onClick={toggle}
+                    disabled={busy}
+                    className={`relative w-11 h-6 rounded-full transition-colors disabled:opacity-60 ${
+                        enabled ? 'bg-orange-600' : 'bg-gray-300 dark:bg-zinc-700'
+                    }`}
+                >
+                    <span
+                        className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                            enabled ? 'translate-x-5' : ''
+                        }`}
+                    />
+                </button>
             </div>
         </div>
     );

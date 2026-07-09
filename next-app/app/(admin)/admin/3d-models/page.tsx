@@ -17,7 +17,11 @@ export default async function ThreeDModelsPage() {
     return (
         <ThreeDModelsManager
             initialModels={models}
-            companies={companies.map((c) => ({ id: c.id, name: c.name }))}
+            companies={companies.map((c) => ({
+                id: c.id,
+                name: c.name,
+                customOrderEnabled: c.customOrderEnabled
+            }))}
             initialRequests={requests}
         />
     );
