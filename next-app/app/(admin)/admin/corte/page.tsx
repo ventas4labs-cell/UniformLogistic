@@ -1,15 +1,17 @@
 import { createClient } from '@/utils/supabase/server';
 import { fetchAllOrders } from '@/lib/services/orders';
 import { fetchStageCompletions } from '@/lib/services/stage-completions';
+import { fetchStageItemProgress } from '@/lib/services/stage-item-progress';
 import { fetchOrdersOutsourcedToStage } from '@/lib/services/station-assignments';
 import { orderNeedsStage } from '@/lib/stage-utils';
 import { CorteBoard } from '@/components/admin/corte-board';
 
 export default async function CortePage() {
     const supabase = await createClient();
-    const [all, completed] = await Promise.all([
+    const [all, completed, progress] = await Promise.all([
         fetchAllOrders(supabase),
-        fetchStageCompletions(supabase, 'corte')
+        fetchStageCompletions(supabase, 'corte'),
+        fetchStageItemProgress(supabase, 'corte')
     ]);
     // Workflow is parallel: every non-cancelled order shows up on every
     // board immediately. Corte marks its own work complete via the
@@ -32,6 +34,7 @@ export default async function CortePage() {
         <CorteBoard
             initialOrders={orders}
             initialCompletedOrderIds={Array.from(completed)}
+            initialProgress={progress}
         />
     );
 }

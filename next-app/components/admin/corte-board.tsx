@@ -19,6 +19,8 @@ import { StageBoardFilters } from '@/components/admin/stage-board-filters';
 import { CollapsibleSearch } from '@/components/admin/collapsible-search';
 import { addCorteExtraItemAction } from '@/app/(admin)/admin/_stage-actions';
 import { OrderProductsSummary } from '@/components/admin/order-products-summary';
+import { StagePartialEditor } from '@/components/admin/stage-partial-editor';
+import type { ItemProgress } from '@/lib/services/stage-item-progress';
 import type { CartItem } from '@/lib/types';
 import {
     OrderReportButton,
@@ -112,11 +114,13 @@ const emptyExtra = { productName: '', fabricType: '', size: '', quantity: 1, not
 function OrderCard({
     order,
     isCompleted,
-    onLocalCompletionChange
+    onLocalCompletionChange,
+    initialProgress
 }: {
     order: Order;
     isCompleted: boolean;
     onLocalCompletionChange: (uuid: string, next: boolean) => void;
+    initialProgress?: ItemProgress;
 }) {
     const [expanded, setExpanded] = useState(true);
     // Extras added during this session, appended optimistically so the
@@ -221,6 +225,19 @@ function OrderCard({
                         <OrderReportButton orderId={order.uuid} stage="corte" />
                     </div>
                 )}
+            </div>
+
+            {/* Per-line cut progress — same tracker as Bordado so the
+                corte operator records how many pieces of each line are
+                already cut. The detailed tela/color table stays below. */}
+            <div className="border-t border-gray-100 dark:border-zinc-800 p-4">
+                <StagePartialEditor
+                    order={order}
+                    stage="corte"
+                    initialProgress={initialProgress || {}}
+                    isCompleted={isCompleted}
+                    onCompletedChange={onLocalCompletionChange}
+                />
             </div>
 
             <button
@@ -420,10 +437,12 @@ function OrderCard({
 
 export function CorteBoard({
     initialOrders,
-    initialCompletedOrderIds
+    initialCompletedOrderIds,
+    initialProgress
 }: {
     initialOrders: Order[];
     initialCompletedOrderIds: string[];
+    initialProgress?: ItemProgress;
 }) {
     const [orders] = useState<Order[]>(initialOrders);
     const [completed, setCompleted] = useState<Set<string>>(
@@ -521,6 +540,7 @@ export function CorteBoard({
                             order={order}
                             isCompleted={!!order.uuid && completed.has(order.uuid)}
                             onLocalCompletionChange={handleLocalCompletionChange}
+                            initialProgress={initialProgress}
                         />
                     ))}
                 </div>

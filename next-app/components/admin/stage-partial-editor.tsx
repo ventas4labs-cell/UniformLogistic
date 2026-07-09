@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from 'react';
 import { Check, Loader2, Save } from 'lucide-react';
 import type { Order } from '@/lib/types';
-import type { StageKey } from '@/lib/services/stage-completions';
+import { STAGE_LABELS, type StageKey } from '@/lib/services/stage-completions';
 import type { ItemProgress } from '@/lib/services/stage-item-progress';
 import { saveStageProgressAction } from '@/app/(admin)/admin/_stage-actions';
 
@@ -95,7 +95,7 @@ export function StagePartialEditor({
             <div className="space-y-1.5">
                 <div className="flex items-center gap-2 text-sm font-bold text-green-700 dark:text-green-400">
                     <Check size={16} strokeWidth={3} />
-                    Bordado completo · {totalPieces}/{totalPieces} pzas
+                    {STAGE_LABELS[stage]} completo · {totalPieces}/{totalPieces} pzas
                 </div>
                 {items.map((item, idx) => (
                     <div
