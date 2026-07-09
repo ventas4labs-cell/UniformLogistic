@@ -20,9 +20,12 @@ export function LandingNav({
         >
             <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
                 <Link href="/" className="flex items-center gap-3">
-                    <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#16130F] text-[13px] font-extrabold text-[#F7F4EE]">
-                        UL
-                    </span>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                        src="/ul-logo.png"
+                        alt="Uniform Logistic"
+                        className="h-9 w-9 rounded-xl object-contain bg-white"
+                    />
                     <span className="text-[15px] font-bold tracking-tight">
                         Uniform Logistic
                     </span>

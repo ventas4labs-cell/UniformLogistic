@@ -92,9 +92,12 @@ export function LoginForm({ currentEmail }: { currentEmail?: string | null }) {
                 <div className="w-full max-w-sm">
                     {/* Logo */}
                     <div className="flex justify-center mb-7">
-                        <div className="w-12 h-12 rounded-2xl bg-zinc-900/80 border border-white/10 flex items-center justify-center text-white font-black text-base tracking-tight shadow-2xl">
-                            UL
-                        </div>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                            src="/ul-logo.png"
+                            alt="Uniform Logistic"
+                            className="w-14 h-14 rounded-2xl bg-white object-contain border border-white/10 shadow-2xl"
+                        />
                     </div>
 
                     {/* Title */}
