@@ -12,7 +12,8 @@ import {
     X,
     Building2,
     Package,
-    Check
+    Check,
+    Maximize2
 } from 'lucide-react';
 import type {
     ThreeDModel,
@@ -21,6 +22,8 @@ import type {
     DesignRequest,
     DesignStatus
 } from '@/lib/services/three-d-models';
+import type { PlacedLogo } from '@/components/three-d/centered-gltf';
+import { colorHexByName } from '@/components/custom-order/model-colors';
 import {
     updateModelAction,
     deleteModelAction,
@@ -42,6 +45,17 @@ const ModelZoneEditor = dynamic(
         )
     }
 );
+
+// Same treatment for the customer viewer, reused here so admins can spin
+// the actual model with the requested logos placed on it.
+const ModelViewer3D = dynamic(() => import('@/components/custom-order/model-viewer-3d'), {
+    ssr: false,
+    loading: () => (
+        <div className="flex-1 flex items-center justify-center text-sm text-gray-400">
+            <Loader2 className="animate-spin mr-2" size={16} /> Cargando visor 3D…
+        </div>
+    )
+});
 
 interface Company {
     id: string;
@@ -195,7 +209,11 @@ export function ThreeDModelsManager({
                     </div>
                 )
             ) : tab === 'requests' ? (
-                <RequestsList requests={initialRequests} onChanged={() => router.refresh()} />
+                <RequestsList
+                    requests={initialRequests}
+                    models={initialModels}
+                    onChanged={() => router.refresh()}
+                />
             ) : (
                 <CompaniesToggleList companies={companies} />
             )}
@@ -435,9 +453,11 @@ function DeleteButton({ modelId, onDeleted }: { modelId: string; onDeleted: () =
 // ── Requests tab ────────────────────────────────────────────────────
 function RequestsList({
     requests,
+    models,
     onChanged
 }: {
     requests: DesignRequest[];
+    models: ThreeDModel[];
     onChanged: () => void;
 }) {
     if (requests.length === 0) {
@@ -450,18 +470,45 @@ function RequestsList({
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {requests.map((r) => (
-                <RequestCard key={r.id} request={r} onChanged={onChanged} />
+                <RequestCard
+                    key={r.id}
+                    request={r}
+                    model={models.find((m) => m.id === r.modelId) ?? null}
+                    onChanged={onChanged}
+                />
             ))}
         </div>
     );
 }
 
-function RequestCard({ request: r, onChanged }: { request: DesignRequest; onChanged: () => void }) {
+function RequestCard({
+    request: r,
+    model,
+    onChanged
+}: {
+    request: DesignRequest;
+    model: ThreeDModel | null;
+    onChanged: () => void;
+}) {
     const [busy, setBusy] = useState<DesignStatus | null>(null);
     const [accepting, setAccepting] = useState(false);
     const [acceptErr, setAcceptErr] = useState<string | null>(null);
+    const [inspecting, setInspecting] = useState(false);
     const badge = DESIGN_STATUS.find((s) => s.value === r.status) || DESIGN_STATUS[0];
     const totalPieces = r.items.reduce((s, i) => s + i.quantity, 0);
+
+    // Join each requested logo to its zone anchor on the model so the
+    // viewer can drop a pointer at the right spot. Zones the model no
+    // longer defines (edited after the request) are skipped.
+    const placedLogos: PlacedLogo[] = model
+        ? r.logos
+              .map((l) => {
+                  const zone = model.zones.find((z) => z.id === l.zoneId);
+                  return zone ? { zone, name: l.logoName || l.zoneLabel } : null;
+              })
+              .filter((p): p is PlacedLogo => p !== null)
+        : [];
+    const canInspect = !!model?.modelUrl;
 
     const setStatus = async (status: DesignStatus) => {
         setBusy(status);
@@ -488,14 +535,34 @@ function RequestCard({ request: r, onChanged }: { request: DesignRequest; onChan
     return (
         <div className="bg-white dark:bg-zinc-900 rounded-xl border border-gray-200 dark:border-zinc-800 shadow-sm overflow-hidden">
             <div className="flex">
-                <div className="w-32 shrink-0 bg-gray-100 dark:bg-zinc-800 flex items-center justify-center">
-                    {r.previewUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={r.previewUrl} alt={r.requestRef} className="w-full h-full object-cover" />
-                    ) : (
-                        <Box size={28} className="text-gray-300 dark:text-zinc-600" />
-                    )}
-                </div>
+                {canInspect ? (
+                    <button
+                        type="button"
+                        onClick={() => setInspecting(true)}
+                        title="Ver en 3D con los logos colocados"
+                        className="group relative w-32 shrink-0 bg-gray-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden"
+                    >
+                        {r.previewUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={r.previewUrl} alt={r.requestRef} className="w-full h-full object-cover" />
+                        ) : (
+                            <Box size={28} className="text-gray-300 dark:text-zinc-600" />
+                        )}
+                        <span className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 text-white text-[11px] font-bold">
+                            <Maximize2 size={18} />
+                            Ver en 3D
+                        </span>
+                    </button>
+                ) : (
+                    <div className="w-32 shrink-0 bg-gray-100 dark:bg-zinc-800 flex items-center justify-center">
+                        {r.previewUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={r.previewUrl} alt={r.requestRef} className="w-full h-full object-cover" />
+                        ) : (
+                            <Box size={28} className="text-gray-300 dark:text-zinc-600" />
+                        )}
+                    </div>
+                )}
                 <div className="flex-1 min-w-0 p-4">
                     <div className="flex items-center justify-between gap-2">
                         <span className="font-mono text-sm font-bold text-orange-600 dark:text-orange-400">
@@ -589,8 +656,92 @@ function RequestCard({ request: r, onChanged }: { request: DesignRequest; onChan
                                 </button>
                             );
                         })}
+                        {canInspect && (
+                            <button
+                                type="button"
+                                onClick={() => setInspecting(true)}
+                                className="text-[11px] font-bold px-2 py-1 rounded-md bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-300 hover:bg-orange-100 dark:hover:bg-orange-950/40 hover:text-orange-700 dark:hover:text-orange-300 inline-flex items-center gap-1"
+                            >
+                                <Box size={12} /> Ver en 3D
+                            </button>
+                        )}
                     </div>
                 </div>
+            </div>
+
+            {inspecting && model && (
+                <RequestInspect3DModal
+                    request={r}
+                    model={model}
+                    color={colorHexByName(r.colorName)}
+                    logos={placedLogos}
+                    onClose={() => setInspecting(false)}
+                />
+            )}
+        </div>
+    );
+}
+
+// Full-screen modal that spins up the real customer viewer with the
+// requested logos placed. Mounted only while open, so closing it fully
+// unmounts the R3F canvas and releases its WebGL context.
+function RequestInspect3DModal({
+    request: r,
+    model,
+    color,
+    logos,
+    onClose
+}: {
+    request: DesignRequest;
+    model: ThreeDModel;
+    color: string;
+    logos: PlacedLogo[];
+    onClose: () => void;
+}) {
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+            onClick={onClose}
+        >
+            <div
+                className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-3xl h-[80vh] flex flex-col overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-gray-100 dark:border-zinc-800">
+                    <div className="min-w-0">
+                        <p className="font-mono text-sm font-bold text-orange-600 dark:text-orange-400">
+                            {r.requestRef}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-zinc-400 truncate">
+                            {model.name}
+                            {r.colorName ? ` · ${r.colorName}` : ''} · Arrastrá para girar,
+                            rueda para acercar
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="p-1.5 rounded-lg text-gray-500 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-800"
+                        aria-label="Cerrar"
+                    >
+                        <X size={18} />
+                    </button>
+                </div>
+                <div className="flex-1 flex flex-col bg-zinc-50 dark:bg-zinc-950">
+                    <ModelViewer3D url={model.modelUrl} color={color} logos={logos} />
+                </div>
+                {logos.length > 0 && (
+                    <div className="border-t border-gray-100 dark:border-zinc-800 px-5 py-3 flex flex-wrap gap-2">
+                        {logos.map((l) => (
+                            <span
+                                key={l.zone.id}
+                                className="text-[11px] font-bold px-2 py-1 rounded-full bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-zinc-200"
+                            >
+                                {l.zone.label}: {l.name}
+                            </span>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );

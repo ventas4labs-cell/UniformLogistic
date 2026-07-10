@@ -84,6 +84,18 @@ export function CenteredGLTF({ url, color, onPick, markers = [], activeZoneId, l
         const apply = (m: THREE.Material): THREE.Material => {
             const c = m.clone() as THREE.MeshStandardMaterial;
             if (color && c.color) c.color = new THREE.Color(color);
+            // Fabric response: no metalness, and a capped roughness so
+            // both the keylights and the studio environment leave visible
+            // highlights. Without this a dark color renders as a flat
+            // silhouette because a fully-rough matte surface reflects
+            // almost nothing. envMapIntensity boosts those reflections so
+            // folds and edges read even on black.
+            if ('metalness' in c) c.metalness = 0;
+            if ('roughness' in c) {
+                c.roughness = Math.min(c.roughness ?? 0.7, 0.62);
+            }
+            if ('envMapIntensity' in c) c.envMapIntensity = 1.3;
+            c.needsUpdate = true;
             return c;
         };
         cloned.traverse((o) => {
