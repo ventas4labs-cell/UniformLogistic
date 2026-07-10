@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Minus, Plus } from 'lucide-react';
+import { Minus, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Product, SizeSelection } from '@/lib/types';
 
 interface Props {
@@ -9,6 +9,12 @@ interface Props {
     onAdd: (items: { selection: SizeSelection; quantity: number }[]) => void;
     onCancel: () => void;
 }
+
+// A product's size buckets can carry accidental duplicates (e.g. "XXXL"
+// saved twice). Dedupe so each size renders once — otherwise two cards
+// share the same React key (and the same quantity state).
+const uniqueSizes = <T,>(sizes: T[] | undefined): T[] =>
+    Array.from(new Set(sizes ?? []));
 
 export function SizeSelector({ product, onAdd, onCancel }: Props) {
     // products-manager saves empty buckets as `[]` rather than dropping them,
@@ -32,9 +38,40 @@ export function SizeSelector({ product, onAdd, onCancel }: Props) {
     const [quantities, setQuantities] = useState<Record<string, number>>({});
     const isShirt = product.type === 'shirt';
 
-    // Reset quantities when gender changes for shirts
+    // Pictures to show, scoped to the tab the customer is on: the
+    // selected gender's gallery first, then unisex; when no gallery
+    // exists (older products), fall back to the single primary image.
+    const galleryFor = (gender: 'Men' | 'Women' | null): string[] => {
+        const imgs = product.images || {};
+        const men = imgs.men || [];
+        const women = imgs.women || [];
+        const uni = imgs.unisex || [];
+        let list: string[];
+        if (gender === 'Men') list = [...men, ...uni];
+        else if (gender === 'Women') list = [...women, ...uni];
+        else list = [...uni, ...men, ...women];
+        list = Array.from(new Set(list));
+        if (list.length === 0 && product.image) list = [product.image];
+        return list;
+    };
+    const gallery = galleryFor(selectedGender);
+
+    const [imgIndex, setImgIndex] = useState(0);
+    // Keep the index in range as the gallery changes (e.g. switching tab
+    // to a gender with fewer pictures).
+    const safeIndex = gallery.length > 0 ? Math.min(imgIndex, gallery.length - 1) : 0;
+    const showImage = (delta: number) => {
+        if (gallery.length < 2) return;
+        setImgIndex((i) => {
+            const cur = Math.min(i, gallery.length - 1);
+            return (cur + delta + gallery.length) % gallery.length;
+        });
+    };
+
+    // Reset quantities + carousel when gender changes for shirts
     useEffect(() => {
         setQuantities({});
+        setImgIndex(0);
     }, [selectedGender]);
 
     const updateQuantity = (size: string, delta: number) => {
@@ -164,6 +201,51 @@ export function SizeSelector({ product, onAdd, onCancel }: Props) {
                 </div>
 
                 <div className="flex-1 overflow-y-auto min-h-0">
+                    {gallery.length > 0 && (
+                        <div className="relative mx-auto mb-6 w-full max-w-xs aspect-square rounded-2xl overflow-hidden bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                                src={gallery[safeIndex]}
+                                alt={product.name}
+                                className="w-full h-full object-contain"
+                            />
+                            {gallery.length > 1 && (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={() => showImage(-1)}
+                                        aria-label="Imagen anterior"
+                                        className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center rounded-full bg-white/85 dark:bg-zinc-900/85 text-zinc-700 dark:text-zinc-200 shadow-md hover:bg-white dark:hover:bg-zinc-900 active:scale-95 transition-all"
+                                    >
+                                        <ChevronLeft size={20} strokeWidth={2.5} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => showImage(1)}
+                                        aria-label="Imagen siguiente"
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center rounded-full bg-white/85 dark:bg-zinc-900/85 text-zinc-700 dark:text-zinc-200 shadow-md hover:bg-white dark:hover:bg-zinc-900 active:scale-95 transition-all"
+                                    >
+                                        <ChevronRight size={20} strokeWidth={2.5} />
+                                    </button>
+                                    <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex items-center gap-1.5">
+                                        {gallery.map((_, i) => (
+                                            <button
+                                                key={i}
+                                                type="button"
+                                                onClick={() => setImgIndex(i)}
+                                                aria-label={`Ver imagen ${i + 1}`}
+                                                className={`h-1.5 rounded-full transition-all ${
+                                                    i === safeIndex
+                                                        ? 'w-4 bg-orange-500'
+                                                        : 'w-1.5 bg-white/70 dark:bg-zinc-500 hover:bg-white'
+                                                }`}
+                                            />
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
                     {isShirt && (
                         <div className="space-y-6">
                             {hasMen && hasWomen && (
@@ -184,10 +266,11 @@ export function SizeSelector({ product, onAdd, onCancel }: Props) {
                             )}
                             {selectedGender && (
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                                    {(selectedGender === 'Men'
-                                        ? product.sizes.men
-                                        : product.sizes.women
-                                    )?.map((s) => renderQtyInput(s))}
+                                    {uniqueSizes(
+                                        selectedGender === 'Men'
+                                            ? product.sizes.men
+                                            : product.sizes.women
+                                    ).map((s) => renderQtyInput(s))}
                                 </div>
                             )}
                         </div>
@@ -197,7 +280,7 @@ export function SizeSelector({ product, onAdd, onCancel }: Props) {
                         <div className="space-y-6">
                             <h4 className="font-bold text-zinc-900 dark:text-zinc-100">Cintura</h4>
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                                {product.sizes.waist?.map((w) => renderQtyInput(w))}
+                                {uniqueSizes(product.sizes.waist).map((w) => renderQtyInput(w))}
                             </div>
                         </div>
                     )}
