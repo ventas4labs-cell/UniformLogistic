@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
-import { Download, Search, RefreshCw, Loader2, Eye, Receipt, Pencil, Trash2, Filter, Calendar, User, Building2, Bell, X, AlertTriangle, CheckCircle2, Undo2, Plus, History, ShoppingCart, Clock } from 'lucide-react';
+import { Download, Search, RefreshCw, Loader2, Eye, Receipt, Pencil, Trash2, Filter, Calendar, User, Building2, Bell, X, AlertTriangle, CheckCircle2, Undo2, Plus, History, ShoppingCart, Clock, Boxes, Truck } from 'lucide-react';
 import type { Order } from '@/lib/types';
 import type { AdminProduct } from '@/lib/services/products';
 import type { MissingInsumoReport } from '@/lib/services/missing-insumos';
@@ -27,6 +27,7 @@ import type { StationUser } from '@/lib/services/station-users';
 import type { StationAssignment } from '@/lib/services/station-assignments';
 import { FacturaModal } from '@/components/admin/factura-modal';
 import { OrderEditModal } from '@/components/admin/order-edit-modal';
+import { OrderDetailModal, type OrderModel3D } from '@/components/admin/order-detail-modal';
 import { useRouter } from 'next/navigation';
 
 export function OrdersTable({
@@ -37,7 +38,9 @@ export function OrdersTable({
     initialStageCompletions = [],
     stationUsers = [],
     initialAssignments = [],
-    deletedOrders = []
+    deletedOrders = [],
+    completedOrders = [],
+    models3d = []
 }: {
     initialOrders: Order[];
     products: AdminProduct[];
@@ -47,6 +50,13 @@ export function OrdersTable({
     stationUsers?: StationUser[];
     initialAssignments?: StationAssignment[];
     deletedOrders?: DeletedOrderHistoryEntry[];
+    /**
+     * Orders fully dispatched or fully moved into stock. They leave the
+     * active list and live in the "Completados" archive.
+     */
+    completedOrders?: { orderId: string; reason: 'dispatched' | 'stock' }[];
+    /** Product-code → 3D model, for the detail view's 3D preview. */
+    models3d?: OrderModel3D[];
 }) {
     const [orders, setOrders] = useState<Order[]>(initialOrders);
     const [reports, setReports] = useState<MissingInsumoReport[]>(initialReports);
@@ -169,6 +179,25 @@ export function OrdersTable({
     // Whether the deleted-orders history modal is open. Populated from
     // the server-fetched `deletedOrders` prop; opens on-demand only.
     const [showDeletedHistory, setShowDeletedHistory] = useState(false);
+    // Whether the completed-orders (dispatched / in-stock) archive is open.
+    const [showCompleted, setShowCompleted] = useState(false);
+    // orderId → why it's completed, for the archive badge + filtering it
+    // out of the active list.
+    const completedReasonById = new Map(
+        completedOrders.map((c) => [c.orderId, c.reason] as const)
+    );
+    const isCompleted = (o: Order) => !!o.uuid && completedReasonById.has(o.uuid);
+    // Order whose detailed view is open, and the product-code → 3D model
+    // lookup used to surface a 3D preview inside it.
+    const [detailOrder, setDetailOrder] = useState<Order | null>(null);
+    const modelByCode = new Map(models3d.map((m) => [m.productCode, m] as const));
+    const modelForOrder = (o: Order): OrderModel3D | null => {
+        for (const it of o.items) {
+            const m = it.productId && modelByCode.get(it.productId);
+            if (m) return m;
+        }
+        return null;
+    };
     // Which order's notification popover is currently open.
     const [notifOrder, setNotifOrder] = useState<Order | null>(null);
     // Global notifications panel (all orders at once).
@@ -313,7 +342,12 @@ export function OrdersTable({
     const totalPieces = (order: Order) =>
         order.items.reduce((s, i) => s + i.quantity, 0);
 
-    const filtered = orders.filter((o) => {
+    // Completed orders (fully dispatched / in stock) leave the active
+    // list; they're reachable only through the "Completados" archive.
+    const activeOrders = orders.filter((o) => !isCompleted(o));
+    const completedList = orders.filter((o) => isCompleted(o));
+
+    const filtered = activeOrders.filter((o) => {
         if (bucketFilter !== 'all' && bucketFor(o) !== bucketFilter) return false;
         if (companyFilter !== 'all' && o.companyName !== companyFilter) return false;
         const term = searchTerm.toLowerCase();
@@ -328,7 +362,7 @@ export function OrdersTable({
         );
     });
 
-    const bucketCounts = orders.reduce(
+    const bucketCounts = activeOrders.reduce(
         (acc, o) => {
             const b = bucketFor(o);
             acc[b] = (acc[b] || 0) + 1;
@@ -440,6 +474,21 @@ export function OrdersTable({
                         {deletedOrders.length > 0 && (
                             <span className="ml-0.5 min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-gray-700 dark:bg-zinc-600 text-white text-[10px] font-bold flex items-center justify-center leading-none">
                                 {deletedOrders.length > 99 ? '99+' : deletedOrders.length}
+                            </span>
+                        )}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setShowCompleted(true)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-bold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-950/40 hover:bg-green-200 dark:hover:bg-green-900/50 rounded-lg transition-colors"
+                        title="Pedidos completados (despachados o en stock)"
+                        aria-label="Pedidos completados"
+                    >
+                        <CheckCircle2 size={14} />
+                        Completados
+                        {completedList.length > 0 && (
+                            <span className="ml-0.5 min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-green-700 dark:bg-green-600 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                                {completedList.length > 99 ? '99+' : completedList.length}
                             </span>
                         )}
                     </button>
@@ -856,7 +905,7 @@ export function OrdersTable({
 
             {previewPdf && (
                 <div
-                    className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6"
+                    className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6"
                     onClick={closePreview}
                 >
                     <div
@@ -1048,6 +1097,139 @@ export function OrdersTable({
                     onClose={() => setShowDeletedHistory(false)}
                 />
             )}
+
+            {showCompleted && (
+                <CompletedOrdersModal
+                    orders={completedList}
+                    reasonById={completedReasonById}
+                    onClose={() => setShowCompleted(false)}
+                    onViewDetail={(o) => setDetailOrder(o)}
+                />
+            )}
+
+            {detailOrder && (
+                <OrderDetailModal
+                    order={detailOrder}
+                    model={modelForOrder(detailOrder)}
+                    onClose={() => setDetailOrder(null)}
+                />
+            )}
+        </div>
+    );
+}
+
+// ── Completados archive ─────────────────────────────────────────────
+// Read-only list of orders that fully left production — every piece
+// dispatched to the customer, or moved into the company's stock. Each
+// row notes which channel closed it.
+function CompletedOrdersModal({
+    orders,
+    reasonById,
+    onClose,
+    onViewDetail
+}: {
+    orders: Order[];
+    reasonById: Map<string, 'dispatched' | 'stock'>;
+    onClose: () => void;
+    onViewDetail: (order: Order) => void;
+}) {
+    const sorted = orders
+        .slice()
+        .sort(
+            (a, b) =>
+                new Date(b.dateCreated).getTime() - new Date(a.dateCreated).getTime()
+        );
+
+    return (
+        <div
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={onClose}
+        >
+            <div
+                className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-gray-100 dark:border-zinc-800">
+                    <div className="flex items-center gap-2">
+                        <CheckCircle2 size={18} className="text-green-600 dark:text-green-400" />
+                        <h3 className="text-sm font-bold text-gray-900 dark:text-zinc-100">
+                            Pedidos completados
+                        </h3>
+                        {sorted.length > 0 && (
+                            <span className="text-xs font-bold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-950/50 px-2 py-0.5 rounded-full">
+                                {sorted.length}
+                            </span>
+                        )}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="p-1.5 rounded-lg text-gray-500 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-800"
+                        aria-label="Cerrar"
+                    >
+                        <X size={18} />
+                    </button>
+                </div>
+
+                <div className="overflow-y-auto p-4 space-y-2">
+                    {sorted.length === 0 ? (
+                        <p className="py-12 text-center text-sm text-gray-500 dark:text-zinc-400">
+                            Aún no hay pedidos completados. Se agregan acá cuando se
+                            despachan por completo o se pasan a stock.
+                        </p>
+                    ) : (
+                        sorted.map((o) => {
+                            const reason = o.uuid ? reasonById.get(o.uuid) : undefined;
+                            const pieces = o.items.reduce((s, i) => s + i.quantity, 0);
+                            return (
+                                <div
+                                    key={o.uuid || o.id}
+                                    className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-800/40 p-3"
+                                >
+                                    <div className="min-w-0">
+                                        <p className="font-mono text-sm font-bold text-orange-600 dark:text-orange-400">
+                                            {o.id}
+                                        </p>
+                                        <p className="text-sm font-semibold text-gray-900 dark:text-zinc-100 truncate">
+                                            {o.companyName || '—'}
+                                        </p>
+                                        <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
+                                            {new Date(o.dateCreated).toLocaleDateString()} · {pieces} pzas
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <span
+                                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-bold ${
+                                                reason === 'stock'
+                                                    ? 'text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-950/40'
+                                                    : 'text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/40'
+                                            }`}
+                                        >
+                                            {reason === 'stock' ? (
+                                                <>
+                                                    <Boxes size={11} /> En stock
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Truck size={11} /> Despachado
+                                                </>
+                                            )}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => onViewDetail(o)}
+                                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold text-gray-600 dark:text-zinc-300 hover:bg-gray-200 dark:hover:bg-zinc-700"
+                                            title="Ver detalle"
+                                        >
+                                            <Eye size={13} /> Ver
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
+            </div>
         </div>
     );
 }
