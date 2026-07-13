@@ -7,13 +7,15 @@ import {
     RefreshCw,
     Truck,
     CheckCircle2,
-    Clock
+    Clock,
+    Boxes
 } from 'lucide-react';
 import type { Order } from '@/lib/types';
 import { StageCompleteToggle } from '@/components/admin/stage-complete-toggle';
 import type { StageTab } from '@/components/admin/stage-tab-bar';
 import { StageBoardFilters } from '@/components/admin/stage-board-filters';
 import { DispatchModal } from '@/components/admin/dispatch-modal';
+import { AddToStockModal } from '@/components/admin/add-to-stock-modal';
 import { CollapsibleSearch } from '@/components/admin/collapsible-search';
 import { OrderProductsSummary } from '@/components/admin/order-products-summary';
 import {
@@ -30,6 +32,12 @@ interface Props {
      * dispatch progress without a second round trip.
      */
     initialDispatched: Record<string, Record<string, number>>;
+    /**
+     * Map<orderId, Map<orderItemId, addedToStockQty>>. Same shape as
+     * initialDispatched — how much of each line has already been pushed
+     * into the company's stock, so partial adds show remaining.
+     */
+    initialAddedToStock: Record<string, Record<string, number>>;
 }
 
 // ── Dispatch progress helpers ───────────────────────────────────────
@@ -54,7 +62,9 @@ function OrderCard({
     onLocalChange,
     dispatched,
     onDispatch,
-    onApplyDispatch
+    onApplyDispatch,
+    addedToStock,
+    onAddToStock
 }: {
     order: Order;
     isCompleted: boolean;
@@ -62,11 +72,16 @@ function OrderCard({
     dispatched: Map<string, number>;
     onDispatch: () => void;
     onApplyDispatch: (lines: { orderItemId: string; quantity: number }[]) => void;
+    addedToStock: Map<string, number>;
+    onAddToStock: () => void;
 }) {
     const totals = orderTotals(order, dispatched);
     const allDispatched = totals.remaining === 0 && totals.ordered > 0;
     const partial = totals.shipped > 0 && !allDispatched;
     void onApplyDispatch; // forwarded via prop chain — keeps lint quiet
+    // Stock progress reuses the same helper (shipped field = added qty).
+    const stockTotals = orderTotals(order, addedToStock);
+    const allInStock = stockTotals.remaining === 0 && stockTotals.ordered > 0;
 
     return (
         <div
@@ -204,6 +219,29 @@ function OrderCard({
                         </>
                     )}
                 </button>
+                <button
+                    type="button"
+                    onClick={onAddToStock}
+                    disabled={!order.uuid || allInStock}
+                    className={`mt-2 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-colors shadow-sm ${
+                        allInStock
+                            ? 'bg-indigo-100 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 cursor-not-allowed'
+                            : 'bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed'
+                    }`}
+                >
+                    {allInStock ? (
+                        <>
+                            <CheckCircle2 size={16} /> Todo en stock
+                        </>
+                    ) : (
+                        <>
+                            <Boxes size={16} /> Agregar a stock
+                            {stockTotals.shipped > 0
+                                ? ` (${stockTotals.remaining} restantes)`
+                                : ''}
+                        </>
+                    )}
+                </button>
                 {order.uuid && (
                     <div className="mt-3">
                         <OrderReportButton orderId={order.uuid} stage="empaque" />
@@ -217,12 +255,24 @@ function OrderCard({
 export function EmpaqueBoard({
     initialOrders,
     initialCompletedOrderIds,
-    initialDispatched
+    initialDispatched,
+    initialAddedToStock
 }: Props) {
     const [orders] = useState<Order[]>(initialOrders);
     const [completed, setCompleted] = useState<Set<string>>(
         () => new Set(initialCompletedOrderIds)
     );
+    // Per-order added-to-stock totals — same shape as `dispatched`.
+    const [addedToStock, setAddedToStock] = useState<Map<string, Map<string, number>>>(
+        () => {
+            const m = new Map<string, Map<string, number>>();
+            for (const [oid, lines] of Object.entries(initialAddedToStock)) {
+                m.set(oid, new Map(Object.entries(lines)));
+            }
+            return m;
+        }
+    );
+    const [stockTarget, setStockTarget] = useState<Order | null>(null);
     // Per-order dispatched totals — Map<orderId, Map<orderItemId, qty>>.
     // Mutated optimistically when a dispatch lands so the card progress
     // chip and per-line counts update without a refresh.
@@ -280,6 +330,23 @@ export function EmpaqueBoard({
                 setCompleted((prev) => new Set(prev).add(orderUuid));
             }
         }
+    };
+
+    // Bump local added-to-stock totals after a successful add so the
+    // card's remaining count updates without a refresh.
+    const applyStockEntry = (
+        orderUuid: string,
+        lines: { orderItemId: string; quantity: number }[]
+    ) => {
+        setAddedToStock((prev) => {
+            const next = new Map(prev);
+            const perOrder = new Map(next.get(orderUuid) || []);
+            for (const l of lines) {
+                perOrder.set(l.orderItemId, (perOrder.get(l.orderItemId) || 0) + l.quantity);
+            }
+            next.set(orderUuid, perOrder);
+            return next;
+        });
     };
 
     const tabFiltered = useMemo(() => {
@@ -367,6 +434,10 @@ export function EmpaqueBoard({
                             onApplyDispatch={(lines) =>
                                 order.uuid && applyDispatch(order.uuid, lines)
                             }
+                            addedToStock={
+                                (order.uuid && addedToStock.get(order.uuid)) || new Map()
+                            }
+                            onAddToStock={() => setStockTarget(order)}
                         />
                     ))}
                 </div>
@@ -382,6 +453,20 @@ export function EmpaqueBoard({
                             applyDispatch(dispatchTarget.uuid, lines);
                         }
                         setDispatchTarget(null);
+                    }}
+                />
+            )}
+
+            {stockTarget && stockTarget.uuid && (
+                <AddToStockModal
+                    order={stockTarget}
+                    addedToStock={addedToStock.get(stockTarget.uuid) || new Map()}
+                    onClose={() => setStockTarget(null)}
+                    onApplied={(lines) => {
+                        if (stockTarget.uuid) {
+                            applyStockEntry(stockTarget.uuid, lines);
+                        }
+                        setStockTarget(null);
                     }}
                 />
             )}

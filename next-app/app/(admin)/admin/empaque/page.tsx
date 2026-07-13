@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server';
 import { fetchAllOrders } from '@/lib/services/orders';
 import { fetchStageCompletions } from '@/lib/services/stage-completions';
 import { fetchDispatchTotalsForOrders } from '@/lib/services/dispatches';
+import { fetchStockEntryTotalsForOrders } from '@/lib/services/stock-entries';
 import { fetchOrdersOutsourcedToStage } from '@/lib/services/station-assignments';
 import { orderNeedsStage } from '@/lib/stage-utils';
 import { EmpaqueBoard } from '@/components/admin/empaque-board';
@@ -15,9 +16,10 @@ export default async function EmpaquePage() {
     const orderIds = empaqueOrders
         .map((o) => o.uuid)
         .filter((id): id is string => !!id);
-    const [completed, totals, outsourced] = await Promise.all([
+    const [completed, totals, addedToStock, outsourced] = await Promise.all([
         fetchStageCompletions(supabase, 'empaque'),
         fetchDispatchTotalsForOrders(supabase, orderIds),
+        fetchStockEntryTotalsForOrders(supabase, orderIds),
         fetchOrdersOutsourcedToStage(supabase, orderIds, 'empaque')
     ]);
     // Orders sent to an external empaque station are handled there, so
@@ -32,11 +34,16 @@ export default async function EmpaquePage() {
     for (const [oid, lines] of totals.entries()) {
         initialDispatched[oid] = Object.fromEntries(lines.entries());
     }
+    const initialAddedToStock: Record<string, Record<string, number>> = {};
+    for (const [oid, lines] of addedToStock.entries()) {
+        initialAddedToStock[oid] = Object.fromEntries(lines.entries());
+    }
     return (
         <EmpaqueBoard
             initialOrders={orders}
             initialCompletedOrderIds={Array.from(completed)}
             initialDispatched={initialDispatched}
+            initialAddedToStock={initialAddedToStock}
         />
     );
 }
