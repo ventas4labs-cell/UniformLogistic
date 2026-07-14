@@ -72,6 +72,9 @@ export function OrderQuickCreate({ companies, onClose }: Props) {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [createdRef, setCreatedRef] = useState<string | null>(null);
+    // The cart lives in a right-side drawer, toggled by the floating cart
+    // button so the product grid keeps the full width.
+    const [cartOpen, setCartOpen] = useState(false);
 
     const pickCompany = async (id: string) => {
         setCompanyId(id);
@@ -92,6 +95,8 @@ export function OrderQuickCreate({ companies, onClose }: Props) {
 
     const addLine = (p: AdminProduct, opt: SizeOption, qty: number) => {
         if (qty <= 0) return;
+        // Reveal the cart drawer so the operator sees the line land.
+        setCartOpen(true);
         const key = `${p.id}|${opt.label}`;
         setCart((prev) => {
             const existing = prev.find((l) => l.key === key);
@@ -171,7 +176,7 @@ export function OrderQuickCreate({ companies, onClose }: Props) {
 
     return (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] overflow-hidden flex flex-col">
+            <div className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] overflow-hidden flex flex-col">
                 <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-zinc-800">
                     <h3 className="text-lg font-bold flex items-center gap-2">
                         <ShoppingCart size={20} className="text-orange-600 dark:text-orange-400" />
@@ -259,126 +264,186 @@ export function OrderQuickCreate({ companies, onClose }: Props) {
                             )}
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-5">
-                            {!companyId ? (
-                                <p className="text-sm text-gray-500 dark:text-zinc-400 text-center py-10">
-                                    Elegí una empresa para ver su catálogo.
-                                </p>
-                            ) : loadingCatalog ? (
-                                <div className="flex items-center justify-center gap-2 py-10 text-gray-500 dark:text-zinc-400">
-                                    <Loader2 className="animate-spin" size={18} /> Cargando catálogo…
-                                </div>
-                            ) : visibleCatalog.length === 0 ? (
-                                <p className="text-sm text-gray-500 dark:text-zinc-400 text-center py-10">
-                                    {catalog && catalog.length === 0
-                                        ? 'Esta empresa no tiene productos asignados.'
-                                        : 'Ningún producto coincide con la búsqueda.'}
-                                </p>
-                            ) : (
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                    {visibleCatalog.map((p) => (
-                                        <ProductCard key={p.uuid} product={p} onAdd={addLine} />
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Cart + submit */}
-                        <div className="border-t border-gray-200 dark:border-zinc-800 p-4 bg-gray-50 dark:bg-zinc-900/60 max-h-[40vh] overflow-y-auto">
-                            {cart.length === 0 ? (
-                                <p className="text-sm text-gray-400 dark:text-zinc-500 italic text-center py-2">
-                                    Agregá productos para armar el pedido.
-                                </p>
-                            ) : (
-                                <div className="space-y-1.5 mb-3">
-                                    {cart.map((l) => (
-                                        <div
-                                            key={l.key}
-                                            className="flex items-center gap-2 bg-white dark:bg-zinc-900 rounded-lg px-2 py-1.5 border border-gray-200 dark:border-zinc-800"
-                                        >
-                                            {l.image ? (
-                                                // eslint-disable-next-line @next/next/no-img-element
-                                                <img
-                                                    src={l.image}
-                                                    alt=""
-                                                    className="w-8 h-8 rounded object-cover shrink-0"
-                                                />
-                                            ) : (
-                                                <div className="w-8 h-8 rounded bg-gray-100 dark:bg-zinc-800 flex items-center justify-center shrink-0">
-                                                    <ImageIcon size={14} className="text-gray-300 dark:text-zinc-600" />
-                                                </div>
-                                            )}
-                                            <div className="min-w-0 flex-1">
-                                                <div className="text-sm font-semibold text-gray-900 dark:text-zinc-100 truncate">
-                                                    {l.productName}
-                                                </div>
-                                                <div className="text-[11px] text-gray-500 dark:text-zinc-400 font-mono">
-                                                    {l.label}
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-1 shrink-0">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setLineQty(l.key, l.quantity - 1)}
-                                                    className="w-6 h-6 rounded bg-gray-100 dark:bg-zinc-800 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-zinc-700"
-                                                >
-                                                    <Minus size={12} />
-                                                </button>
-                                                <span className="w-8 text-center font-bold text-sm">
-                                                    {l.quantity}
-                                                </span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setLineQty(l.key, l.quantity + 1)}
-                                                    className="w-6 h-6 rounded bg-gray-100 dark:bg-zinc-800 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-zinc-700"
-                                                >
-                                                    <Plus size={12} />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setLineQty(l.key, 0)}
-                                                    className="w-6 h-6 rounded text-gray-400 hover:text-red-600 flex items-center justify-center"
-                                                >
-                                                    <Trash2 size={12} />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
-                                <input
-                                    type="date"
-                                    value={deliveryDate}
-                                    onChange={(e) => setDeliveryDate(e.target.value)}
-                                    title="Fecha de entrega (opcional)"
-                                    className="p-2.5 border border-gray-300 dark:border-zinc-700 rounded-lg text-sm bg-white dark:bg-zinc-900 focus:ring-2 focus:ring-orange-500 outline-none"
-                                />
-                                <input
-                                    type="text"
-                                    value={notes}
-                                    onChange={(e) => setNotes(e.target.value)}
-                                    placeholder="Nota (opcional)"
-                                    className="p-2.5 border border-gray-300 dark:border-zinc-700 rounded-lg text-sm bg-white dark:bg-zinc-900 focus:ring-2 focus:ring-orange-500 outline-none"
-                                />
+                        <div className="relative flex-1 min-h-0">
+                            <div className="h-full overflow-y-auto p-5">
+                                {!companyId ? (
+                                    <p className="text-sm text-gray-500 dark:text-zinc-400 text-center py-10">
+                                        Elegí una empresa para ver su catálogo.
+                                    </p>
+                                ) : loadingCatalog ? (
+                                    <div className="flex items-center justify-center gap-2 py-10 text-gray-500 dark:text-zinc-400">
+                                        <Loader2 className="animate-spin" size={18} /> Cargando catálogo…
+                                    </div>
+                                ) : visibleCatalog.length === 0 ? (
+                                    <p className="text-sm text-gray-500 dark:text-zinc-400 text-center py-10">
+                                        {catalog && catalog.length === 0
+                                            ? 'Esta empresa no tiene productos asignados.'
+                                            : 'Ningún producto coincide con la búsqueda.'}
+                                    </p>
+                                ) : (
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                        {visibleCatalog.map((p) => (
+                                            <ProductCard key={p.uuid} product={p} onAdd={addLine} />
+                                        ))}
+                                    </div>
+                                )}
                             </div>
 
-                            {error && (
-                                <div className="bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 p-2.5 rounded-lg text-sm border border-red-100 dark:border-red-900/50 mb-3">
-                                    {error}
-                                </div>
+                            {/* Click-away scrim while the cart drawer is open */}
+                            {cartOpen && (
+                                <div
+                                    className="absolute inset-0 z-20 bg-black/10"
+                                    onClick={() => setCartOpen(false)}
+                                />
                             )}
 
-                            <button
-                                type="button"
-                                onClick={submit}
-                                disabled={saving || cart.length === 0 || !companyId}
-                                className="w-full py-3 bg-orange-600 text-white rounded-lg font-bold hover:bg-orange-700 disabled:bg-gray-300 dark:disabled:bg-zinc-700 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            {/* Floating cart toggle (bottom-right) */}
+                            {!cartOpen && (
+                                <button
+                                    type="button"
+                                    onClick={() => setCartOpen(true)}
+                                    className="absolute bottom-5 right-5 z-20 inline-flex items-center gap-2 rounded-full bg-orange-600 text-white font-bold px-5 py-3.5 shadow-lg shadow-orange-500/25 hover:bg-orange-700 transition-colors"
+                                >
+                                    <ShoppingCart size={18} />
+                                    Carrito
+                                    {totalPieces > 0 && (
+                                        <span className="min-w-[1.4rem] h-6 px-1.5 rounded-full bg-white text-orange-700 text-xs font-extrabold flex items-center justify-center">
+                                            {totalPieces}
+                                        </span>
+                                    )}
+                                </button>
+                            )}
+
+                            {/* Cart sidebar drawer */}
+                            <div
+                                className={`absolute inset-y-0 right-0 z-30 w-full sm:w-[380px] max-w-full bg-white dark:bg-zinc-900 border-l border-gray-200 dark:border-zinc-800 shadow-2xl flex flex-col transition-transform duration-300 ${
+                                    cartOpen ? 'translate-x-0' : 'translate-x-full pointer-events-none'
+                                }`}
                             >
-                                {saving ? <Loader2 className="animate-spin" size={18} /> : <ShoppingCart size={18} />}
-                                Crear pedido{totalPieces > 0 ? ` · ${totalPieces} pzas` : ''}
-                            </button>
+                                <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-zinc-800">
+                                    <h4 className="font-bold flex items-center gap-2 text-gray-900 dark:text-zinc-100">
+                                        <ShoppingCart size={18} className="text-orange-600 dark:text-orange-400" />
+                                        Carrito
+                                        {totalPieces > 0 && (
+                                            <span className="text-xs font-bold text-orange-700 dark:text-orange-300 bg-orange-100 dark:bg-orange-950/50 px-2 py-0.5 rounded-full">
+                                                {totalPieces} pzas
+                                            </span>
+                                        )}
+                                    </h4>
+                                    <button
+                                        type="button"
+                                        onClick={() => setCartOpen(false)}
+                                        className="p-1.5 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg text-gray-500 dark:text-zinc-400"
+                                        aria-label="Cerrar carrito"
+                                    >
+                                        <X size={18} />
+                                    </button>
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto p-4">
+                                    {cart.length === 0 ? (
+                                        <p className="text-sm text-gray-400 dark:text-zinc-500 italic text-center py-8">
+                                            Agregá productos para armar el pedido.
+                                        </p>
+                                    ) : (
+                                        <div className="space-y-1.5">
+                                            {cart.map((l) => (
+                                                <div
+                                                    key={l.key}
+                                                    className="flex items-center gap-2 bg-gray-50 dark:bg-zinc-800/50 rounded-lg px-2 py-1.5 border border-gray-200 dark:border-zinc-800"
+                                                >
+                                                    {l.image ? (
+                                                        // eslint-disable-next-line @next/next/no-img-element
+                                                        <img
+                                                            src={l.image}
+                                                            alt=""
+                                                            className="w-8 h-8 rounded object-cover shrink-0"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-8 h-8 rounded bg-gray-100 dark:bg-zinc-800 flex items-center justify-center shrink-0">
+                                                            <ImageIcon size={14} className="text-gray-300 dark:text-zinc-600" />
+                                                        </div>
+                                                    )}
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="text-sm font-semibold text-gray-900 dark:text-zinc-100 truncate">
+                                                            {l.productName}
+                                                        </div>
+                                                        <div className="text-[11px] text-gray-500 dark:text-zinc-400 font-mono">
+                                                            {l.label}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 shrink-0">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setLineQty(l.key, l.quantity - 1)}
+                                                            className="w-6 h-6 rounded bg-gray-100 dark:bg-zinc-800 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-zinc-700"
+                                                        >
+                                                            <Minus size={12} />
+                                                        </button>
+                                                        <span className="w-8 text-center font-bold text-sm">
+                                                            {l.quantity}
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setLineQty(l.key, l.quantity + 1)}
+                                                            className="w-6 h-6 rounded bg-gray-100 dark:bg-zinc-800 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-zinc-700"
+                                                        >
+                                                            <Plus size={12} />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setLineQty(l.key, 0)}
+                                                            className="w-6 h-6 rounded text-gray-400 hover:text-red-600 flex items-center justify-center"
+                                                        >
+                                                            <Trash2 size={12} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="border-t border-gray-200 dark:border-zinc-800 p-4 space-y-3 bg-gray-50 dark:bg-zinc-900/60">
+                                    <div className="grid grid-cols-1 gap-2">
+                                        <div>
+                                            <label className="block text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-zinc-400 mb-1">
+                                                Fecha aproximada de entrega
+                                            </label>
+                                            <input
+                                                type="date"
+                                                value={deliveryDate}
+                                                onChange={(e) => setDeliveryDate(e.target.value)}
+                                                title="Fecha aproximada de entrega (opcional)"
+                                                className="w-full p-2.5 border border-gray-300 dark:border-zinc-700 rounded-lg text-sm bg-white dark:bg-zinc-900 focus:ring-2 focus:ring-orange-500 outline-none"
+                                            />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            value={notes}
+                                            onChange={(e) => setNotes(e.target.value)}
+                                            placeholder="Nota (opcional)"
+                                            className="p-2.5 border border-gray-300 dark:border-zinc-700 rounded-lg text-sm bg-white dark:bg-zinc-900 focus:ring-2 focus:ring-orange-500 outline-none"
+                                        />
+                                    </div>
+
+                                    {error && (
+                                        <div className="bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 p-2.5 rounded-lg text-sm border border-red-100 dark:border-red-900/50">
+                                            {error}
+                                        </div>
+                                    )}
+
+                                    <button
+                                        type="button"
+                                        onClick={submit}
+                                        disabled={saving || cart.length === 0 || !companyId}
+                                        className="w-full py-3 bg-orange-600 text-white rounded-lg font-bold hover:bg-orange-700 disabled:bg-gray-300 dark:disabled:bg-zinc-700 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    >
+                                        {saving ? <Loader2 className="animate-spin" size={18} /> : <ShoppingCart size={18} />}
+                                        Crear pedido{totalPieces > 0 ? ` · ${totalPieces} pzas` : ''}
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </>
                 )}
