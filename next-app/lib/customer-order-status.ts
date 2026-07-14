@@ -19,7 +19,8 @@ import type { DispatchTotalsByOrder } from '@/lib/services/dispatches';
 // and adds the delivery split the customer dashboard needs:
 //   production → still being made (not all stages done)
 //   ready      → made & packed, not yet delivered
-//   completed  → delivered (fully dispatched) or manually completed
+//   completed  → delivered (fully dispatched), fully moved into the
+//                customer's stock, or manually completed
 //   cancelled  → order cancelled
 
 export type CustomerBucket = 'production' | 'ready' | 'completed' | 'cancelled';
@@ -43,7 +44,10 @@ export interface CustomerOrderProgress {
 export function deriveOrderProgress(
     order: Order,
     completions: CompletionIndex,
-    dispatchTotals: DispatchTotalsByOrder
+    dispatchTotals: DispatchTotalsByOrder,
+    // Same shape as dispatchTotals — how much of each line was pushed
+    // into the company's stock. Optional so older callers still compile.
+    stockTotals?: DispatchTotalsByOrder
 ): CustomerOrderProgress {
     const totalPieces = order.items.reduce((s, i) => s + i.quantity, 0);
 
@@ -64,17 +68,28 @@ export function deriveOrderProgress(
     if (dt) for (const q of dt.values()) deliveredPieces += q;
     const fullyDelivered = totalPieces > 0 && deliveredPieces >= totalPieces;
 
+    // Stocked pieces = sum of every line pushed into the company's stock.
+    let stockedPieces = 0;
+    const st = order.uuid ? stockTotals?.get(order.uuid) : undefined;
+    if (st) for (const q of st.values()) stockedPieces += q;
+    const fullyStocked = totalPieces > 0 && stockedPieces >= totalPieces;
+
     let bucket: CustomerBucket;
     let statusLabel: string;
     if (order.status === 'cancelled') {
         bucket = 'cancelled';
         statusLabel = 'Cancelado';
-    } else if (order.status === 'completed' || fullyDelivered) {
-        // Delivery is the strongest completion signal for a customer —
-        // if every piece has been dispatched, the order is done for them
-        // regardless of which stages were checked off in the workshop.
+    } else if (order.status === 'completed' || fullyDelivered || fullyStocked) {
+        // Completion for the customer: every piece delivered, or every
+        // piece moved into their stock (now sitting in "Mi almacén") —
+        // either way the order is done regardless of which workshop
+        // stages were checked off.
         bucket = 'completed';
-        statusLabel = 'Entregado';
+        statusLabel = fullyDelivered
+            ? 'Entregado'
+            : fullyStocked
+                ? 'En stock'
+                : 'Completado';
     } else if (allStagesDone) {
         bucket = 'ready';
         statusLabel = 'Listo para despacho';
