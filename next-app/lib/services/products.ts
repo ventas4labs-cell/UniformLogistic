@@ -87,8 +87,10 @@ export const extractSizeLabel = (
     if (!trimmed) return null;
     // Pants — "C32\"" or "C32\" / L30\""
     if (/^c\d+/i.test(trimmed)) return null;
-    // Strip "H · " or "M · " gender prefix.
-    const m = trimmed.match(/^[HM]\s*·\s*(.+)$/);
+    // Strip the gender prefix. Accept the new full words ("Hombre · ",
+    // "Mujer · ") and the legacy single letters ("H · ", "M · ") so old
+    // orders keep resolving their per-size BOM correctly.
+    const m = trimmed.match(/^(?:hombre|mujer|h|m)\s*·\s*(.+)$/i);
     return (m ? m[1] : trimmed).trim();
 };
 

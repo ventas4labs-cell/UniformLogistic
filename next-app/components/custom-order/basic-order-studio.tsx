@@ -39,7 +39,7 @@ const COLORS: { name: string; hex: string }[] = [
 
 function sizeLabel(sel: SizeSelection): string {
     if (sel.waist) return sel.inseam ? `${sel.waist}"×${sel.inseam}"` : `C${sel.waist}"`;
-    const prefix = sel.gender === 'Men' ? 'H' : sel.gender === 'Women' ? 'M' : '';
+    const prefix = sel.gender === 'Men' ? 'Hombre' : sel.gender === 'Women' ? 'Mujer' : '';
     return prefix ? `${prefix} · ${sel.size}` : sel.size || '';
 }
 

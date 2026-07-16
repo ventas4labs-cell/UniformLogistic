@@ -26,7 +26,7 @@ function sizeLabel(sel: SizeSelection): string {
     if (sel.waist) {
         return sel.inseam ? `C${sel.waist}" / L${sel.inseam}"` : `C${sel.waist}"`;
     }
-    const g = sel.gender ? (sel.gender === 'Men' ? 'H · ' : 'M · ') : '';
+    const g = sel.gender ? (sel.gender === 'Men' ? 'Hombre · ' : 'Mujer · ') : '';
     return `${g}${sel.size || ''}`.trim() || '—';
 }
 

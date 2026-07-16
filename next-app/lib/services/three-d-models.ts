@@ -300,7 +300,7 @@ export interface DesignLogo {
 
 // One size line the customer chose (drives the order on accept).
 export interface DesignItem {
-    size: string; // display label, e.g. "H · M"
+    size: string; // display label, e.g. "Hombre · M"
     quantity: number;
     selection: SizeSelection;
 }

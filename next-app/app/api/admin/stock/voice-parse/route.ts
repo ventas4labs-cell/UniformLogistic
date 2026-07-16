@@ -202,8 +202,8 @@ Detección de TIPO de movimiento (mapeá el verbo dictado a uno de los enums):
 - **adjustment** (corrección por conteo físico — el 'quantity' es el TOTAL FINAL, no un delta): "el conteo dice", "el conteo arroja", "conté X y son", "el inventario físico es", "ajustar a", "corregir a", "en bodega hay realmente", "el conteo cierra en".
 
 Tallas canónicas:
-- "hombre talla M" → "H · M"
-- "mujer XL" → "M · XL"
+- "hombre talla M" → "Hombre · M"
+- "mujer XL" → "Mujer · XL"
 - "cintura 32" → "C32\\""
 - "cintura 34 largo 30" → "C34\\" / L30\\""
 - "mediana" → M, "grande" → L, "extra grande" → XL, "doble extra grande" → 2XL, "triple extra grande" → 3XL.

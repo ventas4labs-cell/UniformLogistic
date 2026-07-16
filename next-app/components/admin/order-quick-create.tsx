@@ -35,9 +35,9 @@ function sizeOptions(p: AdminProduct): SizeOption[] {
         for (const w of waist) out.push({ label: `C${w}"`, selection: { waist: w } });
     } else {
         for (const s of p.sizes.men || [])
-            out.push({ label: `H · ${s}`, selection: { gender: 'Men', size: s } });
+            out.push({ label: `Hombre · ${s}`, selection: { gender: 'Men', size: s } });
         for (const s of p.sizes.women || [])
-            out.push({ label: `M · ${s}`, selection: { gender: 'Women', size: s } });
+            out.push({ label: `Mujer · ${s}`, selection: { gender: 'Women', size: s } });
     }
     if (out.length === 0) out.push({ label: 'Único', selection: {} });
     return out;

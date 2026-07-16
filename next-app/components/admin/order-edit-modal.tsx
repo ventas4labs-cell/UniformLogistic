@@ -29,8 +29,8 @@ function isoDate(date: string | undefined | null): string {
 
 function listSizesForProduct(p: AdminProduct): string[] {
     const sizes: string[] = [];
-    if (p.sizes.men?.length) sizes.push(...p.sizes.men.map((s) => `H · ${s}`));
-    if (p.sizes.women?.length) sizes.push(...p.sizes.women.map((s) => `M · ${s}`));
+    if (p.sizes.men?.length) sizes.push(...p.sizes.men.map((s) => `Hombre · ${s}`));
+    if (p.sizes.women?.length) sizes.push(...p.sizes.women.map((s) => `Mujer · ${s}`));
     if (p.sizes.waist?.length) {
         for (const w of p.sizes.waist) {
             if (p.sizes.inseam?.length) {

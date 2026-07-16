@@ -48,14 +48,14 @@ function expandSizes(p: ProductRow): string[] {
 
     if (p.product_type === 'shirt') {
         // Shirts: gender-prefixed strings. Unisex products get both
-        // H · and M · variants so warehouse can split inventory.
+        // Hombre · and Mujer · variants so warehouse can split inventory.
         if (p.gender === 'men') {
-            (sj.men || []).forEach((s) => out.push(`H · ${s}`));
+            (sj.men || []).forEach((s) => out.push(`Hombre · ${s}`));
         } else if (p.gender === 'women') {
-            (sj.women || []).forEach((s) => out.push(`M · ${s}`));
+            (sj.women || []).forEach((s) => out.push(`Mujer · ${s}`));
         } else {
-            (sj.men || []).forEach((s) => out.push(`H · ${s}`));
-            (sj.women || []).forEach((s) => out.push(`M · ${s}`));
+            (sj.men || []).forEach((s) => out.push(`Hombre · ${s}`));
+            (sj.women || []).forEach((s) => out.push(`Mujer · ${s}`));
             if (out.length === 0) {
                 // No gendered size lists configured — fall back to bare labels.
                 (sj.men || sj.women || []).forEach((s) => out.push(s));

@@ -100,9 +100,9 @@ const inferType = (item: CartItem): 'shirt' | 'pant' => {
 
 const formatShirtSize = (item: CartItem): string => {
     const g = item.selection.gender;
-    const prefix = g === 'Men' ? 'H' : g === 'Women' ? 'M' : '';
+    const prefix = g === 'Men' ? 'Hombre' : g === 'Women' ? 'Mujer' : '';
     const s = item.selection.size || '';
-    return prefix ? `${prefix}-${s}` : s;
+    return prefix ? `${prefix} · ${s}` : s;
 };
 
 const formatPantSize = (item: CartItem): string => {
@@ -138,12 +138,14 @@ const SHIRT_SIZE_RANK: Record<string, number> = {
 const sizeSortKey = (label: string): [number, number, string] => {
     let gender = '';
     let size = label.trim();
-    const m = size.match(/^([HM])\s*[·\-]\s*(.+)$/);
+    // Accept full words ("Hombre · ", "Mujer · ") and legacy letters.
+    const m = size.match(/^(hombre|mujer|[HM])\s*[·\-]\s*(.+)$/i);
     if (m) {
         gender = m[1];
         size = m[2].trim();
     }
-    const genderRank = gender === 'H' ? 0 : gender === 'M' ? 1 : 2;
+    const g0 = gender.charAt(0).toLowerCase();
+    const genderRank = g0 === 'h' ? 0 : g0 === 'm' ? 1 : 2;
 
     const upper = size.toUpperCase().replace(/\s+/g, '');
     const rank = SHIRT_SIZE_RANK[upper];

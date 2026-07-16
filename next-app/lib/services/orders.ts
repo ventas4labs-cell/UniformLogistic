@@ -33,7 +33,7 @@ export const selectionToSizeString = (selection: SizeSelection): string => {
             : `C${selection.waist}"`;
     }
     const genderPrefix = selection.gender
-        ? (selection.gender === 'Men' ? 'H · ' : 'M · ')
+        ? (selection.gender === 'Men' ? 'Hombre · ' : 'Mujer · ')
         : '';
     return `${genderPrefix}${selection.size || ''}`.trim();
 };

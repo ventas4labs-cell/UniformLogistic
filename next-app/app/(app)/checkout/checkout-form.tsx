@@ -16,8 +16,8 @@ function formatItemSize(item: CartItem) {
     }
     const genderPrefix = item.selection.gender
         ? item.selection.gender === 'Men'
-            ? 'H · '
-            : 'M · '
+            ? 'Hombre · '
+            : 'Mujer · '
         : '';
     return `${genderPrefix}${item.selection.size || ''}`;
 }
