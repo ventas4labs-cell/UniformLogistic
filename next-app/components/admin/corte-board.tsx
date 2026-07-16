@@ -9,7 +9,8 @@ import {
     ChevronDown,
     ChevronUp,
     Plus,
-    X
+    X,
+    HardHat
 } from 'lucide-react';
 import type { Order } from '@/lib/types';
 import { parseColors } from '@/lib/stage-utils';
@@ -115,12 +116,15 @@ function OrderCard({
     order,
     isCompleted,
     onLocalCompletionChange,
-    initialProgress
+    initialProgress,
+    stationNames = []
 }: {
     order: Order;
     isCompleted: boolean;
     onLocalCompletionChange: (uuid: string, next: boolean) => void;
     initialProgress?: ItemProgress;
+    /** External corte station(s) this order is assigned to, if any. */
+    stationNames?: string[];
 }) {
     const [expanded, setExpanded] = useState(true);
     // Extras added during this session, appended optimistically so the
@@ -216,6 +220,11 @@ function OrderCard({
                     {localExtras.length > 0 && (
                         <span className="bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 text-xs font-bold px-2 py-1 rounded-full">
                             +{localExtras.length} extra
+                        </span>
+                    )}
+                    {stationNames.length > 0 && (
+                        <span className="inline-flex items-center gap-1 bg-indigo-100 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 text-xs font-bold px-2 py-1 rounded-full">
+                            <HardHat size={12} /> {stationNames.join(', ')}
                         </span>
                     )}
                 </div>
@@ -438,21 +447,31 @@ function OrderCard({
 export function CorteBoard({
     initialOrders,
     initialCompletedOrderIds,
-    initialProgress
+    initialProgress,
+    assignedStationsByOrder = {}
 }: {
     initialOrders: Order[];
     initialCompletedOrderIds: string[];
     initialProgress?: ItemProgress;
+    /** orderId → external corte station name(s) assigned to it. */
+    assignedStationsByOrder?: Record<string, string[]>;
 }) {
     const [orders] = useState<Order[]>(initialOrders);
     const [completed, setCompleted] = useState<Set<string>>(
         () => new Set(initialCompletedOrderIds)
     );
     const [tab, setTab] = useState<StageTab>('pending');
+    // Assignment scope: all corte orders, or only those handed to an
+    // external corte station.
+    const [assignTab, setAssignTab] = useState<'all' | 'assigned'>('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [companyFilter, setCompanyFilter] = useState<string>('all');
     const [pending] = useTransition();
     const router = useRouter();
+
+    const stationsFor = (o: Order): string[] =>
+        (o.uuid && assignedStationsByOrder[o.uuid]) || [];
+    const assignedCount = orders.filter((o) => stationsFor(o).length > 0).length;
 
     const handleLocalCompletionChange = (uuid: string, next: boolean) => {
         setCompleted((prev) => {
@@ -463,11 +482,25 @@ export function CorteBoard({
         });
     };
 
+    // Assignment scope is applied first, then the pending/done/all tab.
+    const scoped = useMemo(
+        () =>
+            assignTab === 'assigned'
+                ? orders.filter((o) => stationsFor(o).length > 0)
+                : orders,
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [orders, assignTab, assignedStationsByOrder]
+    );
+
     const tabFiltered = useMemo(() => {
-        if (tab === 'all') return orders;
-        if (tab === 'done') return orders.filter((o) => o.uuid && completed.has(o.uuid));
-        return orders.filter((o) => !(o.uuid && completed.has(o.uuid)));
-    }, [orders, completed, tab]);
+        // "Asignados" is a visibility view — show every assigned order so
+        // the default pending sub-filter never hides ones an external
+        // station already completed.
+        if (assignTab === 'assigned') return scoped;
+        if (tab === 'all') return scoped;
+        if (tab === 'done') return scoped.filter((o) => o.uuid && completed.has(o.uuid));
+        return scoped.filter((o) => !(o.uuid && completed.has(o.uuid)));
+    }, [scoped, completed, tab, assignTab]);
 
     const filtered = tabFiltered.filter((o) => {
         if (companyFilter !== 'all' && o.companyName !== companyFilter) return false;
@@ -481,9 +514,9 @@ export function CorteBoard({
     });
 
     const counts = {
-        pending: orders.filter((o) => !(o.uuid && completed.has(o.uuid))).length,
-        done: orders.filter((o) => o.uuid && completed.has(o.uuid)).length,
-        all: orders.length
+        pending: scoped.filter((o) => !(o.uuid && completed.has(o.uuid))).length,
+        done: scoped.filter((o) => o.uuid && completed.has(o.uuid)).length,
+        all: scoped.length
     };
 
     return (
@@ -524,13 +557,48 @@ export function CorteBoard({
                 </div>
             </div>
 
+            {/* Assignment-scope tabs: full visibility of external-station work */}
+            <div className="inline-flex items-center gap-1 p-1 mb-4 bg-gray-100 dark:bg-zinc-800 rounded-xl">
+                {(
+                    [
+                        { key: 'all', label: 'Todos', count: orders.length },
+                        { key: 'assigned', label: 'Asignados a estación', count: assignedCount }
+                    ] as const
+                ).map((t) => (
+                    <button
+                        key={t.key}
+                        type="button"
+                        onClick={() => setAssignTab(t.key)}
+                        className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-colors ${
+                            assignTab === t.key
+                                ? 'bg-white dark:bg-zinc-900 shadow-sm text-gray-900 dark:text-zinc-100'
+                                : 'text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-200'
+                        }`}
+                    >
+                        {t.key === 'assigned' && <HardHat size={14} />}
+                        {t.label}
+                        <span
+                            className={`min-w-[1.3rem] px-1 rounded-full text-[11px] leading-5 ${
+                                assignTab === t.key
+                                    ? 'bg-orange-100 dark:bg-orange-950/50 text-orange-700 dark:text-orange-300'
+                                    : 'bg-gray-200 dark:bg-zinc-700 text-gray-600 dark:text-zinc-300'
+                            }`}
+                        >
+                            {t.count}
+                        </span>
+                    </button>
+                ))}
+            </div>
+
             {filtered.length === 0 ? (
                 <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm p-12 text-center text-gray-500 dark:text-zinc-400">
-                    {tab === 'pending'
-                        ? 'No hay pedidos pendientes de corte.'
-                        : tab === 'done'
-                            ? 'Todavía no se ha completado ningún pedido en corte.'
-                            : 'No hay pedidos.'}
+                    {assignTab === 'assigned'
+                        ? 'Ningún pedido de corte está asignado a una estación externa.'
+                        : tab === 'pending'
+                            ? 'No hay pedidos pendientes de corte.'
+                            : tab === 'done'
+                                ? 'Todavía no se ha completado ningún pedido en corte.'
+                                : 'No hay pedidos.'}
                 </div>
             ) : (
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4 items-start">
@@ -541,6 +609,7 @@ export function CorteBoard({
                             isCompleted={!!order.uuid && completed.has(order.uuid)}
                             onLocalCompletionChange={handleLocalCompletionChange}
                             initialProgress={initialProgress}
+                            stationNames={stationsFor(order)}
                         />
                     ))}
                 </div>

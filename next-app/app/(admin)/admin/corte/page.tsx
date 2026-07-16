@@ -2,7 +2,7 @@ import { createClient } from '@/utils/supabase/server';
 import { fetchAllOrders } from '@/lib/services/orders';
 import { fetchStageCompletions } from '@/lib/services/stage-completions';
 import { fetchStageItemProgress } from '@/lib/services/stage-item-progress';
-import { fetchOrdersOutsourcedToStage } from '@/lib/services/station-assignments';
+import { fetchAssignmentsForOrders } from '@/lib/services/station-assignments';
 import { orderNeedsStage } from '@/lib/stage-utils';
 import { CorteBoard } from '@/components/admin/corte-board';
 
@@ -19,22 +19,25 @@ export default async function CortePage() {
     const corteOrders = all.filter(
         (o) => o.status !== 'cancelled' && orderNeedsStage(o, 'corte')
     );
-    // An order handed to an EXTERNAL corte station is produced there, so
-    // drop it from this in-house corte board to avoid double production.
-    // (Re-appears here if the assignment is removed.)
-    const outsourced = await fetchOrdersOutsourcedToStage(
-        supabase,
-        corteOrders.map((o) => o.uuid).filter((id): id is string => !!id),
-        'corte'
-    );
-    const orders = corteOrders.filter(
-        (o) => !(o.uuid && outsourced.has(o.uuid))
-    );
+    // Full visibility: show ALL corte orders and, for the ones handed to
+    // an external corte station, note which station — surfaced via the
+    // board's "Todos / Asignados a estación" tab and a per-card badge.
+    const corteOrderIds = corteOrders
+        .map((o) => o.uuid)
+        .filter((id): id is string => !!id);
+    const assignments = await fetchAssignmentsForOrders(supabase, corteOrderIds);
+    const assignedStationsByOrder: Record<string, string[]> = {};
+    for (const a of assignments) {
+        if (a.stationUserStage !== 'corte') continue;
+        const name = a.stationUserName || a.stationUserEmail || 'Estación';
+        (assignedStationsByOrder[a.orderId] ||= []).push(name);
+    }
     return (
         <CorteBoard
-            initialOrders={orders}
+            initialOrders={corteOrders}
             initialCompletedOrderIds={Array.from(completed)}
             initialProgress={progress}
+            assignedStationsByOrder={assignedStationsByOrder}
         />
     );
 }
