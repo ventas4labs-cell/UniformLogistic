@@ -16,6 +16,7 @@ import {
     PackageCheck,
     PenTool,
     Box,
+    Truck,
     type LucideIcon
 } from 'lucide-react';
 
@@ -56,5 +57,6 @@ export const ADMIN_MODULES: AdminModule[] = [
     { id: 'impresion', label: 'Impresión', href: '/admin/impresion', Icon: Printer, group: 'operaciones' },
     { id: 'bordado', label: 'Bordado', href: '/admin/bordado', Icon: Sparkles, group: 'operaciones' },
     { id: 'empaque', label: 'Empaque', href: '/admin/empaque', Icon: PackageCheck, group: 'operaciones' },
-    { id: 'ploter', label: 'Ploter', href: '/admin/ploter', Icon: PenTool, group: 'operaciones' }
+    { id: 'ploter', label: 'Ploter', href: '/admin/ploter', Icon: PenTool, group: 'operaciones' },
+    { id: 'entregas', label: 'Entregas', href: '/admin/entregas', Icon: Truck, group: 'operaciones' }
 ];

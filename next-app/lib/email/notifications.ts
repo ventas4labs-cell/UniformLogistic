@@ -9,6 +9,7 @@ import {
     quoteReceivedEmail,
     quoteAdminNotice,
     orderCompletedEmail,
+    deliveryScheduledEmail,
     invoiceOverdueEmail,
     type QuoteEmailData
 } from '@/lib/email/templates';
@@ -113,6 +114,54 @@ export async function sendOrderCompletedEmail(
         await sendEmail({ to, subject: t.subject, html: t.html, text: t.text });
     } catch (e) {
         console.error('[email] order completed notice failed', e);
+    }
+}
+
+/**
+ * Notify the customer that their order is out for / scheduled for
+ * delivery. `dateIso` is YYYY-MM-DD. Best-effort — never throws.
+ */
+export async function sendDeliveryScheduledEmail(
+    supabase: SupabaseClient,
+    orderUuid: string,
+    dateIso: string
+): Promise<void> {
+    try {
+        const { data, error } = await supabase
+            .from('orders')
+            .select('order_number, company:companies ( name, email, contact_name )')
+            .eq('id', orderUuid)
+            .maybeSingle();
+        if (error || !data) return;
+        const row = data as unknown as {
+            order_number: number;
+            company:
+                | { name: string; email: string; contact_name: string }
+                | { name: string; email: string; contact_name: string }[]
+                | null;
+        };
+        const company = pickOne(row.company);
+        const to = (company?.email || '').trim();
+        if (!to) return;
+
+        const today = new Date().toISOString().slice(0, 10);
+        const isToday = dateIso === today;
+        // Format YYYY-MM-DD as a local es-CR date without timezone drift.
+        const [y, m, dd] = dateIso.split('-').map((n) => parseInt(n, 10));
+        const dateLabel = isToday
+            ? 'hoy'
+            : `el ${dd}/${m}/${y}`;
+
+        const t = deliveryScheduledEmail({
+            orderRef: `ORDEN-${String(row.order_number).padStart(5, '0')}`,
+            companyName: company?.name || '',
+            contactName: company?.contact_name || '',
+            dateLabel,
+            isToday
+        });
+        await sendEmail({ to, subject: t.subject, html: t.html, text: t.text });
+    } catch (e) {
+        console.error('[email] delivery scheduled notice failed', e);
     }
 }
 

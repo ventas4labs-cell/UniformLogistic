@@ -213,6 +213,43 @@ export function orderCompletedEmail(o: OrderCompletedEmailData): RenderedEmail {
     };
 }
 
+// ── 3b. Delivery scheduled — to the customer ─────────────────────────
+export interface DeliveryScheduledEmailData {
+    orderRef: string;
+    companyName: string;
+    contactName: string;
+    /** Human date label, e.g. "hoy" or "el 20/07/2026". */
+    dateLabel: string;
+    isToday: boolean;
+}
+
+export function deliveryScheduledEmail(d: DeliveryScheduledEmailData): RenderedEmail {
+    const greet = d.contactName || d.companyName;
+    const when = d.isToday
+        ? 'será entregado <strong>hoy</strong>'
+        : `está programado para entregarse <strong>${esc(d.dateLabel)}</strong>`;
+    const body = `
+    <p style="margin:0 0 14px 0;">${greet ? `Hola ${esc(greet)},` : 'Hola,'}</p>
+    <p style="margin:0 0 6px 0;">Tu pedido <strong style="color:${ORANGE};">${esc(d.orderRef)}</strong> ${when}.</p>
+    <p style="margin:14px 0 0 0;color:${MUTED};font-size:14px;">Nuestro mensajero se encargará de la entrega. Si necesitás coordinar algo, respondé este correo.</p>`;
+    return {
+        subject: d.isToday
+            ? `Tu pedido ${d.orderRef} sale a entrega hoy — Uniform Logistic`
+            : `Tu pedido ${d.orderRef} tiene fecha de entrega — Uniform Logistic`,
+        html: layout({
+            title: 'Entrega programada',
+            preheader: d.isToday
+                ? `${d.orderRef} sale hoy`
+                : `${d.orderRef} — entrega ${d.dateLabel}`,
+            body
+        }),
+        text:
+            `${greet ? `Hola ${greet},\n\n` : ''}Tu pedido ${d.orderRef} ${
+                d.isToday ? 'será entregado hoy' : `se entregará ${d.dateLabel}`
+            }.\n\nUniform Logistic\n${SUPPORT_EMAIL}`
+    };
+}
+
 // ── 4. Overdue invoices reminder — to the customer ───────────────────
 export interface OverdueEmailData {
     companyName: string;

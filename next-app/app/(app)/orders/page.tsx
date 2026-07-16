@@ -4,6 +4,7 @@ import { fetchUserOrders } from '@/lib/services/orders';
 import { fetchStageCompletionsForOrders } from '@/lib/services/stage-completions';
 import { fetchDispatchTotalsForOrders } from '@/lib/services/dispatches';
 import { fetchStockEntryTotalsForOrders } from '@/lib/services/stock-entries';
+import { fetchDeliveriesForOrders } from '@/lib/services/deliveries';
 import { deriveOrderProgress } from '@/lib/customer-order-status';
 import { OrderCard } from '@/components/customer/order-card';
 
@@ -16,10 +17,11 @@ export default async function OrdersPage() {
 
     const orders = await fetchUserOrders(supabase, user.id);
     const orderIds = orders.map((o) => o.uuid).filter((id): id is string => !!id);
-    const [completions, dispatchTotals, stockTotals] = await Promise.all([
+    const [completions, dispatchTotals, stockTotals, deliveries] = await Promise.all([
         fetchStageCompletionsForOrders(supabase, orderIds),
         fetchDispatchTotalsForOrders(supabase, orderIds),
-        fetchStockEntryTotalsForOrders(supabase, orderIds)
+        fetchStockEntryTotalsForOrders(supabase, orderIds),
+        fetchDeliveriesForOrders(supabase, orderIds)
     ]);
 
     return (
@@ -40,7 +42,8 @@ export default async function OrdersPage() {
                             order,
                             completions,
                             dispatchTotals,
-                            stockTotals
+                            stockTotals,
+                            !!(order.uuid && deliveries.get(order.uuid)?.deliveredAt)
                         );
                         return (
                             <OrderCard

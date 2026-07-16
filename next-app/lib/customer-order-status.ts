@@ -47,7 +47,10 @@ export function deriveOrderProgress(
     dispatchTotals: DispatchTotalsByOrder,
     // Same shape as dispatchTotals — how much of each line was pushed
     // into the company's stock. Optional so older callers still compile.
-    stockTotals?: DispatchTotalsByOrder
+    stockTotals?: DispatchTotalsByOrder,
+    // True once the delivery module has marked the order delivered. Only
+    // a real delivery (not merely being dispatched) completes the order.
+    delivered = false
 ): CustomerOrderProgress {
     const totalPieces = order.items.reduce((s, i) => s + i.quantity, 0);
 
@@ -62,11 +65,13 @@ export function deriveOrderProgress(
     const totalStages = stages.length;
     const allStagesDone = totalStages > 0 && doneCount === totalStages;
 
-    // Delivered pieces = sum of every dispatched line for this order.
-    let deliveredPieces = 0;
+    // Dispatched pieces = sum of every dispatched line for this order.
+    // Being fully dispatched means the order is packed & ready to leave —
+    // NOT delivered. The delivery module marks the actual delivery.
+    let dispatchedPieces = 0;
     const dt = order.uuid ? dispatchTotals.get(order.uuid) : undefined;
-    if (dt) for (const q of dt.values()) deliveredPieces += q;
-    const fullyDelivered = totalPieces > 0 && deliveredPieces >= totalPieces;
+    if (dt) for (const q of dt.values()) dispatchedPieces += q;
+    const fullyDispatched = totalPieces > 0 && dispatchedPieces >= totalPieces;
 
     // Stocked pieces = sum of every line pushed into the company's stock.
     let stockedPieces = 0;
@@ -79,18 +84,19 @@ export function deriveOrderProgress(
     if (order.status === 'cancelled') {
         bucket = 'cancelled';
         statusLabel = 'Cancelado';
-    } else if (order.status === 'completed' || fullyDelivered || fullyStocked) {
-        // Completion for the customer: every piece delivered, or every
-        // piece moved into their stock (now sitting in "Mi almacén") —
-        // either way the order is done regardless of which workshop
-        // stages were checked off.
+    } else if (order.status === 'completed' || delivered || fullyStocked) {
+        // Completion for the customer: the order was actually delivered
+        // (by the delivery module) or every piece moved into their stock
+        // ("Mi almacén"). Being merely dispatched is NOT completion.
         bucket = 'completed';
-        statusLabel = fullyDelivered
+        statusLabel = delivered
             ? 'Entregado'
             : fullyStocked
                 ? 'En stock'
                 : 'Completado';
-    } else if (allStagesDone) {
+    } else if (fullyDispatched || allStagesDone) {
+        // Packed & dispatched (or all stages done) → waiting for the
+        // courier. Shows in the customer's "Listos para despacho" list.
         bucket = 'ready';
         statusLabel = 'Listo para despacho';
     } else {
@@ -106,6 +112,6 @@ export function deriveOrderProgress(
         doneCount,
         totalStages,
         totalPieces,
-        deliveredPieces
+        deliveredPieces: dispatchedPieces
     };
 }

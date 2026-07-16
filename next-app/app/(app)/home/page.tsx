@@ -18,6 +18,7 @@ import { fetchUserOrders } from '@/lib/services/orders';
 import { fetchStageCompletionsForOrders } from '@/lib/services/stage-completions';
 import { fetchDispatchTotalsForOrders } from '@/lib/services/dispatches';
 import { fetchStockEntryTotalsForOrders } from '@/lib/services/stock-entries';
+import { fetchDeliveriesForOrders } from '@/lib/services/deliveries';
 import { deriveOrderProgress, type CustomerOrderProgress } from '@/lib/customer-order-status';
 import { fetchStockForUser, summarizeStock } from '@/lib/services/stock';
 import { fetchInvoicesForUser, summarizeInvoices } from '@/lib/services/invoices';
@@ -79,17 +80,24 @@ export default async function HomePage() {
     // stages) + order_dispatches (delivery) — not orders.status. Derive
     // each order's true bucket from those.
     const orderIds = allOrders.map((o) => o.uuid).filter((id): id is string => !!id);
-    const [completions, dispatchTotals, stockTotals] = await Promise.all([
+    const [completions, dispatchTotals, stockTotals, deliveries] = await Promise.all([
         fetchStageCompletionsForOrders(supabase, orderIds),
         fetchDispatchTotalsForOrders(supabase, orderIds),
-        fetchStockEntryTotalsForOrders(supabase, orderIds)
+        fetchStockEntryTotalsForOrders(supabase, orderIds),
+        fetchDeliveriesForOrders(supabase, orderIds)
     ]);
     const progressByOrder = new Map<string, CustomerOrderProgress>();
     for (const o of allOrders) {
         if (o.uuid) {
             progressByOrder.set(
                 o.uuid,
-                deriveOrderProgress(o, completions, dispatchTotals, stockTotals)
+                deriveOrderProgress(
+                    o,
+                    completions,
+                    dispatchTotals,
+                    stockTotals,
+                    !!deliveries.get(o.uuid)?.deliveredAt
+                )
             );
         }
     }
