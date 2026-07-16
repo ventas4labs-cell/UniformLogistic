@@ -8,6 +8,7 @@ import {
     HardHat,
     Link2,
     Loader2,
+    Package,
     Plus,
     Power,
     PowerOff,
@@ -48,6 +49,8 @@ export interface OrderSummary {
     companyName: string;
     createdAt: string;
     deliveryDate: string;
+    /** Distinct product names in the order, for at-a-glance visibility. */
+    items: string[];
 }
 
 interface ManagerProps {
@@ -91,6 +94,40 @@ export function StationUsersManager({
             return next;
         });
     };
+
+    // Visibility view: which orders each station currently has. Derived
+    // live from assignmentPairs so it updates the moment an assignment is
+    // made from the modal. Orders missing from orderSummaries (e.g.
+    // cancelled) are skipped.
+    const ordersByStation = useMemo(() => {
+        const orderById = new Map(orderSummaries.map((o) => [o.uuid, o]));
+        const map = new Map<string, OrderSummary[]>();
+        for (const pair of assignmentPairs) {
+            const [orderId, stationUserId] = pair.split('|');
+            const order = orderById.get(orderId);
+            if (!order) continue;
+            const arr = map.get(stationUserId);
+            if (arr) arr.push(order);
+            else map.set(stationUserId, [order]);
+        }
+        for (const arr of map.values()) {
+            arr.sort(
+                (a, b) =>
+                    (a.deliveryDate || '').localeCompare(b.deliveryDate || '') ||
+                    a.ref.localeCompare(b.ref)
+            );
+        }
+        return map;
+    }, [assignmentPairs, orderSummaries]);
+
+    const totalAssigned = useMemo(() => {
+        let n = 0;
+        for (const arr of ordersByStation.values()) n += arr.length;
+        return n;
+    }, [ordersByStation]);
+    const stationsWithOrders = users.filter(
+        (u) => (ordersByStation.get(u.id)?.length ?? 0) > 0
+    );
 
     const handleCreated = (u: StationUser) => {
         setUsers((prev) => [...prev, u].sort((a, b) => a.displayName.localeCompare(b.displayName)));
@@ -324,6 +361,86 @@ export function StationUsersManager({
                             ))}
                         </tbody>
                     </table>
+                )}
+            </div>
+
+            {/* ── Pedidos por estación — assignment visibility ────────── */}
+            <div className="mt-8">
+                <div className="flex items-center gap-2 mb-3">
+                    <Package size={18} className="text-orange-600 dark:text-orange-400" />
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-zinc-100">
+                        Pedidos por estación
+                    </h3>
+                    {totalAssigned > 0 && (
+                        <span className="text-xs font-bold text-orange-700 dark:text-orange-300 bg-orange-100 dark:bg-orange-950/50 px-2 py-0.5 rounded-full">
+                            {totalAssigned} asignado{totalAssigned === 1 ? '' : 's'}
+                        </span>
+                    )}
+                </div>
+
+                {stationsWithOrders.length === 0 ? (
+                    <div className="bg-white dark:bg-zinc-900 rounded-xl border border-gray-200 dark:border-zinc-800 p-8 text-center text-sm text-gray-500 dark:text-zinc-400">
+                        Ningún pedido asignado a una estación todavía. Usá{' '}
+                        <span className="font-semibold">Asignar a estación externa</span>{' '}
+                        para empezar.
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+                        {stationsWithOrders.map((u) => {
+                            const stationOrders = ordersByStation.get(u.id) || [];
+                            return (
+                                <div
+                                    key={u.id}
+                                    className={`bg-white dark:bg-zinc-900 rounded-xl border border-gray-200 dark:border-zinc-800 shadow-sm overflow-hidden ${
+                                        u.isActive ? '' : 'opacity-60'
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-100 dark:border-zinc-800">
+                                        <div className="min-w-0">
+                                            <p className="font-bold text-gray-900 dark:text-zinc-100 truncate">
+                                                {u.displayName}
+                                            </p>
+                                            <span className="inline-block mt-0.5 px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 text-[10px] font-bold uppercase tracking-wide">
+                                                {STAGE_LABELS[u.stage] || u.stage}
+                                            </span>
+                                        </div>
+                                        <span className="shrink-0 text-xs font-bold text-gray-600 dark:text-zinc-300 bg-gray-100 dark:bg-zinc-800 px-2 py-1 rounded-full">
+                                            {stationOrders.length} pedido
+                                            {stationOrders.length === 1 ? '' : 's'}
+                                        </span>
+                                    </div>
+                                    <ul className="divide-y divide-gray-100 dark:divide-zinc-800">
+                                        {stationOrders.map((o) => (
+                                            <li
+                                                key={o.uuid}
+                                                className="flex items-center justify-between gap-3 px-4 py-2.5"
+                                            >
+                                                <div className="min-w-0">
+                                                    <p className="font-mono text-xs font-bold text-orange-600 dark:text-orange-400">
+                                                        {o.ref}
+                                                    </p>
+                                                    <p className="text-sm text-gray-700 dark:text-zinc-300 truncate">
+                                                        {o.companyName || '—'}
+                                                    </p>
+                                                    {o.items.length > 0 && (
+                                                        <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5 line-clamp-2">
+                                                            {o.items.join(', ')}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                {o.deliveryDate && (
+                                                    <span className="shrink-0 text-[11px] text-gray-500 dark:text-zinc-400">
+                                                        Entrega{' '}
+                                                        {new Date(o.deliveryDate).toLocaleDateString()}
+                                                    </span>
+                                                )}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            );
+                        })}
+                    </div>
                 )}
             </div>
 

@@ -25,7 +25,10 @@ export default async function StationUsersPage() {
             ref: o.id,
             companyName: o.companyName,
             createdAt: o.dateCreated,
-            deliveryDate: o.deliveryDate
+            deliveryDate: o.deliveryDate,
+            // Distinct product names so the station view shows what each
+            // order actually contains, not just its ref/company.
+            items: [...new Set(o.items.map((i) => i.productName).filter(Boolean))]
         }));
 
     return (
