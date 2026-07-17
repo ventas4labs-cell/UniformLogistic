@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { cookies } from "next/headers";
+import { DeviceClass } from "@/components/device-class";
 import "./globals.css";
 
 // Inter is loaded as the cross-platform fallback. On Apple devices the CSS
@@ -41,6 +42,7 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans transition-colors">
+        <DeviceClass />
         {children}
       </body>
     </html>

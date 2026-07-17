@@ -184,3 +184,36 @@ h1, h2, h3, h4 {
     animation: none !important;
   }
 }
+
+/*
+ * ─── Touch / small-device usability ─────────────────────────────────
+ * Adapts the UI to phones and tablets without per-component changes.
+ * Complements the Tailwind responsive breakpoints already in use.
+ */
+
+/* No hover on touch → controls hidden behind hover would be unreachable.
+ * Reveal any opacity/hover-gated action so it's always tappable. */
+@media (hover: none) {
+  .group-hover\:opacity-100 { opacity: 1 !important; }
+}
+
+/* Coarse (finger) pointer: momentum scroll for the wide, horizontally
+ * scrolling regions (tables, tab strips) and comfortable minimum tap
+ * targets on the small icon-only buttons that pepper the admin. */
+@media (pointer: coarse) {
+  .overflow-x-auto,
+  .overflow-auto {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  button,
+  a[role="button"],
+  [role="tab"] {
+    touch-action: manipulation; /* kill the 300ms tap delay */
+  }
+}
+
+/* Device-class hooks for CSS that can't be a plain media query. The
+ * attribute is set on <html> by the DeviceClass client component. */
+:root[data-device="phone"] .hide-on-phone { display: none !important; }
+:root[data-device="desktop"] .only-phone { display: none !important; }
