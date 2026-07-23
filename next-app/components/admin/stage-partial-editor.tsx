@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
-import { Check, Loader2, Save, ImageIcon } from 'lucide-react';
+import { Check, Loader2, Save, ImageIcon, X } from 'lucide-react';
 import type { Order } from '@/lib/types';
 import { STAGE_LABELS, type StageKey } from '@/lib/services/stage-completions';
 import type { ItemProgress } from '@/lib/services/stage-item-progress';
@@ -52,6 +52,37 @@ export function StagePartialEditor({
     const [draft, setDraft] = useState<Record<string, number>>(seed);
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
+    // Product image the operator tapped to enlarge — the tracker
+    // thumbnails are small, so a full-size view helps when matching the
+    // garment on the table.
+    const [zoom, setZoom] = useState<{ url: string; name: string } | null>(null);
+
+    const zoomModal = zoom ? (
+        <div
+            className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center p-4"
+            onClick={() => setZoom(null)}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Imagen de ${zoom.name}`}
+        >
+            <button
+                type="button"
+                onClick={() => setZoom(null)}
+                className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20"
+                aria-label="Cerrar"
+            >
+                <X size={22} />
+            </button>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+                src={zoom.url}
+                alt={zoom.name}
+                onClick={(e) => e.stopPropagation()}
+                className="max-h-[80vh] max-w-full rounded-2xl shadow-2xl object-contain"
+            />
+            <p className="mt-4 text-white font-semibold text-center">{zoom.name}</p>
+        </div>
+    ) : null;
 
     const doneTotal = useMemo(
         () => items.reduce((s, i) => s + (i.uuid ? draft[i.uuid] ?? 0 : 0), 0),
@@ -102,7 +133,7 @@ export function StagePartialEditor({
                         key={item.uuid || idx}
                         className="flex items-center gap-3 text-sm bg-green-50/60 dark:bg-green-950/20 rounded-lg px-3 py-2"
                     >
-                        <ItemThumb item={item} />
+                        <ItemThumb item={item} onZoom={setZoom} />
                         <div className="min-w-0 flex-1">
                             <span className="font-medium text-gray-900 dark:text-zinc-100">
                                 {item.productName}
@@ -116,6 +147,7 @@ export function StagePartialEditor({
                         </span>
                     </div>
                 ))}
+                {zoomModal}
             </div>
         );
     }
@@ -161,7 +193,7 @@ export function StagePartialEditor({
                             key={id || idx}
                             className="flex items-center gap-2 text-sm bg-gray-50 dark:bg-zinc-800/50 rounded-lg px-3 py-2"
                         >
-                            <ItemThumb item={item} />
+                            <ItemThumb item={item} onZoom={setZoom} />
                             <div className="min-w-0 flex-1">
                                 <span className="font-medium text-gray-900 dark:text-zinc-100">
                                     {item.productName}
@@ -237,23 +269,45 @@ export function StagePartialEditor({
                                 ? 'Avance guardado'
                                 : 'Guardar avance'}
             </button>
+            {zoomModal}
         </div>
     );
 }
 
 // Small product thumbnail so operators can see the garment they're
-// working on. Falls back to a placeholder icon when no image is set.
-function ItemThumb({ item }: { item: { imageUrl?: string; productName: string } }) {
-    return item.imageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-            src={item.imageUrl}
-            alt={item.productName}
-            className="w-10 h-10 rounded-lg object-cover shrink-0 border border-gray-200 dark:border-zinc-700"
-        />
-    ) : (
-        <div className="w-10 h-10 rounded-lg bg-gray-200 dark:bg-zinc-700 shrink-0 flex items-center justify-center">
-            <ImageIcon size={16} className="text-gray-400 dark:text-zinc-500" />
-        </div>
+// working on. Tap to enlarge (the tracker rows are compact, so the
+// full-size view is what an operator actually matches against the
+// garment). Falls back to a placeholder icon when no image is set.
+function ItemThumb({
+    item,
+    onZoom
+}: {
+    item: { imageUrl?: string; productName: string };
+    onZoom: (z: { url: string; name: string }) => void;
+}) {
+    if (!item.imageUrl) {
+        return (
+            <div className="w-10 h-10 rounded-lg bg-gray-200 dark:bg-zinc-700 shrink-0 flex items-center justify-center">
+                <ImageIcon size={16} className="text-gray-400 dark:text-zinc-500" />
+            </div>
+        );
+    }
+    const url = item.imageUrl;
+    return (
+        <button
+            type="button"
+            onClick={() => onZoom({ url, name: item.productName })}
+            className="w-10 h-10 rounded-lg overflow-hidden shrink-0 border border-gray-200 dark:border-zinc-700 active:scale-95 transition-transform hover:ring-2 hover:ring-orange-400"
+            title="Ver imagen del producto"
+            aria-label={`Ver imagen de ${item.productName}`}
+        >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+                src={url}
+                alt={item.productName}
+                loading="lazy"
+                className="w-full h-full object-cover"
+            />
+        </button>
     );
 }
