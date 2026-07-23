@@ -9,6 +9,7 @@ import {
     PenTool,
     ChevronDown,
     ChevronUp,
+    ImageIcon,
     type LucideIcon
 } from 'lucide-react';
 import type { Order } from '@/lib/types';
@@ -184,6 +185,18 @@ function OrderCard({
                                 key={idx}
                                 className="flex items-center gap-3 text-sm bg-gray-50 dark:bg-zinc-800/50 rounded-lg px-3 py-2"
                             >
+                                {item.imageUrl ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                        src={item.imageUrl}
+                                        alt={item.productName}
+                                        className="w-10 h-10 rounded-lg object-cover shrink-0 border border-gray-200 dark:border-zinc-700"
+                                    />
+                                ) : (
+                                    <div className="w-10 h-10 rounded-lg bg-gray-200 dark:bg-zinc-700 shrink-0 flex items-center justify-center">
+                                        <ImageIcon size={16} className="text-gray-400 dark:text-zinc-500" />
+                                    </div>
+                                )}
                                 <div className="min-w-0 flex-1">
                                     <span className="font-medium text-gray-900 dark:text-zinc-100">
                                         {item.productName}
