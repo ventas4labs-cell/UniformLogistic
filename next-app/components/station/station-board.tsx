@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { HardHat, LogOut, RefreshCw, Search, ChevronDown, ChevronUp, Receipt, ImageIcon, X } from 'lucide-react';
+import { HardHat, LogOut, RefreshCw, Search, Receipt } from 'lucide-react';
 import type { Order } from '@/lib/types';
 import { signOutAction } from '@/app/login/actions';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -183,10 +183,6 @@ function OrderCard({
     onLocalChange: (uuid: string, next: boolean) => void;
     initialProgress?: ItemProgress;
 }) {
-    const [expanded, setExpanded] = useState(true);
-    // Product image the station operator tapped to enlarge — lets a
-    // maquila see the product example full-size while manufacturing.
-    const [zoom, setZoom] = useState<{ url: string; name: string } | null>(null);
     const totalPieces = order.items.reduce((s, i) => s + i.quantity, 0);
 
     return (
@@ -254,99 +250,6 @@ function OrderCard({
                     onCompletedChange={onLocalChange}
                 />
             </div>
-
-            <button
-                onClick={() => setExpanded(!expanded)}
-                className="w-full flex items-center justify-center gap-1 px-4 py-2 text-xs font-semibold text-gray-500 dark:text-zinc-400 hover:bg-gray-50 dark:hover:bg-zinc-800/50 border-t border-gray-100 dark:border-zinc-800 transition-colors"
-            >
-                {expanded ? (
-                    <>
-                        Ocultar piezas <ChevronUp size={14} />
-                    </>
-                ) : (
-                    <>
-                        Ver piezas <ChevronDown size={14} />
-                    </>
-                )}
-            </button>
-
-            {expanded && (
-                <div className="border-t border-gray-100 dark:border-zinc-800 p-4 space-y-1.5">
-                    {order.items.map((item, idx) => (
-                        <div
-                            key={idx}
-                            className="flex items-center gap-3 text-sm bg-gray-50 dark:bg-zinc-800/50 rounded-lg px-3 py-2"
-                        >
-                            {item.imageUrl ? (
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setZoom({ url: item.imageUrl!, name: item.productName })
-                                    }
-                                    className="shrink-0 w-12 h-12 rounded-lg overflow-hidden border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 active:scale-95 transition-transform"
-                                    title="Ver imagen del producto"
-                                    aria-label={`Ver imagen de ${item.productName}`}
-                                >
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
-                                        src={item.imageUrl}
-                                        alt={item.productName}
-                                        loading="lazy"
-                                        className="w-full h-full object-cover"
-                                    />
-                                </button>
-                            ) : (
-                                <div className="shrink-0 w-12 h-12 rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 flex items-center justify-center text-gray-300 dark:text-zinc-600">
-                                    <ImageIcon size={18} />
-                                </div>
-                            )}
-                            <div className="min-w-0 flex-1">
-                                <span className="font-medium text-gray-900 dark:text-zinc-100">
-                                    {item.productName}
-                                </span>
-                                <span className="text-gray-500 dark:text-zinc-400 ml-2 text-xs">
-                                    {item.selection.size || ''}
-                                </span>
-                                {item.fabricType && (
-                                    <span className="text-gray-400 dark:text-zinc-500 ml-1 text-xs">
-                                        · {item.fabricType}
-                                    </span>
-                                )}
-                            </div>
-                            <span className="font-bold text-gray-700 dark:text-zinc-200 shrink-0 ml-2">
-                                x{item.quantity}
-                            </span>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {zoom && (
-                <div
-                    className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center p-4"
-                    onClick={() => setZoom(null)}
-                    role="dialog"
-                    aria-modal="true"
-                    aria-label={`Imagen de ${zoom.name}`}
-                >
-                    <button
-                        type="button"
-                        onClick={() => setZoom(null)}
-                        className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20"
-                        aria-label="Cerrar"
-                    >
-                        <X size={22} />
-                    </button>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                        src={zoom.url}
-                        alt={zoom.name}
-                        onClick={(e) => e.stopPropagation()}
-                        className="max-h-[80vh] max-w-full rounded-2xl shadow-2xl object-contain"
-                    />
-                    <p className="mt-4 text-white font-semibold text-center">{zoom.name}</p>
-                </div>
-            )}
         </div>
     );
 }
