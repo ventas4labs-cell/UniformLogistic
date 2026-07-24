@@ -10,6 +10,7 @@ import { fetchDeletedOrders } from '@/lib/services/deleted-orders';
 import { fetchDispatchTotalsForOrders } from '@/lib/services/dispatches';
 import { fetchStockEntryTotalsForOrders } from '@/lib/services/stock-entries';
 import { fetchThreeDModels } from '@/lib/services/three-d-models';
+import { fetchCorteFabricReports } from '@/lib/services/corte-fabric-reports';
 import { OrdersTable } from '@/components/admin/orders-table';
 import type { Order } from '@/lib/types';
 
@@ -48,12 +49,14 @@ export default async function AdminOrdersPage() {
         .filter((m) => m.productCode && m.modelUrl)
         .map((m) => ({ productCode: m.productCode, modelUrl: m.modelUrl, name: m.name }));
     const orderIds = orders.map((o) => o.uuid).filter((id): id is string => !!id);
-    const [completions, assignments, dispatchTotals, stockTotals] = await Promise.all([
-        fetchStageCompletionsForOrders(supabase, orderIds),
-        fetchAssignmentsForOrders(supabase, orderIds),
-        fetchDispatchTotalsForOrders(supabase, orderIds),
-        fetchStockEntryTotalsForOrders(supabase, orderIds)
-    ]);
+    const [completions, assignments, dispatchTotals, stockTotals, fabricReportsByOrder] =
+        await Promise.all([
+            fetchStageCompletionsForOrders(supabase, orderIds),
+            fetchAssignmentsForOrders(supabase, orderIds),
+            fetchDispatchTotalsForOrders(supabase, orderIds),
+            fetchStockEntryTotalsForOrders(supabase, orderIds),
+            fetchCorteFabricReports(supabase, orderIds)
+        ]);
     // Orders whose production is finished: everything dispatched, or
     // everything moved into stock. These drop off the active list and
     // into the "Completados" archive.
@@ -85,6 +88,7 @@ export default async function AdminOrdersPage() {
             deletedOrders={deletedOrders}
             completedOrders={completedOrders}
             models3d={models3d}
+            fabricReportsByOrder={fabricReportsByOrder}
         />
     );
 }

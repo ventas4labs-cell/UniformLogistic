@@ -149,3 +149,104 @@ export function fabricLinesForOrder(order: Order): FabricLine[] {
         }))
         .sort((a, b) => a.label.localeCompare(b.label));
 }
+
+// ─── Consolidated consumption (Pedidos → Consumo de tela) ────────────
+// Aggregation for the cross-order view. Pure and `now`-injectable so
+// the period boundaries can be exercised deterministically.
+
+export type FabricPeriod = 'month' | 'last-month' | '3m' | 'all';
+
+/** One reported tela on one order, flattened for aggregation. */
+export interface FabricUsageLine {
+    orderRef: string;
+    orderUuid: string;
+    company: string;
+    reportedAt: string;
+    fabricType: string;
+    label: string;
+    used: number;
+    unit: string;
+    expected: number | null;
+    notes: string | null;
+}
+
+export interface FabricUsageGroup {
+    key: string;
+    label: string;
+    unit: string;
+    used: number;
+    /** Null when no line in the group had a derivable BOM estimate. */
+    expected: number | null;
+    orders: number;
+    lines: FabricUsageLine[];
+}
+
+/** Inclusive-start / exclusive-end window, or null for "all time". */
+export function fabricPeriodRange(
+    period: FabricPeriod,
+    now: Date = new Date()
+): { from: Date; to: Date } | null {
+    if (period === 'all') return null;
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    if (period === 'month') return { from: startOfMonth, to: startOfNextMonth };
+    if (period === 'last-month') {
+        return {
+            from: new Date(now.getFullYear(), now.getMonth() - 1, 1),
+            to: startOfMonth
+        };
+    }
+    return {
+        from: new Date(now.getFullYear(), now.getMonth() - 2, 1),
+        to: startOfNextMonth
+    };
+}
+
+/**
+ * Filter by when corte reported the cut — that's when the tela was
+ * actually consumed, not when the order was placed.
+ */
+export function filterFabricLines(
+    lines: FabricUsageLine[],
+    period: FabricPeriod,
+    now: Date = new Date()
+): FabricUsageLine[] {
+    const range = fabricPeriodRange(period, now);
+    if (!range) return lines;
+    return lines.filter((l) => {
+        const t = new Date(l.reportedAt);
+        return t >= range.from && t < range.to;
+    });
+}
+
+/**
+ * Total per tela AND unit. The unit is part of the key on purpose:
+ * metros and kilos must never land in the same total, and an estimate
+ * in one unit says nothing about a figure in the other.
+ */
+export function groupFabricLines(lines: FabricUsageLine[]): FabricUsageGroup[] {
+    const m = new Map<string, FabricUsageGroup>();
+    for (const l of lines) {
+        const key = `${l.label}|${l.unit}`;
+        const g = m.get(key) || {
+            key,
+            label: l.label,
+            unit: l.unit,
+            used: 0,
+            expected: null,
+            orders: 0,
+            lines: []
+        };
+        g.used = roundQty(g.used + l.used);
+        // Stays null until at least one line carries an estimate, so a
+        // group with no BOM coverage shows "—" rather than a fake 0.
+        if (l.expected !== null) g.expected = roundQty((g.expected ?? 0) + l.expected);
+        g.lines.push(l);
+        m.set(key, g);
+    }
+    for (const g of m.values()) {
+        g.orders = new Set(g.lines.map((l) => l.orderUuid)).size;
+        g.lines.sort((a, b) => b.reportedAt.localeCompare(a.reportedAt));
+    }
+    return Array.from(m.values()).sort((a, b) => b.used - a.used);
+}

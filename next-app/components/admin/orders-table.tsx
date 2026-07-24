@@ -2,13 +2,15 @@
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
-import { Download, Search, RefreshCw, Loader2, Eye, Receipt, Pencil, Trash2, Filter, Calendar, User, Building2, Bell, X, AlertTriangle, CheckCircle2, Undo2, Plus, History, ShoppingCart, Clock, Boxes, Truck } from 'lucide-react';
+import { Download, Search, RefreshCw, Loader2, Eye, Receipt, Pencil, Trash2, Filter, Calendar, User, Building2, Bell, X, AlertTriangle, CheckCircle2, Undo2, Plus, History, ShoppingCart, Clock, Boxes, Truck, Ruler } from 'lucide-react';
 import type { Order } from '@/lib/types';
 import type { AdminProduct } from '@/lib/services/products';
 import type { MissingInsumoReport } from '@/lib/services/missing-insumos';
 import type { StageNotification } from '@/lib/services/stage-notifications';
 import type { OrderStatus } from '@/lib/services/orders';
 import type { DeletedOrderHistoryEntry } from '@/lib/services/deleted-orders';
+import type { CorteFabricReport } from '@/lib/services/corte-fabric-reports';
+import { FabricConsumptionModal } from '@/components/admin/fabric-consumption-modal';
 import {
     updateOrderStatusAction,
     deleteOrderAction
@@ -40,7 +42,8 @@ export function OrdersTable({
     initialAssignments = [],
     deletedOrders = [],
     completedOrders = [],
-    models3d = []
+    models3d = [],
+    fabricReportsByOrder = {}
 }: {
     initialOrders: Order[];
     products: AdminProduct[];
@@ -57,6 +60,8 @@ export function OrdersTable({
     completedOrders?: { orderId: string; reason: 'dispatched' | 'stock' }[];
     /** Product-code → 3D model, for the detail view's 3D preview. */
     models3d?: OrderModel3D[];
+    /** orderId → fabric consumption reported by Corte. */
+    fabricReportsByOrder?: Record<string, CorteFabricReport[]>;
 }) {
     const [orders, setOrders] = useState<Order[]>(initialOrders);
     const [reports, setReports] = useState<MissingInsumoReport[]>(initialReports);
@@ -179,6 +184,7 @@ export function OrdersTable({
     // Whether the deleted-orders history modal is open. Populated from
     // the server-fetched `deletedOrders` prop; opens on-demand only.
     const [showDeletedHistory, setShowDeletedHistory] = useState(false);
+    const [showFabricReport, setShowFabricReport] = useState(false);
     // Whether the completed-orders (dispatched / in-stock) archive is open.
     const [showCompleted, setShowCompleted] = useState(false);
     // orderId → why it's completed, for the archive badge + filtering it
@@ -461,6 +467,16 @@ export function OrdersTable({
                                 </span>
                             ) : null;
                         })()}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setShowFabricReport(true)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-bold text-orange-700 dark:text-orange-300 bg-orange-100 dark:bg-orange-950/40 hover:bg-orange-200 dark:hover:bg-orange-900/50 rounded-lg transition-colors"
+                        title="Consumo de tela reportado por Corte"
+                        aria-label="Consumo de tela"
+                    >
+                        <Ruler size={14} />
+                        Tela
                     </button>
                     <button
                         type="button"
@@ -1089,6 +1105,14 @@ export function OrdersTable({
                         </div>
                     </div>
                 </div>
+            )}
+
+            {showFabricReport && (
+                <FabricConsumptionModal
+                    orders={orders}
+                    reportsByOrder={fabricReportsByOrder}
+                    onClose={() => setShowFabricReport(false)}
+                />
             )}
 
             {showDeletedHistory && (

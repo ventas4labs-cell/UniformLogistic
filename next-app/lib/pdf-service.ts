@@ -536,3 +536,126 @@ export const generateAdminPDF = (order: Order, opts: AdminPdfOptions = {}) => {
 
     return doc;
 };
+
+// ─── Fabric consumption report (Pedidos → Consumo de tela) ───────────
+// Consolidated view of what corte reported spending, per tela, with the
+// BOM estimate alongside so over-spend shows up. Two tables: totals per
+// tela, then the per-order lines that make them up.
+
+export interface FabricConsumptionSummaryRow {
+    fabricType: string;
+    unit: string;
+    orders: number;
+    used: number;
+    /** Null when no line in the group had a derivable BOM estimate. */
+    expected: number | null;
+}
+
+export interface FabricConsumptionDetailRow {
+    orderRef: string;
+    company: string;
+    date: string;
+    fabricType: string;
+    used: number;
+    unit: string;
+    expected: number | null;
+    notes: string | null;
+}
+
+const fmtQty = (n: number) =>
+    n.toLocaleString('es-CR', { maximumFractionDigits: 2 });
+
+const fmtDiff = (used: number, expected: number | null): string => {
+    if (expected === null) return '—';
+    const d = used - expected;
+    return `${d > 0 ? '+' : ''}${fmtQty(d)}`;
+};
+
+export const generateFabricConsumptionPDF = (
+    summary: FabricConsumptionSummaryRow[],
+    detail: FabricConsumptionDetailRow[],
+    periodLabel: string
+) => {
+    const doc = createDoc();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const primary = [245, 124, 0] as const;
+
+    doc.setFillColor(primary[0], primary[1], primary[2]);
+    doc.rect(0, 0, pageWidth, 24, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.text('CONSUMO DE TELA', 14, 14);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.text(periodLabel, 14, 20);
+    doc.setFontSize(8);
+    doc.text(
+        `Generado ${new Date().toLocaleDateString('es-CR')}`,
+        pageWidth - 14,
+        20,
+        { align: 'right' }
+    );
+
+    doc.setTextColor(0);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('Totales por tela', 14, 34);
+
+    autoTable(doc, {
+        startY: 38,
+        head: [['Tela', 'Unidad', 'Pedidos', 'Gastado', 'Esperado', 'Diferencia']],
+        body: summary.map((r) => [
+            r.fabricType,
+            r.unit,
+            String(r.orders),
+            fmtQty(r.used),
+            r.expected === null ? '—' : fmtQty(r.expected),
+            fmtDiff(r.used, r.expected)
+        ]),
+        theme: 'striped',
+        headStyles: { fillColor: [80, 80, 80] },
+        styles: { fontSize: 9, cellPadding: 2 },
+        columnStyles: {
+            2: { halign: 'center' },
+            3: { halign: 'right' },
+            4: { halign: 'right' },
+            5: { halign: 'right' }
+        },
+        margin: { left: 14, right: 14 }
+    });
+
+    const y =
+        (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
+            .finalY + 10;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('Detalle por pedido', 14, y);
+
+    autoTable(doc, {
+        startY: y + 4,
+        head: [['Pedido', 'Cliente', 'Fecha', 'Tela', 'Gastado', 'Esperado', 'Dif.', 'Nota']],
+        body: detail.map((r) => [
+            r.orderRef,
+            r.company,
+            r.date,
+            r.fabricType,
+            `${fmtQty(r.used)} ${r.unit}`,
+            r.expected === null ? '—' : `${fmtQty(r.expected)} ${r.unit}`,
+            fmtDiff(r.used, r.expected),
+            r.notes || ''
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: [80, 80, 80] },
+        styles: { fontSize: 8, cellPadding: 1.5 },
+        columnStyles: {
+            4: { halign: 'right' },
+            5: { halign: 'right' },
+            6: { halign: 'right' }
+        },
+        margin: { left: 14, right: 14 }
+    });
+
+    return doc;
+};
