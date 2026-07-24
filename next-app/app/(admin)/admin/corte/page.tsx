@@ -3,6 +3,7 @@ import { fetchAllOrders } from '@/lib/services/orders';
 import { fetchStageCompletions } from '@/lib/services/stage-completions';
 import { fetchStageItemProgress } from '@/lib/services/stage-item-progress';
 import { fetchAssignmentsForOrders } from '@/lib/services/station-assignments';
+import { fetchCorteFabricReports } from '@/lib/services/corte-fabric-reports';
 import { orderNeedsStage } from '@/lib/stage-utils';
 import { CorteBoard } from '@/components/admin/corte-board';
 
@@ -25,7 +26,10 @@ export default async function CortePage() {
     const corteOrderIds = corteOrders
         .map((o) => o.uuid)
         .filter((id): id is string => !!id);
-    const assignments = await fetchAssignmentsForOrders(supabase, corteOrderIds);
+    const [assignments, fabricReportsByOrder] = await Promise.all([
+        fetchAssignmentsForOrders(supabase, corteOrderIds),
+        fetchCorteFabricReports(supabase, corteOrderIds)
+    ]);
     const assignedStationsByOrder: Record<string, string[]> = {};
     for (const a of assignments) {
         if (a.stationUserStage !== 'corte') continue;
@@ -38,6 +42,7 @@ export default async function CortePage() {
             initialCompletedOrderIds={Array.from(completed)}
             initialProgress={progress}
             assignedStationsByOrder={assignedStationsByOrder}
+            fabricReportsByOrder={fabricReportsByOrder}
         />
     );
 }

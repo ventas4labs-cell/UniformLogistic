@@ -4,6 +4,7 @@ import { fetchOrderIdsAssignedTo } from '@/lib/services/station-assignments';
 import { fetchOrdersByIds } from '@/lib/services/orders';
 import { fetchStageCompletions, STAGE_LABELS } from '@/lib/services/stage-completions';
 import { fetchStageItemProgress } from '@/lib/services/stage-item-progress';
+import { fetchCorteFabricReports } from '@/lib/services/corte-fabric-reports';
 import { StationBoard } from '@/components/station/station-board';
 
 // Restricted dashboard shown to external station users (corte /
@@ -20,10 +21,15 @@ export default async function StationPage() {
     if (!station) return null;
 
     const orderIds = await fetchOrderIdsAssignedTo(supabase, user.id);
-    const [orders, completedSet, progress] = await Promise.all([
+    const [orders, completedSet, progress, fabricReportsByOrder] = await Promise.all([
         fetchOrdersByIds(supabase, orderIds),
         fetchStageCompletions(supabase, station.stage),
-        fetchStageItemProgress(supabase, station.stage)
+        fetchStageItemProgress(supabase, station.stage),
+        // Only corte reports fabric consumption; skip the query for the
+        // other stations rather than fetching rows nothing will render.
+        station.stage === 'corte'
+            ? fetchCorteFabricReports(supabase, orderIds)
+            : Promise.resolve({})
     ]);
 
     return (
@@ -39,6 +45,7 @@ export default async function StationPage() {
                 orderIds.includes(id)
             )}
             initialProgress={progress}
+            fabricReportsByOrder={fabricReportsByOrder}
         />
     );
 }

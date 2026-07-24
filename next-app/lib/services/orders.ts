@@ -164,7 +164,9 @@ interface CompanyJoin {
 interface ItemProduct {
     product_type: 'shirt' | 'pant' | null;
     fabric_type: string | null;
-    bom_json: { name: string; qty: number }[] | null;
+    // `unit` matters to the corte fabric report — it's what tells us a
+    // BOM line is measured in metros rather than per-piece.
+    bom_json: { name: string; qty: number; unit?: string }[] | null;
     codigo_cabys: string | null;
     image_url: string | null;
     stages_json: string[] | null;
@@ -295,7 +297,7 @@ const hydrateOrphanItems = async (
                 product_code: string;
                 product_type: 'shirt' | 'pant' | null;
                 fabric_type: string | null;
-                bom_json: { name: string; qty: number }[] | null;
+                bom_json: { name: string; qty: number; unit?: string }[] | null;
                 codigo_cabys: string | null;
                 image_url: string | null;
             }

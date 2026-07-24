@@ -73,6 +73,7 @@ export interface CartItem {
     bom?: {
         name: string;
         qty: number;
+        unit?: string;
         qtyBySize?: Record<string, number>;
         logoId?: string;
         logoImageUrl?: string;

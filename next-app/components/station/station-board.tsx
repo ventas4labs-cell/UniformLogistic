@@ -13,6 +13,8 @@ import { SubmitInvoiceModal } from '@/components/station/submit-invoice-modal';
 import { OrderProductsSummary } from '@/components/admin/order-products-summary';
 import { StagePartialEditor } from '@/components/admin/stage-partial-editor';
 import type { ItemProgress } from '@/lib/services/stage-item-progress';
+import { CorteFabricReportPanel } from '@/components/admin/corte-fabric-report';
+import type { CorteFabricReport } from '@/lib/services/corte-fabric-reports';
 
 interface StationInfo {
     id: string;
@@ -27,13 +29,21 @@ interface Props {
     initialCompletedOrderIds: string[];
     /** Board-wide map of order_item_id → qty done, for the per-line tracker. */
     initialProgress?: ItemProgress;
+    /** orderId → fabric already reported. Corte stations only. */
+    fabricReportsByOrder?: Record<string, CorteFabricReport[]>;
 }
 
 // External station shell — same per-card pattern as the admin stage
 // boards but stripped down: no insumo aggregation, no notification
 // bells, no admin nav. The station user marks their stage complete
 // per order from here.
-export function StationBoard({ station, initialOrders, initialCompletedOrderIds, initialProgress }: Props) {
+export function StationBoard({
+    station,
+    initialOrders,
+    initialCompletedOrderIds,
+    initialProgress,
+    fabricReportsByOrder = {}
+}: Props) {
     const router = useRouter();
     const [orders] = useState<Order[]>(initialOrders);
     const [completed, setCompleted] = useState<Set<string>>(
@@ -162,6 +172,9 @@ export function StationBoard({ station, initialOrders, initialCompletedOrderIds,
                             isCompleted={!!order.uuid && completed.has(order.uuid)}
                             onLocalChange={handleLocalChange}
                             initialProgress={initialProgress}
+                            fabricReports={
+                                (order.uuid && fabricReportsByOrder[order.uuid]) || []
+                            }
                         />
                     ))}
                 </div>
@@ -175,13 +188,15 @@ function OrderCard({
     stage,
     isCompleted,
     onLocalChange,
-    initialProgress
+    initialProgress,
+    fabricReports = []
 }: {
     order: Order;
     stage: StageKey;
     isCompleted: boolean;
     onLocalChange: (uuid: string, next: boolean) => void;
     initialProgress?: ItemProgress;
+    fabricReports?: CorteFabricReport[];
 }) {
     const totalPieces = order.items.reduce((s, i) => s + i.quantity, 0);
 
@@ -250,6 +265,13 @@ function OrderCard({
                     onCompletedChange={onLocalChange}
                 />
             </div>
+
+            {/* Corte workshops also report how much tela the order ate. */}
+            {stage === 'corte' && (
+                <div className="px-4 pb-4">
+                    <CorteFabricReportPanel order={order} initialReports={fabricReports} />
+                </div>
+            )}
         </div>
     );
 }

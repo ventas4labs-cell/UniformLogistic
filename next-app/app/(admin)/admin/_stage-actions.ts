@@ -23,6 +23,10 @@ import {
     saveStageItemProgress,
     type ProgressEntry
 } from '@/lib/services/stage-item-progress';
+import {
+    saveCorteFabricReport,
+    type FabricUsageEntry
+} from '@/lib/services/corte-fabric-reports';
 import { fetchStationUser } from '@/lib/services/station-users';
 import { isStationAssignedToOrder } from '@/lib/services/station-assignments';
 import { isAdminEmail } from '@/lib/admin-acting-company';
@@ -242,6 +246,39 @@ export async function addCorteExtraItemAction(
     } catch (err) {
         return {
             error: err instanceof Error ? err.message : 'No se pudo agregar el extra.'
+        };
+    }
+}
+
+// ─── Corte: fabric consumption report ────────────────────────────────
+// The corte agent records how much tela the order actually ate, one
+// figure per tela. `expectedQty` rides along from the client as the BOM
+// estimate shown at the time of reporting — snapshotting it keeps the
+// variance honest if the product's BOM is edited later. Same
+// authorization as every other corte mutation.
+export async function saveCorteFabricReportAction(
+    orderUuid: string,
+    entries: FabricUsageEntry[]
+): Promise<{ error?: string }> {
+    const supabase = await createClient();
+    const {
+        data: { user }
+    } = await supabase.auth.getUser();
+    if (!user) return { error: 'No autenticado.' };
+    if (!(await authorizeStageMutation(supabase, user.id, user.email, orderUuid, 'corte'))) {
+        return { error: 'No autorizado para esta orden.' };
+    }
+    if (entries.some((e) => !Number.isFinite(e.qtyUsed) || e.qtyUsed < 0)) {
+        return { error: 'La cantidad de tela no puede ser negativa.' };
+    }
+    try {
+        await saveCorteFabricReport(supabase, orderUuid, entries, user.id);
+        revalidatePath('/admin/corte');
+        revalidatePath('/station');
+        return {};
+    } catch (err) {
+        return {
+            error: err instanceof Error ? err.message : 'No se pudo guardar el reporte de tela.'
         };
     }
 }

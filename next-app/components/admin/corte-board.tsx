@@ -24,6 +24,8 @@ import {
     OrderReportButton,
     MissingReportsHistoryButton
 } from '@/components/admin/missing-report-controls';
+import { CorteFabricReportPanel } from '@/components/admin/corte-fabric-report';
+import type { CorteFabricReport } from '@/lib/services/corte-fabric-reports';
 
 const emptyExtra = { productName: '', fabricType: '', size: '', quantity: 1, note: '' };
 
@@ -32,7 +34,8 @@ function OrderCard({
     isCompleted,
     onLocalCompletionChange,
     initialProgress,
-    stationNames = []
+    stationNames = [],
+    fabricReports = []
 }: {
     order: Order;
     isCompleted: boolean;
@@ -40,6 +43,8 @@ function OrderCard({
     initialProgress?: ItemProgress;
     /** External corte station(s) this order is assigned to, if any. */
     stationNames?: string[];
+    /** Fabric already reported for this order, one line per tela. */
+    fabricReports?: CorteFabricReport[];
 }) {
     // Extras added during this session, appended optimistically so the
     // operator sees them immediately. The server data picks them up on
@@ -166,6 +171,16 @@ function OrderCard({
                 />
             </div>
 
+            {/* How much tela the cut actually ate, per tela, against the
+                BOM estimate. Extras count too — they're cut from the
+                same roll — so it reads the same `items` list. */}
+            <div className="px-4 pb-4">
+                <CorteFabricReportPanel
+                    order={{ ...order, items }}
+                    initialReports={fabricReports}
+                />
+            </div>
+
                     {/* Add-extra affordance */}
                     <div className="p-3 border-t border-gray-100 dark:border-zinc-800">
                         {showExtraForm ? (
@@ -281,13 +296,16 @@ export function CorteBoard({
     initialOrders,
     initialCompletedOrderIds,
     initialProgress,
-    assignedStationsByOrder = {}
+    assignedStationsByOrder = {},
+    fabricReportsByOrder = {}
 }: {
     initialOrders: Order[];
     initialCompletedOrderIds: string[];
     initialProgress?: ItemProgress;
     /** orderId → external corte station name(s) assigned to it. */
     assignedStationsByOrder?: Record<string, string[]>;
+    /** orderId → fabric consumption already reported for it. */
+    fabricReportsByOrder?: Record<string, CorteFabricReport[]>;
 }) {
     const [orders] = useState<Order[]>(initialOrders);
     const [completed, setCompleted] = useState<Set<string>>(
@@ -443,6 +461,9 @@ export function CorteBoard({
                             onLocalCompletionChange={handleLocalCompletionChange}
                             initialProgress={initialProgress}
                             stationNames={stationsFor(order)}
+                            fabricReports={
+                                (order.uuid && fabricReportsByOrder[order.uuid]) || []
+                            }
                         />
                     ))}
                 </div>

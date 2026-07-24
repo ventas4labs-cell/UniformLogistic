@@ -67,7 +67,7 @@ export function aggregateInsumosGlobal(orders: Order[]): InsumoSummary[] {
 // roughly "<Product> <Color> de <Gender>" (e.g. "Columbia Azul de
 // Hombre", "Docker Beige de Mujer"). When the convention isn't met we
 // return undefined and callers fall back to the fabric type or "—".
-const COLOR_WORDS = new Set([
+export const COLOR_WORDS = new Set([
     'azul',
     'rojo',
     'verde',
