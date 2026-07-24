@@ -3,7 +3,9 @@
 import { useMemo, useState, useTransition } from 'react';
 import { Check, Loader2, Save } from 'lucide-react';
 import { ProductThumb, useProductZoom } from '@/components/admin/product-thumb';
-import type { Order } from '@/lib/types';
+import { ColorSwatches } from '@/components/admin/color-swatches';
+import { parseColors } from '@/lib/stage-utils';
+import type { CartItem, Order } from '@/lib/types';
 import { STAGE_LABELS, type StageKey } from '@/lib/services/stage-completions';
 import type { ItemProgress } from '@/lib/services/stage-item-progress';
 import { saveStageProgressAction } from '@/app/(admin)/admin/_stage-actions';
@@ -106,14 +108,7 @@ export function StagePartialEditor({
                         className="flex items-center gap-3 text-sm bg-green-50/60 dark:bg-green-950/20 rounded-lg px-3 py-2"
                     >
                         <ProductThumb item={item} onZoom={openZoom} />
-                        <div className="min-w-0 flex-1">
-                            <span className="font-medium text-gray-900 dark:text-zinc-100">
-                                {item.productName}
-                            </span>
-                            <span className="text-gray-500 dark:text-zinc-400 ml-2 text-xs">
-                                {item.selection.size || ''}
-                            </span>
-                        </div>
+                        <ItemMeta item={item} />
                         <span className="font-bold text-gray-700 dark:text-zinc-200 shrink-0">
                             x{item.quantity}
                         </span>
@@ -166,14 +161,7 @@ export function StagePartialEditor({
                             className="flex items-center gap-2 text-sm bg-gray-50 dark:bg-zinc-800/50 rounded-lg px-3 py-2"
                         >
                             <ProductThumb item={item} onZoom={openZoom} />
-                            <div className="min-w-0 flex-1">
-                                <span className="font-medium text-gray-900 dark:text-zinc-100">
-                                    {item.productName}
-                                </span>
-                                <span className="text-gray-500 dark:text-zinc-400 ml-2 text-xs">
-                                    {item.selection.size || ''}
-                                </span>
-                            </div>
+                            <ItemMeta item={item} />
                             <div className="flex items-center gap-1.5 shrink-0">
                                 <input
                                     type="number"
@@ -242,6 +230,42 @@ export function StagePartialEditor({
                                 : 'Guardar avance'}
             </button>
             {zoomModal}
+        </div>
+    );
+}
+
+// Everything the operator needs to identify the piece on the table:
+// name, size, tela + colour, plus the extra/note flags. Carrying the
+// full spec here is what lets the boards drop the second "piezas"
+// table that used to repeat the same items underneath.
+function ItemMeta({ item }: { item: CartItem }) {
+    const colors = parseColors(item.fabricType);
+    return (
+        <div className="min-w-0 flex-1">
+            <div className="flex items-baseline gap-1.5 flex-wrap">
+                {item.isExtra && (
+                    <span className="text-[9px] font-extrabold uppercase tracking-wide text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/50 px-1.5 py-0.5 rounded">
+                        Extra
+                    </span>
+                )}
+                <span className="font-medium text-gray-900 dark:text-zinc-100">
+                    {item.productName}
+                </span>
+                <span className="text-gray-500 dark:text-zinc-400 text-xs">
+                    {item.selection.size || ''}
+                </span>
+            </div>
+            {(item.fabricType || colors.length > 0) && (
+                <div className="flex items-center gap-2 flex-wrap text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
+                    {item.fabricType && <span>{item.fabricType}</span>}
+                    {colors.length > 0 && <ColorSwatches colors={colors} compact />}
+                </div>
+            )}
+            {item.note && (
+                <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80 mt-0.5">
+                    {item.note}
+                </p>
+            )}
         </div>
     );
 }

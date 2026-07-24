@@ -6,14 +6,11 @@ import {
     Scissors,
     RefreshCw,
     Loader2,
-    ChevronDown,
-    ChevronUp,
     Plus,
     X,
     HardHat
 } from 'lucide-react';
 import type { Order } from '@/lib/types';
-import { parseColors } from '@/lib/stage-utils';
 import { StageCompleteToggle } from '@/components/admin/stage-complete-toggle';
 import type { StageTab } from '@/components/admin/stage-tab-bar';
 import { StageBoardFilters } from '@/components/admin/stage-board-filters';
@@ -27,88 +24,6 @@ import {
     OrderReportButton,
     MissingReportsHistoryButton
 } from '@/components/admin/missing-report-controls';
-
-
-// Base color hex by Spanish color name (lowercase keys). Falls back to
-// a neutral gray for unrecognized names.
-const COLOR_HEX: Record<string, string> = {
-    azul: '#2563eb',
-    rojo: '#dc2626',
-    verde: '#16a34a',
-    amarillo: '#facc15',
-    negro: '#000000',
-    blanco: '#ffffff',
-    gris: '#9ca3af',
-    beige: '#d4b896',
-    café: '#7c4a1e',
-    cafe: '#7c4a1e',
-    rosa: '#f472b6',
-    naranja: '#f97316',
-    morado: '#9333ea',
-    celeste: '#7dd3fc',
-    turquesa: '#14b8a6',
-    kaki: '#8a8456',
-    caqui: '#8a8456',
-    crema: '#fef3c7',
-    marino: '#1e3a8a',
-    vino: '#7f1d1d',
-    oliva: '#65a30d',
-    mostaza: '#ca8a04',
-    coral: '#fb7185',
-    menta: '#6ee7b7',
-    lila: '#c084fc',
-    violeta: '#7c3aed'
-};
-
-// Darken (amount < 0) or lighten (amount > 0) a #rrggbb hex.
-function shadeHex(hex: string, amount: number): string {
-    const m = hex.replace('#', '');
-    if (m.length !== 6) return hex;
-    const num = parseInt(m, 16);
-    const adj = (c: number) =>
-        amount < 0
-            ? Math.round(c * (1 + amount))
-            : Math.round(c + (255 - c) * amount);
-    const r = adj((num >> 16) & 0xff);
-    const g = adj((num >> 8) & 0xff);
-    const b = adj(num & 0xff);
-    return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
-}
-
-// Heuristic color swatch. Accepts labels like "Azul oscuro" / "Negro";
-// picks the base color word and applies a claro/oscuro shade. Falls
-// back to neutral gray when no color word is recognized.
-function colorSwatch(label: string): string {
-    const parts = label.toLowerCase().split(/\s+/);
-    const base = parts.find((p) => COLOR_HEX[p]);
-    let hex = base ? COLOR_HEX[base] : '#d1d5db';
-    if (parts.some((p) => p.startsWith('oscur'))) hex = shadeHex(hex, -0.35);
-    else if (parts.some((p) => p.startsWith('clar'))) hex = shadeHex(hex, 0.35);
-    return hex;
-}
-
-// Renders one swatch + label per color. Telas with two fabric segments
-// (e.g. "Army azul oscuro / Speed dry negro") surface both colors.
-function ColorSwatches({ colors }: { colors: string[] }) {
-    if (colors.length === 0) {
-        return <span className="text-gray-400 dark:text-zinc-500">—</span>;
-    }
-    return (
-        <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
-            {colors.map((c, i) => (
-                <span key={`${c}-${i}`} className="inline-flex items-center gap-1.5">
-                    <span
-                        className="w-3 h-3 rounded-full border border-gray-300 dark:border-zinc-600 shrink-0"
-                        style={{ backgroundColor: colorSwatch(c) }}
-                    />
-                    <span className="text-gray-700 dark:text-zinc-300 whitespace-nowrap">
-                        {c}
-                    </span>
-                </span>
-            ))}
-        </span>
-    );
-}
 
 const emptyExtra = { productName: '', fabricType: '', size: '', quantity: 1, note: '' };
 
@@ -126,7 +41,6 @@ function OrderCard({
     /** External corte station(s) this order is assigned to, if any. */
     stationNames?: string[];
 }) {
-    const [expanded, setExpanded] = useState(true);
     // Extras added during this session, appended optimistically so the
     // operator sees them immediately. The server data picks them up on
     // the next refresh.
@@ -236,100 +150,21 @@ function OrderCard({
                 )}
             </div>
 
-            {/* Per-line cut progress — same tracker as Bordado so the
-                corte operator records how many pieces of each line are
-                already cut. The detailed tela/color table stays below. */}
+            {/* Per-line cut progress — same tracker as Bordado. Each row
+                carries the full spec (producto, tela, color, talla,
+                cantidad), so there's no second table repeating the items
+                underneath. */}
             <div className="border-t border-gray-100 dark:border-zinc-800 p-4">
                 <StagePartialEditor
-                    order={order}
+                    // Includes optimistic extras so a just-added piece
+                    // shows in the tracker without waiting for a refresh.
+                    order={{ ...order, items }}
                     stage="corte"
                     initialProgress={initialProgress || {}}
                     isCompleted={isCompleted}
                     onCompletedChange={onLocalCompletionChange}
                 />
             </div>
-
-            <button
-                onClick={() => setExpanded(!expanded)}
-                className="w-full flex items-center justify-center gap-1 px-4 py-2 text-xs font-semibold text-gray-500 dark:text-zinc-400 hover:bg-gray-50 dark:hover:bg-zinc-800/50 border-t border-gray-100 dark:border-zinc-800 transition-colors"
-            >
-                {expanded ? (
-                    <>
-                        Ocultar piezas <ChevronUp size={14} />
-                    </>
-                ) : (
-                    <>
-                        Ver piezas <ChevronDown size={14} />
-                    </>
-                )}
-            </button>
-
-            {expanded && (
-                <div className="border-t border-gray-100 dark:border-zinc-800 overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead className="bg-gray-50 dark:bg-zinc-900/60">
-                            <tr>
-                                <th className="text-left px-4 py-2 font-semibold text-gray-600 dark:text-zinc-400 text-xs">
-                                    Producto
-                                </th>
-                                <th className="text-left px-4 py-2 font-semibold text-gray-600 dark:text-zinc-400 text-xs">
-                                    Tela
-                                </th>
-                                <th className="text-left px-4 py-2 font-semibold text-gray-600 dark:text-zinc-400 text-xs">
-                                    Color
-                                </th>
-                                <th className="text-left px-4 py-2 font-semibold text-gray-600 dark:text-zinc-400 text-xs">
-                                    Talla
-                                </th>
-                                <th className="text-right px-4 py-2 font-semibold text-gray-600 dark:text-zinc-400 text-xs">
-                                    Cant.
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-zinc-800">
-                            {items.map((item, idx) => {
-                                const colors = parseColors(item.fabricType);
-                                return (
-                                    <tr
-                                        key={item.uuid || idx}
-                                        className={
-                                            item.isExtra
-                                                ? 'bg-amber-50/60 dark:bg-amber-950/20'
-                                                : 'hover:bg-gray-50 dark:hover:bg-zinc-800/30'
-                                        }
-                                    >
-                                        <td className="px-4 py-2 text-gray-900 dark:text-zinc-100">
-                                            <div className="flex items-center gap-1.5">
-                                                {item.isExtra && (
-                                                    <span className="text-[9px] font-extrabold uppercase tracking-wide text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/50 px-1.5 py-0.5 rounded">
-                                                        Extra
-                                                    </span>
-                                                )}
-                                                <span>{item.productName}</span>
-                                            </div>
-                                            {item.note && (
-                                                <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80 mt-0.5">
-                                                    {item.note}
-                                                </p>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-2 text-gray-600 dark:text-zinc-400">
-                                            {item.fabricType || '—'}
-                                        </td>
-                                        <td className="px-4 py-2">
-                                            <ColorSwatches colors={colors} />
-                                        </td>
-                                        <td className="px-4 py-2 font-mono text-gray-700 dark:text-zinc-300">
-                                            {item.selection.size || '—'}
-                                        </td>
-                                        <td className="px-4 py-2 text-right font-bold text-gray-900 dark:text-zinc-100">
-                                            {item.quantity}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
 
                     {/* Add-extra affordance */}
                     <div className="p-3 border-t border-gray-100 dark:border-zinc-800">
@@ -438,8 +273,6 @@ function OrderCard({
                             </button>
                         )}
                     </div>
-                </div>
-            )}
         </div>
     );
 }
