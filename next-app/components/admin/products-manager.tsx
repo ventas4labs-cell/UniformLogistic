@@ -401,10 +401,13 @@ export function ProductsManager({
                     return;
                 }
             }
-            if (editing) {
-                await updateProductAction(editing.uuid, form);
-            } else {
-                await createProductAction(form);
+            const result = editing
+                ? await updateProductAction(editing.uuid, form)
+                : await createProductAction(form);
+            if (!result.ok) {
+                setError(result.error);
+                setSaving(false);
+                return;
             }
             setShowForm(false);
             router.refresh();

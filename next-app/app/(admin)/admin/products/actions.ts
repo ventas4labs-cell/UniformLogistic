@@ -10,16 +10,44 @@ import {
     ProductInput
 } from '@/lib/services/products';
 
-export async function createProductAction(input: ProductInput) {
-    const supabase = await createClient();
-    await createProduct(supabase, input);
-    revalidatePath('/admin/products');
+export type SaveProductResult = { ok: true } | { ok: false; error: string };
+
+// Turns a raw Supabase/Postgres error into a friendly Spanish message.
+// Server Action errors are redacted in production, so we return this as
+// data (return values cross the RSC boundary intact) instead of throwing.
+function toFriendlyError(err: unknown, code: string): string {
+    const e = err as { code?: string; message?: string } | null;
+    if (e?.code === '23505') {
+        return `Ya existe un producto con el código "${code}". Usá un código distinto.`;
+    }
+    return e?.message || 'No se pudo guardar el producto.';
 }
 
-export async function updateProductAction(uuid: string, input: ProductInput) {
-    const supabase = await createClient();
-    await updateProduct(supabase, uuid, input);
-    revalidatePath('/admin/products');
+export async function createProductAction(
+    input: ProductInput
+): Promise<SaveProductResult> {
+    try {
+        const supabase = await createClient();
+        await createProduct(supabase, input);
+        revalidatePath('/admin/products');
+        return { ok: true };
+    } catch (err) {
+        return { ok: false, error: toFriendlyError(err, input.productCode) };
+    }
+}
+
+export async function updateProductAction(
+    uuid: string,
+    input: ProductInput
+): Promise<SaveProductResult> {
+    try {
+        const supabase = await createClient();
+        await updateProduct(supabase, uuid, input);
+        revalidatePath('/admin/products');
+        return { ok: true };
+    } catch (err) {
+        return { ok: false, error: toFriendlyError(err, input.productCode) };
+    }
 }
 
 export async function deleteProductAction(uuid: string) {
