@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { cookies } from "next/headers";
+import { Analytics } from "@vercel/analytics/next";
 import { DeviceClass } from "@/components/device-class";
 import "./globals.css";
 
@@ -44,6 +45,7 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans transition-colors">
         <DeviceClass />
         {children}
+        <Analytics />
       </body>
     </html>
   );
