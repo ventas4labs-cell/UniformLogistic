@@ -14,7 +14,8 @@ import {
     ImageIcon,
     Sticker,
     Sparkles,
-    Printer
+    Printer,
+    AlertTriangle
 } from 'lucide-react';
 import type { AdminProduct, ProductInput, BomItem } from '@/lib/services/products';
 import type { ProductGender } from '@/lib/types';
@@ -222,6 +223,11 @@ export function ProductsManager({
     // keyed so this resets naturally when the form is reopened.
     const [openOverrides, setOpenOverrides] = useState<Set<number>>(new Set());
     const [showLogoPicker, setShowLogoPicker] = useState(false);
+    // Product pending delete confirmation. Native confirm() is easy to
+    // suppress and clashes with the app's own modals, so we use a proper
+    // dialog and keep the target here until confirmed or dismissed.
+    const [deleteTarget, setDeleteTarget] = useState<AdminProduct | null>(null);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
 
     /** Rebuild raw size text from a form's parsed sizes — used on open + voice merges. */
     const sizesTextFromForm = (s: ProductInput['sizes']) => ({
@@ -419,14 +425,19 @@ export function ProductsManager({
         }
     };
 
-    const handleDelete = (p: AdminProduct) => {
-        if (!confirm(`¿Eliminar el producto "${p.name}"?`)) return;
+    const confirmDelete = () => {
+        const p = deleteTarget;
+        if (!p) return;
+        setDeleteError(null);
         startTransition(async () => {
             try {
                 await deleteProductAction(p.uuid);
+                setDeleteTarget(null);
                 router.refresh();
             } catch (err) {
-                alert(`No se pudo eliminar: ${err instanceof Error ? err.message : err}`);
+                setDeleteError(
+                    `No se pudo eliminar: ${err instanceof Error ? err.message : err}`
+                );
             }
         });
     };
@@ -568,9 +579,14 @@ export function ProductsManager({
                                                 <Edit2 size={16} />
                                             </button>
                                             <button
-                                                onClick={() => handleDelete(p)}
+                                                onClick={() => {
+                                                    setDeleteError(null);
+                                                    setDeleteTarget(p);
+                                                }}
                                                 disabled={pending}
                                                 className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-red-50 hover:text-red-600 rounded-lg disabled:opacity-50"
+                                                title="Eliminar producto"
+                                                aria-label={`Eliminar ${p.name}`}
                                             >
                                                 <Trash2 size={16} />
                                             </button>
@@ -608,6 +624,83 @@ export function ProductsManager({
                             <p className="text-sm font-semibold text-gray-900 dark:text-zinc-100 truncate">
                                 {previewImage.alt}
                             </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {deleteTarget && (
+                <div
+                    className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+                    onClick={() => !pending && setDeleteTarget(null)}
+                >
+                    <div
+                        className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-md"
+                        onClick={(e) => e.stopPropagation()}
+                        role="alertdialog"
+                        aria-modal="true"
+                        aria-labelledby="delete-product-title"
+                    >
+                        <div className="p-6">
+                            <div className="flex items-start gap-4">
+                                <div className="shrink-0 w-11 h-11 rounded-full bg-red-100 dark:bg-red-950/50 flex items-center justify-center">
+                                    <AlertTriangle
+                                        size={22}
+                                        className="text-red-600 dark:text-red-400"
+                                    />
+                                </div>
+                                <div className="min-w-0">
+                                    <h3
+                                        id="delete-product-title"
+                                        className="text-lg font-bold text-gray-900 dark:text-zinc-100"
+                                    >
+                                        Eliminar producto
+                                    </h3>
+                                    <p className="mt-1 text-sm text-gray-600 dark:text-zinc-400">
+                                        ¿Seguro que querés eliminar{' '}
+                                        <span className="font-semibold text-gray-900 dark:text-zinc-100">
+                                            {deleteTarget.name}
+                                        </span>
+                                        {deleteTarget.id ? (
+                                            <span className="text-gray-500 dark:text-zinc-500">
+                                                {' '}
+                                                ({deleteTarget.id})
+                                            </span>
+                                        ) : null}
+                                        ? Esta acción no se puede deshacer.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {deleteError && (
+                                <p className="mt-4 text-sm font-medium text-red-600 dark:text-red-400">
+                                    {deleteError}
+                                </p>
+                            )}
+
+                            <div className="mt-6 flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setDeleteTarget(null)}
+                                    disabled={pending}
+                                    className="px-4 py-2 rounded-lg text-sm font-bold text-gray-700 dark:text-zinc-300 bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors disabled:opacity-50"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={confirmDelete}
+                                    disabled={pending}
+                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {pending ? (
+                                        <Loader2 size={15} className="animate-spin" />
+                                    ) : (
+                                        <Trash2 size={15} />
+                                    )}
+                                    {pending ? 'Eliminando…' : 'Eliminar'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
