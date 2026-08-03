@@ -14,10 +14,13 @@ export interface ProductImages {
 
 // A selectable colour for a product (shown as a swatch in the public
 // fast-order picker). `hex` drives the swatch; `name` is what's stored
-// on the request/order.
+// on the request/order. `imageUrl` (optional) is a photo of the product
+// in that colour — the picker swaps to it when the swatch is selected,
+// falling back to the primary image when absent.
 export interface ProductColor {
     name: string;
     hex: string;
+    imageUrl?: string;
 }
 
 export interface Product {

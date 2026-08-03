@@ -533,6 +533,15 @@ function ConfigDrawer({
     // tagged with that color, or the primary image if none matches.
     const shownImage = imageForColor(item, color);
 
+    // Blank-flash guard: the <img> is key-remounted per color, so the
+    // old picture vanishes the instant the swatch changes while the new
+    // file may still be downloading. Track which src has actually
+    // loaded; until then keep the frame's height and show a spinner
+    // instead of an empty beige strip. onError also settles so a broken
+    // URL can't spin forever.
+    const [readySrc, setReadySrc] = useState<string | null>(null);
+    const imgReady = readySrc === shownImage;
+
     const linePrice = lineSubtotal({
         unitPrice: item.unitPrice,
         pricePerLogo: item.pricePerLogo,
@@ -561,15 +570,32 @@ function ConfigDrawer({
                     shown ? 'translate-x-0' : 'translate-x-full'
                 }`}
             >
-                <div className="relative bg-[#F1EDE4] shrink-0">
+                <div className="relative bg-[#F1EDE4] shrink-0 min-h-56 sm:min-h-64">
                     {shownImage ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                            key={shownImage}
-                            src={shownImage}
-                            alt={`${item.name}${color ? ' — ' + color : ''}`}
-                            className="block w-full h-auto max-h-[60vh] object-contain"
-                        />
+                        <>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                                key={shownImage}
+                                src={shownImage}
+                                alt={`${item.name}${color ? ' — ' + color : ''}`}
+                                onLoad={() => setReadySrc(shownImage)}
+                                onError={() => setReadySrc(shownImage)}
+                                className={`block w-full h-auto max-h-[60vh] object-contain transition-opacity duration-200 ${
+                                    imgReady ? 'opacity-100' : 'opacity-0'
+                                }`}
+                            />
+                            {!imgReady && (
+                                <div
+                                    className="absolute inset-0 flex items-center justify-center"
+                                    aria-hidden="true"
+                                >
+                                    <Loader2
+                                        size={28}
+                                        className="animate-spin text-[#16130F]/30"
+                                    />
+                                </div>
+                            )}
+                        </>
                     ) : (
                         <div className="w-full h-56 sm:h-64 flex items-center justify-center">
                             <ImageIcon size={40} className="text-[#16130F]/20" />

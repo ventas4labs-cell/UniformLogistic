@@ -287,6 +287,33 @@ export function ProductsManager({
         });
     };
 
+    // Photo of the product in a specific colour — the public fast-order
+    // picker swaps to it when that swatch is selected. Same resize +
+    // upload path as the gender galleries; single file per colour.
+    const [uploadingColorIdx, setUploadingColorIdx] = useState<number | null>(null);
+    const handleColorImage = async (idx: number, files: FileList | null) => {
+        const file = files?.[0];
+        if (!file) return;
+        setUploadingColorIdx(idx);
+        setError(null);
+        try {
+            const { file: optimized } = await resizeImageFile(file);
+            const fd = new FormData();
+            fd.append('file', optimized);
+            const url = await uploadProductImageAction(fd);
+            setForm((f) => ({
+                ...f,
+                colors: (f.colors ?? []).map((c, i) =>
+                    i === idx ? { ...c, imageUrl: url } : c
+                )
+            }));
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Error al subir la imagen');
+        } finally {
+            setUploadingColorIdx(null);
+        }
+    };
+
     // Toggle an audience in the multi-select, never leaving the set empty.
     const toggleGender = (gender: ProductGender) => {
         setForm((f) => {
@@ -847,6 +874,43 @@ export function ProductsManager({
                                 <div className="space-y-2">
                                     {(form.colors ?? []).map((c, i) => (
                                         <div key={i} className="flex items-center gap-2">
+                                            {/* Optional photo of the product in this colour */}
+                                            <label
+                                                className="relative w-10 h-10 rounded-lg border border-gray-300 dark:border-zinc-700 overflow-hidden cursor-pointer flex items-center justify-center bg-gray-50 dark:bg-zinc-800 hover:border-orange-400 transition-colors shrink-0"
+                                                title={
+                                                    c.imageUrl
+                                                        ? 'Cambiar foto de este color'
+                                                        : 'Subir foto de este color'
+                                                }
+                                            >
+                                                {uploadingColorIdx === i ? (
+                                                    <Loader2
+                                                        size={16}
+                                                        className="animate-spin text-orange-500"
+                                                    />
+                                                ) : c.imageUrl ? (
+                                                    // eslint-disable-next-line @next/next/no-img-element
+                                                    <img
+                                                        src={c.imageUrl}
+                                                        alt={c.name || 'Color'}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                ) : (
+                                                    <Upload
+                                                        size={14}
+                                                        className="text-gray-400"
+                                                    />
+                                                )}
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    className="hidden"
+                                                    onChange={(e) => {
+                                                        handleColorImage(i, e.target.files);
+                                                        e.target.value = '';
+                                                    }}
+                                                />
+                                            </label>
                                             <input
                                                 type="color"
                                                 value={c.hex || '#000000'}

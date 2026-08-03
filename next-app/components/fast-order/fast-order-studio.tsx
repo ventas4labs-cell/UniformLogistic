@@ -506,6 +506,16 @@ function ColorPhase({
     // Dialog semantics: focus moves into the modal on open, Escape closes.
     const dialogRef = useDialog(onCancel);
 
+    // Picture follows the selected swatch when that colour has its own
+    // photo; otherwise the primary product image. Until the new file's
+    // onLoad fires the frame keeps its size and shows a spinner instead
+    // of a blank flash (the <img> is key-remounted per src). onError
+    // settles too so a broken URL can't spin forever.
+    const selected = colors.find((c) => c.name === color);
+    const shownImage = selected?.imageUrl || product.image;
+    const [readySrc, setReadySrc] = useState<string | null>(null);
+    const imgReady = readySrc === shownImage;
+
     return (
         <div
             className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4"
@@ -535,14 +545,30 @@ function ColorPhase({
                     </button>
                 </div>
 
-                {product.image && (
-                    <div className="mx-auto mb-5 w-40 aspect-square rounded-2xl overflow-hidden bg-zinc-100 border border-zinc-200">
+                {shownImage && (
+                    <div className="relative mx-auto mb-5 w-40 aspect-square rounded-2xl overflow-hidden bg-zinc-100 border border-zinc-200">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                            src={product.image}
-                            alt={product.name}
-                            className="w-full h-full object-contain"
+                            key={shownImage}
+                            src={shownImage}
+                            alt={`${product.name}${color ? ' — ' + color : ''}`}
+                            onLoad={() => setReadySrc(shownImage)}
+                            onError={() => setReadySrc(shownImage)}
+                            className={`w-full h-full object-contain transition-opacity duration-200 ${
+                                imgReady ? 'opacity-100' : 'opacity-0'
+                            }`}
                         />
+                        {!imgReady && (
+                            <div
+                                className="absolute inset-0 flex items-center justify-center"
+                                aria-hidden="true"
+                            >
+                                <Loader2
+                                    size={22}
+                                    className="animate-spin text-zinc-400"
+                                />
+                            </div>
+                        )}
                     </div>
                 )}
 
