@@ -11,6 +11,7 @@ import {
     type StageKey
 } from '@/lib/services/stage-completions';
 import { bulkAssignStationToOrdersAction } from '@/app/(admin)/admin/station-users/actions';
+import { useDialog } from '@/lib/use-dialog';
 
 interface Props {
     selectedOrderIds: string[];
@@ -127,6 +128,11 @@ function BulkAssignModal({
     const [pending, startTransition] = useTransition();
     const [result, setResult] = useState<{ created: number; existing: number } | null>(null);
     const [error, setError] = useState<string | null>(null);
+    // Escape mirrors the backdrop: once the success summary shows, the
+    // modal only closes via "Listo" so the parent finishes the flow.
+    const dialogRef = useDialog(() => {
+        if (!result) onClose();
+    });
 
     const selectedStation = activeStations.find((u) => u.id === stationUserId);
 
@@ -162,7 +168,18 @@ function BulkAssignModal({
             onClick={result ? undefined : onClose}
         >
             <div
-                className="bg-white dark:bg-zinc-900 w-full max-w-lg rounded-2xl shadow-2xl max-h-[85vh] flex flex-col"
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label={
+                    result
+                        ? 'Asignación completada'
+                        : confirming
+                            ? 'Confirmar asignación'
+                            : 'Asignar a estación externa'
+                }
+                tabIndex={-1}
+                className="bg-white dark:bg-zinc-900 w-full max-w-lg rounded-2xl shadow-2xl max-h-[85vh] flex flex-col outline-none"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-start justify-between gap-3 p-5 border-b border-gray-100 dark:border-zinc-800">

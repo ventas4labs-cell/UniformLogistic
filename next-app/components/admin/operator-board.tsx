@@ -35,6 +35,7 @@ import { InsumoPrepEditor } from '@/components/admin/insumo-prep-editor';
 import { OrderProductsSummary } from '@/components/admin/order-products-summary';
 import type { InsumoPreparation } from '@/lib/services/insumo-preparations';
 import { MissingReportsHistoryButton } from '@/components/admin/missing-report-controls';
+import { useDialog } from '@/lib/use-dialog';
 
 const completionKey = (orderId: string, insumoName: string) =>
     `${orderId}|${insumoName}`;
@@ -130,13 +131,19 @@ function ImagePreviewModal({
     alt: string;
     onClose: () => void;
 }) {
+    const dialogRef = useDialog(onClose);
     return (
         <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
             onClick={onClose}
         >
             <div
-                className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden max-w-lg w-full"
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label={`Vista previa de ${alt}`}
+                tabIndex={-1}
+                className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden max-w-lg w-full outline-none"
                 onClick={(e) => e.stopPropagation()}
             >
                 <button
@@ -541,6 +548,9 @@ function OrderCard({
                     onClick={closePdfPreview}
                 >
                     <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label={`Vista previa del PDF ${order.id}`}
                         className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col overflow-hidden"
                         onClick={(e) => e.stopPropagation()}
                     >

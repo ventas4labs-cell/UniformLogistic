@@ -108,6 +108,9 @@ export function StageCompleteToggle({
                     onClick={() => setConfirmOpen(false)}
                 >
                     <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label={`¿Marcar ${stageLabel.toLowerCase()} completo?`}
                         className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-sm p-6"
                         onClick={(e) => e.stopPropagation()}
                     >

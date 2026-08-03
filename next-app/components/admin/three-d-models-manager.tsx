@@ -31,6 +31,7 @@ import {
     acceptDesignRequestAction,
     setCompanyCustomOrderEnabledAction
 } from '@/app/(admin)/admin/3d-models/actions';
+import { useDialog } from '@/lib/use-dialog';
 
 // R3F is client-only + heavy — load the zone editor lazily so it never
 // SSRs and doesn't weigh down the rest of the admin bundle.
@@ -248,6 +249,9 @@ function ModelEditModal({
     onClose: () => void;
     onSaved: () => void;
 }) {
+    // Data-entry form: no Escape-to-close so a stray keystroke can't
+    // discard what the admin already edited.
+    const dialogRef = useDialog();
     const [name, setName] = useState(model.name);
     const [productType, setProductType] = useState<ThreeDProductType>(model.productType);
     const [allowLogo, setAllowLogo] = useState(model.allowLogoPlacement);
@@ -289,7 +293,14 @@ function ModelEditModal({
 
     return (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto">
-            <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-3xl my-8">
+            <div
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Editar modelo"
+                tabIndex={-1}
+                className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-3xl my-8 outline-none"
+            >
                 <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-zinc-800">
                     <h3 className="font-bold text-lg text-gray-900 dark:text-zinc-100">
                         Editar modelo
@@ -698,13 +709,19 @@ function RequestInspect3DModal({
     logos: PlacedLogo[];
     onClose: () => void;
 }) {
+    const dialogRef = useDialog(onClose);
     return (
         <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
             onClick={onClose}
         >
             <div
-                className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-3xl h-[80vh] flex flex-col overflow-hidden"
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label={`Vista 3D de ${r.requestRef}`}
+                tabIndex={-1}
+                className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-3xl h-[80vh] flex flex-col overflow-hidden outline-none"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-gray-100 dark:border-zinc-800">

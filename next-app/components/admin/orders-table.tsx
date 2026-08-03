@@ -34,6 +34,7 @@ import { FacturaModal } from '@/components/admin/factura-modal';
 import { OrderEditModal } from '@/components/admin/order-edit-modal';
 import { OrderDetailModal, type OrderModel3D } from '@/components/admin/order-detail-modal';
 import { useRouter } from 'next/navigation';
+import { useDialog } from '@/lib/use-dialog';
 
 export function OrdersTable({
     initialOrders,
@@ -947,6 +948,9 @@ export function OrdersTable({
                     onClick={closePreview}
                 >
                     <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label={`Vista previa del PDF ${previewPdf.order.id}`}
                         className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col overflow-hidden"
                         onClick={(e) => e.stopPropagation()}
                     >
@@ -1014,6 +1018,9 @@ export function OrdersTable({
                     onClick={() => !deleting && setDeletingOrder(null)}
                 >
                     <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label={`Eliminar orden ${deletingOrder.id}`}
                         className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-md p-6"
                         onClick={(e) => e.stopPropagation()}
                     >
@@ -1072,6 +1079,9 @@ export function OrdersTable({
                     onClick={() => !cancelling && setCancellingOrder(null)}
                 >
                     <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label={`Cancelar pedido ${cancellingOrder.id}`}
                         className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-md p-6"
                         onClick={(e) => e.stopPropagation()}
                     >
@@ -1182,6 +1192,7 @@ function FastOrderRequestsModal({
     onClose: () => void;
     onDone: () => void;
 }) {
+    const dialogRef = useDialog(onClose);
     const [busyId, setBusyId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -1223,7 +1234,12 @@ function FastOrderRequestsModal({
             onClick={onClose}
         >
             <div
-                className="bg-white dark:bg-zinc-900 w-full max-w-2xl sm:rounded-2xl shadow-2xl max-h-[92vh] flex flex-col"
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Pedidos rápidos (web)"
+                tabIndex={-1}
+                className="bg-white dark:bg-zinc-900 w-full max-w-2xl sm:rounded-2xl shadow-2xl max-h-[92vh] flex flex-col outline-none"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-center justify-between gap-3 p-5 border-b border-zinc-100 dark:border-zinc-800">
@@ -1368,6 +1384,7 @@ function CompletedOrdersModal({
     onClose: () => void;
     onViewDetail: (order: Order) => void;
 }) {
+    const dialogRef = useDialog(onClose);
     const sorted = orders
         .slice()
         .sort(
@@ -1381,7 +1398,12 @@ function CompletedOrdersModal({
             onClick={onClose}
         >
             <div
-                className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden"
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Pedidos completados"
+                tabIndex={-1}
+                className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden outline-none"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-gray-100 dark:border-zinc-800">
@@ -1627,13 +1649,19 @@ function NotificationsPopover({
     onUnacknowledgeStage: (id: string) => void;
     pending: boolean;
 }) {
+    const dialogRef = useDialog(onClose);
     return (
         <div
             className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
             onClick={onClose}
         >
             <div
-                className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col"
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label={`Notificaciones del pedido ${order.id}`}
+                tabIndex={-1}
+                className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col outline-none"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-zinc-800">
@@ -1693,6 +1721,7 @@ function AllNotificationsModal({
     onUnacknowledgeStage: (id: string) => void;
     pending: boolean;
 }) {
+    const dialogRef = useDialog(onClose);
     const sorted = reports
         .slice()
         .sort(
@@ -1712,7 +1741,12 @@ function AllNotificationsModal({
             onClick={onClose}
         >
             <div
-                className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col"
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Notificaciones"
+                tabIndex={-1}
+                className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col outline-none"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-zinc-800">
@@ -1947,6 +1981,7 @@ function DeletedOrdersHistoryModal({
     deletedOrders: DeletedOrderHistoryEntry[];
     onClose: () => void;
 }) {
+    const dialogRef = useDialog(onClose);
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
     const [search, setSearch] = useState('');
 
@@ -1976,7 +2011,12 @@ function DeletedOrdersHistoryModal({
             onClick={onClose}
         >
             <div
-                className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col"
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Pedidos eliminados"
+                tabIndex={-1}
+                className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col outline-none"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-zinc-800">

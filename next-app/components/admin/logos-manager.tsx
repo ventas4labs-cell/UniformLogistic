@@ -290,6 +290,9 @@ export function LogosManager({
                     onClick={() => setPreviewImage(null)}
                 >
                     <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label={`Vista previa de ${previewImage.alt}`}
                         className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden max-w-lg w-full"
                         onClick={(e) => e.stopPropagation()}
                     >
@@ -316,7 +319,12 @@ export function LogosManager({
 
             {showForm && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label={editing ? 'Editar Logo' : 'Nuevo Logo'}
+                        className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+                    >
                         <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-zinc-800">
                             <h3 className="text-xl font-bold">
                                 {editing ? 'Editar Logo' : 'Nuevo Logo'}

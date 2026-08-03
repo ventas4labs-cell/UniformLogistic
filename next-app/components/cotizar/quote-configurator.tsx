@@ -28,6 +28,7 @@ import {
     type CustomerContact,
     type SubmitResult
 } from '@/app/cotizar/actions';
+import { useDialog } from '@/lib/use-dialog';
 
 const IVA_PCT = 13;
 
@@ -526,6 +527,7 @@ function ConfigDrawer({
         setShown(false);
         setTimeout(after, 250);
     };
+    const dialogRef = useDialog(() => dismiss(onClose));
 
     // The shown image tracks the selected color — swaps to the image
     // tagged with that color, or the primary image if none matches.
@@ -550,7 +552,12 @@ function ConfigDrawer({
 
             {/* Sidebar panel */}
             <div
-                className={`relative h-full w-full max-w-md bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-out ${
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label={`Configurar ${item.name}`}
+                tabIndex={-1}
+                className={`relative h-full w-full max-w-md bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-out outline-none ${
                     shown ? 'translate-x-0' : 'translate-x-full'
                 }`}
             >

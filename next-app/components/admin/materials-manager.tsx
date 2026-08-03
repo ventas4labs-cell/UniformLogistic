@@ -21,6 +21,7 @@ import {
     deleteMaterialAction,
     updateMaterialAction
 } from '@/app/(admin)/admin/materials/actions';
+import { useDialog } from '@/lib/use-dialog';
 
 // Common Spanish units offered as defaults — admin can still type any
 // free-form value because the DB column is plain text.
@@ -459,13 +460,21 @@ function MaterialFormModal({
     onClose: () => void;
     onSubmit: (e: React.FormEvent) => void;
 }) {
+    // Data-entry form: no Escape-to-close so a stray keystroke can't
+    // discard what the admin already typed.
+    const dialogRef = useDialog();
     return (
         <div
             className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
             onClick={onClose}
         >
             <div
-                className="bg-white dark:bg-zinc-900 w-full max-w-lg rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto"
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label={editing ? `Editar ${editing.name}` : 'Nuevo material'}
+                tabIndex={-1}
+                className="bg-white dark:bg-zinc-900 w-full max-w-lg rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto outline-none"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-zinc-800">

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useDialog } from '@/lib/use-dialog';
 import { Minus, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Product, SizeSelection } from '@/lib/types';
 
@@ -17,6 +18,9 @@ const uniqueSizes = <T,>(sizes: T[] | undefined): T[] =>
     Array.from(new Set(sizes ?? []));
 
 export function SizeSelector({ product, onAdd, onCancel }: Props) {
+    // Dialog semantics: focus moves into the modal on open, Escape closes.
+    const dialogRef = useDialog(onCancel);
+
     // products-manager saves empty buckets as `[]` rather than dropping them,
     // so a Women-only product still has `sizes.men = []`. An empty array is
     // truthy in JavaScript, which would otherwise (a) show the Hombre/Mujer
@@ -180,8 +184,19 @@ export function SizeSelector({ product, onAdd, onCancel }: Props) {
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4">
-            <div className="bg-white dark:bg-zinc-900 w-full max-w-2xl rounded-t-2xl sm:rounded-2xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto flex flex-col">
+        <div
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4"
+            onClick={onCancel}
+        >
+            <div
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label={`Seleccionar tallas — ${product.name}`}
+                tabIndex={-1}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white dark:bg-zinc-900 w-full max-w-2xl rounded-t-2xl sm:rounded-2xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto flex flex-col outline-none"
+            >
                 <div className="flex justify-between items-center mb-6">
                     <div>
                         <h3 className="text-xl font-extrabold text-zinc-900 dark:text-zinc-100">

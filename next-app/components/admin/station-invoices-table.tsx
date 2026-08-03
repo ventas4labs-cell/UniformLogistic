@@ -217,6 +217,9 @@ export function StationInvoicesTable({ initialInvoices }: Props) {
                     onClick={() => setPreview(null)}
                 >
                     <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label={`Vista previa de ${preview.alt}`}
                         className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden max-w-3xl w-full"
                         onClick={(e) => e.stopPropagation()}
                     >

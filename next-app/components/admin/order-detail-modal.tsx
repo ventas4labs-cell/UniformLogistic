@@ -4,6 +4,7 @@ import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import { X, Package, Calendar, Building2, User, Boxes, Loader2, ImageIcon } from 'lucide-react';
 import type { Order } from '@/lib/types';
+import { useDialog } from '@/lib/use-dialog';
 
 // R3F is heavy + client-only — mount the viewer lazily and only when the
 // admin expands it, so the WebGL context is created (and released) on
@@ -36,6 +37,7 @@ export function OrderDetailModal({
     onClose: () => void;
 }) {
     const [show3D, setShow3D] = useState(false);
+    const dialogRef = useDialog(onClose);
     const totalPieces = order.items.reduce((s, i) => s + i.quantity, 0);
 
     return (
@@ -44,7 +46,12 @@ export function OrderDetailModal({
             onClick={onClose}
         >
             <div
-                className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Detalle del pedido"
+                tabIndex={-1}
+                className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden outline-none"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}

@@ -21,6 +21,7 @@ import {
     reportMissingItemAction
 } from '@/app/(admin)/admin/_stage-actions';
 import type { MissingInsumoReport } from '@/lib/services/missing-insumos';
+import { useDialog } from '@/lib/use-dialog';
 
 // ─── Per-order "Reportar faltante" affordance ───────────────────────
 // A small red button on any operation-board card. Opens an inline form
@@ -260,6 +261,7 @@ function ReportsHistoryModal({
     const [reports, setReports] = useState<MissingInsumoReport[] | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [, startTransition] = useTransition();
+    const dialogRef = useDialog(onClose);
 
     // Lazy load once when the modal mounts. Guard against setting state
     // after unmount (operator closes the modal mid-fetch).
@@ -320,7 +322,12 @@ function ReportsHistoryModal({
             onClick={onClose}
         >
             <div
-                className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden"
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Reportes de faltantes"
+                tabIndex={-1}
+                className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden outline-none"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-gray-100 dark:border-zinc-800">

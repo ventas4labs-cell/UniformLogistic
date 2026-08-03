@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
     ArrowRight,
     X,
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import type { Order, SizeSelection } from '@/lib/types';
 import type { CustomerOrderProgress, CustomerBucket } from '@/lib/customer-order-status';
+import { useDialog } from '@/lib/use-dialog';
 
 const BUCKET_BADGE: Record<CustomerBucket, string> = {
     production: 'bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-300',
@@ -66,14 +67,7 @@ function OrderDetailsModal({
     progress: CustomerOrderProgress;
     onClose: () => void;
 }) {
-    // Close on Escape.
-    useEffect(() => {
-        const onKey = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') onClose();
-        };
-        document.addEventListener('keydown', onKey);
-        return () => document.removeEventListener('keydown', onKey);
-    }, [onClose]);
+    const dialogRef = useDialog(onClose);
 
     const { bucket, statusLabel, stages, totalPieces, deliveredPieces } = progress;
 
@@ -83,7 +77,12 @@ function OrderDetailsModal({
             onClick={onClose}
         >
             <div
-                className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col"
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Detalles del pedido"
+                tabIndex={-1}
+                className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col outline-none"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}

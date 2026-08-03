@@ -8,6 +8,7 @@ import {
     assignStationToOrderAction,
     unassignStationFromOrderAction
 } from '@/app/(admin)/admin/station-users/actions';
+import { useDialog } from '@/lib/use-dialog';
 
 interface Props {
     orderUuid: string;
@@ -109,6 +110,7 @@ function AssignmentsModal({
     onLocalChange: Props['onLocalChange'];
     onClose: () => void;
 }) {
+    const dialogRef = useDialog(onClose);
     const byStage = useMemo(() => {
         const map = new Map<StageKey, StationUser[]>();
         for (const u of activeUsers) {
@@ -127,7 +129,12 @@ function AssignmentsModal({
             onClick={onClose}
         >
             <div
-                className="bg-white dark:bg-zinc-900 w-full max-w-lg rounded-2xl shadow-2xl max-h-[85vh] flex flex-col"
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Asignar estaciones"
+                tabIndex={-1}
+                className="bg-white dark:bg-zinc-900 w-full max-w-lg rounded-2xl shadow-2xl max-h-[85vh] flex flex-col outline-none"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-start justify-between gap-3 p-5 border-b border-gray-100 dark:border-zinc-800">

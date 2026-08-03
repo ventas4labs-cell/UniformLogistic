@@ -25,6 +25,7 @@ import {
     regenerateStationAccessTokenAction,
     setStationUserActiveAction
 } from '@/app/(admin)/admin/station-users/actions';
+import { useDialog } from '@/lib/use-dialog';
 
 // Build the full share URL the station bookmarks. Safe to call in
 // event handlers (copy/regenerate) — they only run client-side. For
@@ -480,6 +481,7 @@ function AssignModal({
     onClose: () => void;
     onAssigned: (orderId: string, stationUserId: string) => void;
 }) {
+    const dialogRef = useDialog(onClose);
     const [stationUserId, setStationUserId] = useState<string>(stations[0]?.id || '');
     const [orderId, setOrderId] = useState<string>('');
     const [search, setSearch] = useState('');
@@ -532,7 +534,12 @@ function AssignModal({
             onClick={onClose}
         >
             <div
-                className="bg-white dark:bg-zinc-900 w-full max-w-lg rounded-2xl shadow-2xl"
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Asignar pedido a estación externa"
+                tabIndex={-1}
+                className="bg-white dark:bg-zinc-900 w-full max-w-lg rounded-2xl shadow-2xl outline-none"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-start justify-between gap-3 p-5 border-b border-gray-100 dark:border-zinc-800">
@@ -650,6 +657,9 @@ function CreateModal({
     onClose: () => void;
     onCreated: (u: StationUser) => void;
 }) {
+    // Data-entry form: no Escape-to-close so a stray keystroke can't
+    // discard what the admin already typed.
+    const dialogRef = useDialog();
     const [email, setEmail] = useState('');
     const [displayName, setDisplayName] = useState('');
     const [stage, setStage] = useState<StageKey>('corte');
@@ -701,7 +711,14 @@ function CreateModal({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-2xl shadow-2xl p-6">
+            <div
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label={createdShare ? 'Estación creada' : 'Nueva estación'}
+                tabIndex={-1}
+                className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-2xl shadow-2xl p-6 outline-none"
+            >
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
                         {createdShare ? 'Estación creada' : 'Nueva estación'}

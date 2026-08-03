@@ -121,6 +121,9 @@ export function OrderLogosButton({
                     onClick={() => setOpen(false)}
                 >
                     <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label={`Logos de ${catLabel}`}
                         className="bg-white dark:bg-zinc-900 w-full max-w-lg rounded-2xl shadow-xl max-h-[85vh] overflow-hidden flex flex-col"
                         onClick={(e) => e.stopPropagation()}
                     >

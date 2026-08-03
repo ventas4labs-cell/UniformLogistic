@@ -122,7 +122,12 @@ export function QuickCreateHost() {
     if (!deps) {
         return (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-                <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl px-6 py-5 flex items-center gap-3">
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label={error ? 'Error al cargar' : 'Cargando'}
+                    className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl px-6 py-5 flex items-center gap-3"
+                >
                     {error ? (
                         <>
                             <span className="text-sm text-red-600 dark:text-red-400">

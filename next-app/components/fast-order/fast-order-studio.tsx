@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useTransition } from 'react';
+import { useDialog } from '@/lib/use-dialog';
 import {
     ArrowLeft,
     ShoppingBag,
@@ -153,7 +154,7 @@ export function FastOrderStudio({ products }: { products: FastOrderProduct[] }) 
                     </button>
                     <Link
                         href="/"
-                        className="mt-3 inline-block text-sm font-semibold text-black/50 hover:text-black"
+                        className="mt-3 inline-block text-sm font-semibold text-black/60 hover:text-black"
                     >
                         Volver al inicio
                     </Link>
@@ -205,7 +206,7 @@ export function FastOrderStudio({ products }: { products: FastOrderProduct[] }) 
                                         <p className="font-semibold truncate">
                                             {it.productName}
                                         </p>
-                                        <p className="text-black/50 text-xs">
+                                        <p className="text-black/60 text-xs">
                                             {[it.size, it.color]
                                                 .filter(Boolean)
                                                 .join(' · ')}
@@ -226,21 +227,27 @@ export function FastOrderStudio({ products }: { products: FastOrderProduct[] }) 
                             onChange={(v) => setContact({ ...contact, name: v })}
                             placeholder="Tu nombre"
                         />
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <Field
-                                label="Correo"
-                                type="email"
-                                value={contact.email}
-                                onChange={(v) => setContact({ ...contact, email: v })}
-                                placeholder="tu@correo.com"
-                            />
-                            <Field
-                                label="Teléfono"
-                                type="tel"
-                                value={contact.phone}
-                                onChange={(v) => setContact({ ...contact, phone: v })}
-                                placeholder="8888-8888"
-                            />
+                        <div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <Field
+                                    label="Correo"
+                                    type="email"
+                                    value={contact.email}
+                                    onChange={(v) => setContact({ ...contact, email: v })}
+                                    placeholder="tu@correo.com"
+                                />
+                                <Field
+                                    label="Teléfono"
+                                    type="tel"
+                                    value={contact.phone}
+                                    onChange={(v) => setContact({ ...contact, phone: v })}
+                                    placeholder="8888-8888"
+                                />
+                            </div>
+                            <p className="mt-1.5 text-xs text-black/60">
+                                Dejanos al menos un correo o un teléfono para poder
+                                contactarte.
+                            </p>
                         </div>
                         <Field
                             label="Empresa (opcional)"
@@ -283,7 +290,7 @@ export function FastOrderStudio({ products }: { products: FastOrderProduct[] }) 
                                 'Enviar pedido'
                             )}
                         </button>
-                        <p className="text-xs text-black/40 text-center">
+                        <p className="text-xs text-black/60 text-center">
                             Al enviar, nuestro equipo revisará tu pedido y te
                             contactará. No es un cobro.
                         </p>
@@ -311,7 +318,7 @@ export function FastOrderStudio({ products }: { products: FastOrderProduct[] }) 
                 </div>
             </header>
 
-            <div className="mx-auto max-w-6xl px-6 py-10">
+            <div className="mx-auto max-w-6xl px-6 py-10 pb-28 lg:pb-10">
                 <div className="mb-8">
                     <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
                         Hacé tu pedido
@@ -323,7 +330,7 @@ export function FastOrderStudio({ products }: { products: FastOrderProduct[] }) 
                 </div>
 
                 {products.length === 0 ? (
-                    <div className="bg-white rounded-2xl border border-black/5 p-10 text-center text-black/50">
+                    <div className="bg-white rounded-2xl border border-black/5 p-10 text-center text-black/60">
                         No hay productos disponibles en este momento.
                     </div>
                 ) : (
@@ -342,6 +349,7 @@ export function FastOrderStudio({ products }: { products: FastOrderProduct[] }) 
                                             <img
                                                 src={p.image}
                                                 alt={p.name}
+                                                loading="lazy"
                                                 className="w-full h-full object-contain"
                                             />
                                         ) : (
@@ -378,12 +386,13 @@ export function FastOrderStudio({ products }: { products: FastOrderProduct[] }) 
                             ))}
                         </div>
 
-                        {/* Cart */}
-                        <aside className="lg:sticky lg:top-20">
+                        {/* Cart — side panel on desktop, below the grid on
+                            mobile (the sticky bottom bar jumps here). */}
+                        <aside id="fast-order-cart" className="lg:sticky lg:top-20 scroll-mt-20">
                             <div className="bg-white rounded-2xl border border-black/5 p-5">
                                 <h2 className="font-bold mb-3">Tu pedido</h2>
                                 {cart.length === 0 ? (
-                                    <p className="text-sm text-black/50 py-6 text-center">
+                                    <p className="text-sm text-black/60 py-6 text-center">
                                         Todavía no agregaste productos.
                                     </p>
                                 ) : (
@@ -397,7 +406,7 @@ export function FastOrderStudio({ products }: { products: FastOrderProduct[] }) 
                                                     <p className="font-semibold text-sm truncate">
                                                         {it.productName}
                                                     </p>
-                                                    <p className="text-black/50 text-xs">
+                                                    <p className="text-black/60 text-xs">
                                                         {[it.size, it.color]
                                                             .filter(Boolean)
                                                             .join(' · ')}{' '}
@@ -406,7 +415,7 @@ export function FastOrderStudio({ products }: { products: FastOrderProduct[] }) 
                                                 </div>
                                                 <button
                                                     onClick={() => removeItem(idx)}
-                                                    className="text-black/30 hover:text-red-600 shrink-0"
+                                                    className="text-black/40 hover:text-red-600 shrink-0"
                                                     aria-label="Quitar"
                                                 >
                                                     <Trash2 size={16} />
@@ -430,6 +439,29 @@ export function FastOrderStudio({ products }: { products: FastOrderProduct[] }) 
                     </div>
                 )}
             </div>
+
+            {/* Sticky mobile checkout bar — the desktop side cart sits below
+                the grid on phones, so surface progress + Continuar as soon
+                as something is in the cart. */}
+            {cart.length > 0 && (
+                <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-black/10 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+                    <div className="flex items-center gap-3 max-w-lg mx-auto">
+                        <a
+                            href="#fast-order-cart"
+                            className="text-sm font-bold text-black/70 whitespace-nowrap"
+                        >
+                            {totalPieces} {totalPieces === 1 ? 'pieza' : 'piezas'}
+                        </a>
+                        <button
+                            onClick={() => setStep('contact')}
+                            className="flex-1 py-3 rounded-xl font-extrabold text-white"
+                            style={{ background: ORANGE }}
+                        >
+                            Continuar
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Per-product config: colour → sizes */}
             {configuring && configPhase === 'color' && (
@@ -471,9 +503,22 @@ function ColorPhase({
     // Require a choice only when the product defines colours.
     const canContinue = !hasSwatches || color.trim().length > 0;
 
+    // Dialog semantics: focus moves into the modal on open, Escape closes.
+    const dialogRef = useDialog(onCancel);
+
     return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4">
-            <div className="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl p-6 shadow-2xl">
+        <div
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4"
+            onClick={onCancel}
+        >
+            <div
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label={`Elegí el color — ${product.name}`}
+                tabIndex={-1}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl p-6 shadow-2xl outline-none">
                 <div className="flex justify-between items-start mb-5">
                     <div>
                         <h3 className="text-xl font-extrabold text-zinc-900">

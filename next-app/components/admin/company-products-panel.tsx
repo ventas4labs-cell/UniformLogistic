@@ -12,6 +12,7 @@ import {
     X
 } from 'lucide-react';
 import { setCompanyProductAssignmentAction } from '@/app/(admin)/admin/companies/[id]/actions';
+import { useDialog } from '@/lib/use-dialog';
 
 interface PanelProduct {
     uuid: string;
@@ -177,6 +178,7 @@ function PickerModal({
     onToggle: (uuid: string, next: boolean) => void;
     onClose: () => void;
 }) {
+    const dialogRef = useDialog(onClose);
     const [query, setQuery] = useState('');
     const [onlyAssigned, setOnlyAssigned] = useState(false);
     const [pending, startTransition] = useTransition();
@@ -203,7 +205,12 @@ function PickerModal({
             onClick={onClose}
         >
             <div
-                className="bg-white dark:bg-zinc-900 w-full max-w-2xl rounded-2xl shadow-2xl max-h-[90vh] flex flex-col"
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Asignar productos"
+                tabIndex={-1}
+                className="bg-white dark:bg-zinc-900 w-full max-w-2xl rounded-2xl shadow-2xl max-h-[90vh] flex flex-col outline-none"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-start justify-between gap-3 p-5 border-b border-gray-100 dark:border-zinc-800">

@@ -11,6 +11,7 @@ import {
     submitCustomDesignAction,
     uploadCustomLogoAction
 } from '@/app/(app)/custom-order/actions';
+import { useDialog } from '@/lib/use-dialog';
 
 const ModelViewer3D = dynamic(() => import('./model-viewer-3d'), {
     ssr: false,
@@ -67,6 +68,9 @@ export function BasicOrderStudio({
     const [doneRef, setDoneRef] = useState<string | null>(null);
     const viewerRef = useRef<HTMLDivElement>(null);
     const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+    // Data-entry studio (color, logos, notas) — no Escape-to-close so a
+    // stray keypress can't discard the design in progress.
+    const dialogRef = useDialog();
 
     const totalPieces = sizeItems.reduce((s, i) => s + i.quantity, 0);
 
@@ -160,7 +164,14 @@ export function BasicOrderStudio({
     };
 
     return (
-        <div className="fixed inset-0 z-50 bg-white dark:bg-zinc-950 overflow-y-auto">
+        <div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Personalizar ${product.name}`}
+            tabIndex={-1}
+            className="fixed inset-0 z-50 bg-white dark:bg-zinc-950 overflow-y-auto outline-none"
+        >
             <div className="max-w-6xl mx-auto p-4 sm:p-6">
                 {doneRef ? (
                     <div className="max-w-lg mx-auto text-center py-20">

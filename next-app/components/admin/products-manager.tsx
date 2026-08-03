@@ -36,6 +36,7 @@ import { validateCABYS } from '@/lib/facturacion/validation/cabys-validator';
 import { VoiceProductDictate } from '@/components/admin/voice-product-dictate';
 import { DecimalInput } from '@/components/admin/decimal-input';
 import { resizeImageFile } from '@/lib/resize-image';
+import { useDialog } from '@/lib/use-dialog';
 
 const emptyForm: ProductInput = {
     productCode: '',
@@ -615,6 +616,9 @@ export function ProductsManager({
                     onClick={() => setPreviewImage(null)}
                 >
                     <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label={`Vista previa de ${previewImage.alt}`}
                         className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden max-w-lg w-full"
                         onClick={(e) => e.stopPropagation()}
                     >
@@ -717,7 +721,12 @@ export function ProductsManager({
 
             {showForm && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label={editing ? 'Editar Producto' : 'Nuevo Producto'}
+                        className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+                    >
                         <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-zinc-800">
                             <h3 className="text-xl font-bold">{editing ? 'Editar Producto' : 'Nuevo Producto'}</h3>
                             <div className="flex items-center gap-2">
@@ -1454,6 +1463,7 @@ function LogoMultiPickerModal({
     onClose: () => void;
     onConfirm: (logos: Logo[]) => void;
 }) {
+    const dialogRef = useDialog(onClose);
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [search, setSearch] = useState('');
     const [showAllCompanies, setShowAllCompanies] = useState(false);
@@ -1507,7 +1517,12 @@ function LogoMultiPickerModal({
             onClick={onClose}
         >
             <div
-                className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col"
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Agregar logos al BOM"
+                tabIndex={-1}
+                className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col outline-none"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-zinc-800">

@@ -12,6 +12,7 @@ import {
     type FabricUsageLine,
     type FabricUsageGroup
 } from '@/lib/corte-fabric';
+import { useDialog } from '@/lib/use-dialog';
 
 // ─── Consumo de tela (Pedidos) ───────────────────────────────────────
 // Consolidated view of what Corte reported spending across orders.
@@ -40,6 +41,7 @@ export function FabricConsumptionModal({
 }) {
     const [period, setPeriod] = useState<FabricPeriod>('month');
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
+    const dialogRef = useDialog(onClose);
 
     // Flatten every reported line, attaching the order it belongs to.
     const allLines = useMemo<FabricUsageLine[]>(() => {
@@ -145,7 +147,12 @@ export function FabricConsumptionModal({
             onClick={onClose}
         >
             <div
-                className="bg-white dark:bg-zinc-900 rounded-2xl shadow-xl w-full max-w-4xl my-8"
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Consumo de tela"
+                tabIndex={-1}
+                className="bg-white dark:bg-zinc-900 rounded-2xl shadow-xl w-full max-w-4xl my-8 outline-none"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 dark:border-zinc-800">
