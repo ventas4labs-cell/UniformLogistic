@@ -12,6 +12,14 @@ export interface ProductImages {
     unisex?: string[];
 }
 
+// A selectable colour for a product (shown as a swatch in the public
+// fast-order picker). `hex` drives the swatch; `name` is what's stored
+// on the request/order.
+export interface ProductColor {
+    name: string;
+    hex: string;
+}
+
 export interface Product {
     id: string;
     name: string;
@@ -46,6 +54,10 @@ export interface Product {
         waist?: number[];
         inseam?: number[];
     };
+    // Selectable colours (swatches) offered for this product in the
+    // public fast-order picker. Empty means "no preset colours" — the
+    // picker falls back to a free-text colour field.
+    colors?: ProductColor[];
 }
 
 export interface SizeSelection {

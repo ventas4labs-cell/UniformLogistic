@@ -1,5 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Product, ProductType, ProductGender, ProductImages } from '@/lib/types';
+import type {
+    Product,
+    ProductType,
+    ProductGender,
+    ProductImages,
+    ProductColor
+} from '@/lib/types';
 import type { StageKey } from '@/lib/services/stage-completions';
 
 // First non-empty picture across the per-audience galleries — used as
@@ -106,6 +112,7 @@ export interface ProductRow {
     genders: string[] | null;
     images_json: ProductImages | null;
     sizes_json: Product['sizes'] | null;
+    colors: ProductColor[] | null;
     fabric_type: string | null;
     is_active: boolean | null;
     is_basic: boolean | null;
@@ -162,6 +169,7 @@ export const mapProductRow = (
         : [row.gender]) as ProductGender[],
     images: row.images_json || {},
     sizes: row.sizes_json || {},
+    colors: Array.isArray(row.colors) ? row.colors : [],
     fabricType: row.fabric_type || '',
     isActive: row.is_active !== false,
     isBasic: row.is_basic === true,
@@ -180,7 +188,7 @@ export const fetchCatalogForCompany = async (
         .select(`
             product:products (
                 id, product_code, name, description, image_url,
-                product_type, type_label, gender, genders, images_json, sizes_json, fabric_type, is_active, is_basic, bom_json, codigo_cabys, stages_json
+                product_type, type_label, gender, genders, images_json, sizes_json, colors, fabric_type, is_active, is_basic, bom_json, codigo_cabys, stages_json
             )
         `)
         .eq('company_id', companyId)
@@ -262,6 +270,8 @@ export interface ProductInput {
     /** Per-audience picture galleries. */
     images?: ProductImages;
     sizes: Product['sizes'];
+    /** Selectable colours (swatches) for the public fast-order picker. */
+    colors?: ProductColor[];
     fabricType?: string;
     isActive?: boolean;
     /** Shared "basic" 3D item shown to every empresa. */
@@ -280,7 +290,7 @@ export interface ProductInput {
 }
 
 const PRODUCT_SELECT =
-    'id, product_code, name, description, image_url, product_type, type_label, gender, genders, images_json, sizes_json, fabric_type, is_active, is_basic, bom_json, codigo_cabys, stages_json';
+    'id, product_code, name, description, image_url, product_type, type_label, gender, genders, images_json, sizes_json, colors, fabric_type, is_active, is_basic, bom_json, codigo_cabys, stages_json';
 
 // Normalize the audience fields from a ProductInput into the DB columns.
 // The single `gender` column stays populated (= first audience) so
@@ -377,6 +387,7 @@ export const createProduct = async (
                 input.typeLabel?.trim() || defaultTypeLabel(input.productType),
             ...audienceColumns(input),
             sizes_json: input.sizes,
+            colors: input.colors ?? [],
             fabric_type: input.fabricType || null,
             is_active: input.isActive ?? true,
             is_basic: input.isBasic ?? false,
@@ -410,6 +421,7 @@ export const updateProduct = async (
                 input.typeLabel?.trim() || defaultTypeLabel(input.productType),
             ...audienceColumns(input),
             sizes_json: input.sizes,
+            colors: input.colors ?? [],
             fabric_type: input.fabricType || null,
             is_active: input.isActive ?? true,
             is_basic: input.isBasic ?? false,

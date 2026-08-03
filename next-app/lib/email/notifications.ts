@@ -11,8 +11,12 @@ import {
     orderCompletedEmail,
     deliveryScheduledEmail,
     invoiceOverdueEmail,
-    type QuoteEmailData
+    fastOrderReceivedEmail,
+    fastOrderAdminNotice,
+    type QuoteEmailData,
+    type FastOrderEmailData
 } from '@/lib/email/templates';
+import type { FastOrderRequest } from '@/lib/services/fast-orders';
 
 const pickOne = <T,>(v: T | T[] | null | undefined): T | null =>
     !v ? null : Array.isArray(v) ? (v[0] ?? null) : v;
@@ -66,6 +70,47 @@ export async function sendQuoteEmails(quote: Quote): Promise<void> {
         await sendEmail({ to: ADMIN_EMAIL, subject: t.subject, html: t.html, text: t.text });
     } catch (e) {
         console.error('[email] quote admin notice failed', e);
+    }
+}
+
+function fastOrderToEmailData(r: FastOrderRequest): FastOrderEmailData {
+    return {
+        requestRef: r.requestRef,
+        contactName: r.contactName,
+        companyName: r.companyName,
+        items: r.items.map((it) => ({
+            name: it.productName,
+            size: it.size,
+            color: it.color,
+            quantity: it.quantity
+        })),
+        totalPieces: r.items.reduce((s, i) => s + i.quantity, 0),
+        contactEmail: r.contactEmail,
+        contactPhone: r.contactPhone,
+        notes: r.notes
+    };
+}
+
+/**
+ * Public fast-order submitted → confirmation to the customer (only if
+ * they left an email) + internal notice to the admin. Best-effort:
+ * never throws (the request is already saved).
+ */
+export async function sendFastOrderEmails(request: FastOrderRequest): Promise<void> {
+    const data = fastOrderToEmailData(request);
+    try {
+        if (data.contactEmail) {
+            const t = fastOrderReceivedEmail(data);
+            await sendEmail({ to: data.contactEmail, subject: t.subject, html: t.html, text: t.text });
+        }
+    } catch (e) {
+        console.error('[email] fast-order customer reply failed', e);
+    }
+    try {
+        const t = fastOrderAdminNotice(data);
+        await sendEmail({ to: ADMIN_EMAIL, subject: t.subject, html: t.html, text: t.text });
+    } catch (e) {
+        console.error('[email] fast-order admin notice failed', e);
     }
 }
 

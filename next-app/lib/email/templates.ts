@@ -289,3 +289,63 @@ export function invoiceOverdueEmail(d: OverdueEmailData): RenderedEmail {
             `\n\nTotal vencido: ${money(d.totalOverdue, d.currency)}\n\nUniform Logistic · ${SUPPORT_EMAIL}`
     };
 }
+
+// ── 6. Fast order (Pedido rápido) — received, to the customer ─────────
+export interface FastOrderEmailData {
+    requestRef: string;
+    contactName: string;
+    companyName: string;
+    items: { name: string; size: string; color: string; quantity: number }[];
+    totalPieces: number;
+    contactEmail: string;
+    contactPhone: string;
+    notes: string;
+}
+
+export function fastOrderReceivedEmail(d: FastOrderEmailData): RenderedEmail {
+    const greet = d.contactName || d.companyName;
+    const rows = d.items.map((it) => ({
+        left: esc(it.name),
+        sub: [it.size, it.color].filter(Boolean).map(esc).join(' · '),
+        right: `${it.quantity} pzas`
+    }));
+    const body = `
+    <p style="margin:0 0 14px 0;">${greet ? `¡Hola ${esc(greet)}!` : '¡Hola!'}</p>
+    <p style="margin:0 0 14px 0;">¡Gracias por tu pedido! Lo recibimos correctamente (referencia <strong style="color:${ORANGE};">${esc(d.requestRef)}</strong>) y nuestro equipo te contactará muy pronto para confirmar los detalles.</p>
+    ${itemsTable(rows)}
+    <p style="margin:14px 0 0 0;font-size:13px;color:${MUTED};">Este es un resumen de tu solicitud. Aún no es un pedido en producción — nos pondremos en contacto para confirmarlo.</p>`;
+    return {
+        subject: `Recibimos tu pedido ${d.requestRef} — Uniform Logistic`,
+        html: layout({ title: '¡Gracias por tu pedido!', preheader: `Tu pedido ${d.requestRef} fue recibido`, body }),
+        text:
+            `${greet ? `¡Hola ${greet}!\n\n` : ''}¡Gracias por tu pedido! Lo recibimos (${d.requestRef}) y te contactaremos pronto.\n\n` +
+            d.items
+                .map((it) => `- ${it.name}${it.size ? ` · ${it.size}` : ''}${it.color ? ` · ${it.color}` : ''} · ${it.quantity} pzas`)
+                .join('\n') +
+            `\n\nUniform Logistic · ${SUPPORT_EMAIL}`
+    };
+}
+
+// ── 7. New fast order — internal notice to the admin ─────────────────
+export function fastOrderAdminNotice(d: FastOrderEmailData): RenderedEmail {
+    const rows = d.items.map((it) => ({
+        left: esc(it.name),
+        sub: [it.size, it.color].filter(Boolean).map(esc).join(' · '),
+        right: `${it.quantity} pzas`
+    }));
+    const contact = [d.contactEmail, d.contactPhone].filter(Boolean).map(esc).join(' · ');
+    const body = `
+    <p style="margin:0 0 14px 0;">Entró un nuevo pedido rápido desde el sitio. Revisalo en <strong>Pedidos → Solicitudes</strong> para aceptarlo.</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${IVORY};border-radius:10px;padding:12px 16px;margin-bottom:8px;">
+      <tr><td style="font-size:14px;color:${INK};padding:2px 0;"><strong>${esc(d.requestRef)}</strong> · ${d.totalPieces} piezas</td></tr>
+      <tr><td style="font-size:13px;color:${MUTED};padding:2px 0;">${esc(d.contactName || '—')}${d.companyName ? ` · ${esc(d.companyName)}` : ''}</td></tr>
+      ${contact ? `<tr><td style="font-size:13px;color:${MUTED};padding:2px 0;">${contact}</td></tr>` : ''}
+      ${d.notes ? `<tr><td style="font-size:13px;color:${MUTED};padding:2px 0;">Nota: ${esc(d.notes)}</td></tr>` : ''}
+    </table>
+    ${itemsTable(rows)}`;
+    return {
+        subject: `Nuevo pedido rápido ${d.requestRef} — ${d.contactName || d.companyName || 'cliente'}`,
+        html: layout({ title: 'Nuevo pedido rápido', preheader: `${d.requestRef} · ${d.totalPieces} piezas`, body }),
+        text: `Nuevo pedido rápido ${d.requestRef}\nCliente: ${d.contactName || ''} ${d.companyName || ''}\nContacto: ${d.contactEmail || ''} ${d.contactPhone || ''}\nPiezas: ${d.totalPieces}`
+    };
+}

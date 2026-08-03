@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
-import { Download, Search, RefreshCw, Loader2, Eye, Receipt, Pencil, Trash2, Filter, Calendar, User, Building2, Bell, X, AlertTriangle, CheckCircle2, Undo2, Plus, History, ShoppingCart, Clock, Boxes, Truck, Ruler } from 'lucide-react';
+import { Download, Search, RefreshCw, Loader2, Eye, Receipt, Pencil, Trash2, Filter, Calendar, User, Building2, Bell, X, AlertTriangle, CheckCircle2, Undo2, Plus, History, ShoppingCart, Clock, Boxes, Truck, Ruler, Inbox, Check } from 'lucide-react';
 import type { Order } from '@/lib/types';
 import type { AdminProduct } from '@/lib/services/products';
 import type { MissingInsumoReport } from '@/lib/services/missing-insumos';
@@ -13,8 +13,11 @@ import type { CorteFabricReport } from '@/lib/services/corte-fabric-reports';
 import { FabricConsumptionModal } from '@/components/admin/fabric-consumption-modal';
 import {
     updateOrderStatusAction,
-    deleteOrderAction
+    deleteOrderAction,
+    acceptFastOrderRequestAction,
+    rejectFastOrderRequestAction
 } from '@/app/(admin)/admin/orders/actions';
+import type { FastOrderRequest } from '@/lib/services/fast-orders';
 import {
     acknowledgeStageNotificationAction,
     unacknowledgeStageNotificationAction,
@@ -43,7 +46,8 @@ export function OrdersTable({
     deletedOrders = [],
     completedOrders = [],
     models3d = [],
-    fabricReportsByOrder = {}
+    fabricReportsByOrder = {},
+    fastRequests = []
 }: {
     initialOrders: Order[];
     products: AdminProduct[];
@@ -62,6 +66,8 @@ export function OrdersTable({
     models3d?: OrderModel3D[];
     /** orderId → fabric consumption reported by Corte. */
     fabricReportsByOrder?: Record<string, CorteFabricReport[]>;
+    /** Pending public fast-order requests awaiting admin review. */
+    fastRequests?: FastOrderRequest[];
 }) {
     const [orders, setOrders] = useState<Order[]>(initialOrders);
     const [reports, setReports] = useState<MissingInsumoReport[]>(initialReports);
@@ -187,6 +193,7 @@ export function OrdersTable({
     const [showFabricReport, setShowFabricReport] = useState(false);
     // Whether the completed-orders (dispatched / in-stock) archive is open.
     const [showCompleted, setShowCompleted] = useState(false);
+    const [showRequests, setShowRequests] = useState(false);
     // orderId → why it's completed, for the archive badge + filtering it
     // out of the active list.
     const completedReasonById = new Map(
@@ -477,6 +484,21 @@ export function OrdersTable({
                     >
                         <Ruler size={14} />
                         Tela
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setShowRequests(true)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-bold text-orange-700 dark:text-orange-300 bg-orange-100 dark:bg-orange-950/40 hover:bg-orange-200 dark:hover:bg-orange-900/50 rounded-lg transition-colors"
+                        title="Pedidos rápidos recibidos desde el sitio web"
+                        aria-label="Solicitudes de pedido rápido"
+                    >
+                        <Inbox size={14} />
+                        Solicitudes
+                        {fastRequests.length > 0 && (
+                            <span className="ml-0.5 min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-orange-600 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                                {fastRequests.length > 99 ? '99+' : fastRequests.length}
+                            </span>
+                        )}
                     </button>
                     <button
                         type="button"
@@ -1138,6 +1160,195 @@ export function OrdersTable({
                     onClose={() => setDetailOrder(null)}
                 />
             )}
+
+            {showRequests && (
+                <FastOrderRequestsModal
+                    requests={fastRequests}
+                    onClose={() => setShowRequests(false)}
+                    onDone={() => router.refresh()}
+                />
+            )}
+        </div>
+    );
+}
+
+// ── Pedido rápido (Solicitudes) review ───────────────────────────────
+function FastOrderRequestsModal({
+    requests,
+    onClose,
+    onDone
+}: {
+    requests: FastOrderRequest[];
+    onClose: () => void;
+    onDone: () => void;
+}) {
+    const [busyId, setBusyId] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    const accept = (id: string) => {
+        if (pending) return;
+        setError(null);
+        setBusyId(id);
+        startTransition(async () => {
+            const res = await acceptFastOrderRequestAction(id);
+            setBusyId(null);
+            if (!res.ok) {
+                setError(res.error || 'No se pudo crear el pedido.');
+                return;
+            }
+            onDone();
+        });
+    };
+
+    const reject = (id: string) => {
+        if (pending) return;
+        if (!confirm('¿Rechazar esta solicitud? No se creará ningún pedido.')) return;
+        setError(null);
+        setBusyId(id);
+        startTransition(async () => {
+            const res = await rejectFastOrderRequestAction(id);
+            setBusyId(null);
+            if (!res.ok) {
+                setError(res.error || 'No se pudo rechazar.');
+                return;
+            }
+            onDone();
+        });
+    };
+
+    return (
+        <div
+            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-start sm:items-center justify-center p-0 sm:p-4"
+            onClick={onClose}
+        >
+            <div
+                className="bg-white dark:bg-zinc-900 w-full max-w-2xl sm:rounded-2xl shadow-2xl max-h-[92vh] flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="flex items-center justify-between gap-3 p-5 border-b border-zinc-100 dark:border-zinc-800">
+                    <div className="flex items-center gap-2">
+                        <Inbox size={18} className="text-orange-600 dark:text-orange-400" />
+                        <h3 className="text-lg font-extrabold text-zinc-900 dark:text-zinc-100">
+                            Pedidos rápidos (web)
+                        </h3>
+                        <span className="text-sm text-zinc-500">{requests.length}</span>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg"
+                        aria-label="Cerrar"
+                    >
+                        <X size={18} />
+                    </button>
+                </div>
+
+                <div className="overflow-y-auto p-5 space-y-4 flex-1">
+                    {error && (
+                        <div className="bg-red-50 text-red-700 p-3 rounded-xl text-sm border border-red-100">
+                            {error}
+                        </div>
+                    )}
+                    {requests.length === 0 ? (
+                        <p className="text-center text-zinc-500 py-10">
+                            No hay solicitudes pendientes.
+                        </p>
+                    ) : (
+                        requests.map((r) => {
+                            const pieces = r.items.reduce((s, i) => s + i.quantity, 0);
+                            const contact = [r.contactEmail, r.contactPhone]
+                                .filter(Boolean)
+                                .join(' · ');
+                            const isBusy = busyId === r.id;
+                            return (
+                                <div
+                                    key={r.id}
+                                    className="rounded-2xl border border-zinc-200 dark:border-zinc-700 p-4"
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <p className="font-bold text-zinc-900 dark:text-zinc-100">
+                                                {r.contactName}
+                                                {r.companyName ? (
+                                                    <span className="text-zinc-500 font-medium">
+                                                        {' '}
+                                                        · {r.companyName}
+                                                    </span>
+                                                ) : null}
+                                            </p>
+                                            {contact && (
+                                                <p className="text-xs text-zinc-500">{contact}</p>
+                                            )}
+                                        </div>
+                                        <span className="shrink-0 text-[11px] font-bold text-orange-700 dark:text-orange-300 bg-orange-100 dark:bg-orange-950/40 px-2 py-0.5 rounded-full font-mono">
+                                            {r.requestRef}
+                                        </span>
+                                    </div>
+
+                                    <ul className="mt-3 space-y-1">
+                                        {r.items.map((it, idx) => (
+                                            <li
+                                                key={idx}
+                                                className="flex items-center justify-between gap-3 text-sm bg-zinc-50 dark:bg-zinc-800/50 rounded-lg px-3 py-1.5"
+                                            >
+                                                <span className="min-w-0 truncate text-zinc-800 dark:text-zinc-200">
+                                                    <span className="font-semibold">
+                                                        {it.productName}
+                                                    </span>
+                                                    <span className="text-zinc-500">
+                                                        {' '}
+                                                        ·{' '}
+                                                        {[it.size, it.color]
+                                                            .filter(Boolean)
+                                                            .join(' · ')}
+                                                    </span>
+                                                </span>
+                                                <span className="shrink-0 font-mono font-bold text-zinc-700 dark:text-zinc-300">
+                                                    ×{it.quantity}
+                                                </span>
+                                            </li>
+                                        ))}
+                                    </ul>
+
+                                    {r.notes && (
+                                        <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400 italic">
+                                            “{r.notes}”
+                                        </p>
+                                    )}
+
+                                    <div className="mt-3 flex items-center justify-between gap-2">
+                                        <span className="text-xs text-zinc-500">
+                                            {pieces} {pieces === 1 ? 'pieza' : 'piezas'} ·{' '}
+                                            {new Date(r.createdAt).toLocaleDateString('es-CR')}
+                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => reject(r.id)}
+                                                disabled={isBusy}
+                                                className="px-3 py-1.5 text-sm font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg disabled:opacity-50"
+                                            >
+                                                Rechazar
+                                            </button>
+                                            <button
+                                                onClick={() => accept(r.id)}
+                                                disabled={isBusy}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold text-white bg-orange-600 hover:bg-orange-700 rounded-lg disabled:opacity-60"
+                                            >
+                                                {isBusy ? (
+                                                    <Loader2 size={14} className="animate-spin" />
+                                                ) : (
+                                                    <Check size={14} />
+                                                )}
+                                                Aceptar y crear pedido
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
+            </div>
         </div>
     );
 }

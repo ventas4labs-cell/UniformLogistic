@@ -11,6 +11,7 @@ import { fetchDispatchTotalsForOrders } from '@/lib/services/dispatches';
 import { fetchStockEntryTotalsForOrders } from '@/lib/services/stock-entries';
 import { fetchThreeDModels } from '@/lib/services/three-d-models';
 import { fetchCorteFabricReports } from '@/lib/services/corte-fabric-reports';
+import { fetchFastOrderRequests } from '@/lib/services/fast-orders';
 import { OrdersTable } from '@/components/admin/orders-table';
 import type { Order } from '@/lib/types';
 
@@ -33,7 +34,7 @@ function fullyCovered(
 
 export default async function AdminOrdersPage() {
     const supabase = await createClient();
-    const [orders, products, reports, stageNotifications, stationUsers, deletedOrders, threeDModels] =
+    const [orders, products, reports, stageNotifications, stationUsers, deletedOrders, threeDModels, fastRequests] =
         await Promise.all([
             fetchAllOrders(supabase),
             fetchProducts(supabase),
@@ -41,8 +42,12 @@ export default async function AdminOrdersPage() {
             fetchAllStageNotifications(supabase),
             fetchStationUsers(supabase),
             fetchDeletedOrders(supabase),
-            fetchThreeDModels(supabase)
+            fetchThreeDModels(supabase),
+            fetchFastOrderRequests(supabase)
         ]);
+    // Only pending fast-order requests need admin action; converted /
+    // rejected ones are done.
+    const pendingRequests = fastRequests.filter((r) => r.status === 'pending');
     // Lightweight product-code → 3D model map so the order detail view
     // can surface a 3D preview when an order includes a modeled product.
     const models3d = threeDModels
@@ -89,6 +94,7 @@ export default async function AdminOrdersPage() {
             completedOrders={completedOrders}
             models3d={models3d}
             fabricReportsByOrder={fabricReportsByOrder}
+            fastRequests={pendingRequests}
         />
     );
 }

@@ -110,6 +110,16 @@ export function LandingHero({ quoteHref = null }: { quoteHref?: string | null })
                                 />
                             </a>
                             <a
+                                href="/ordenar"
+                                className="group inline-flex items-center gap-2 rounded-full border border-[#EA580C] px-8 py-4 text-sm font-bold text-[#EA580C] transition-colors hover:bg-[#EA580C] hover:text-[#F7F4EE]"
+                            >
+                                Hacer un pedido
+                                <ArrowRight
+                                    size={15}
+                                    className="transition-transform group-hover:translate-x-1"
+                                />
+                            </a>
+                            <a
                                 href="#sectores"
                                 className="inline-flex items-center gap-2 rounded-full border border-[#16130F]/20 px-8 py-4 text-sm font-bold transition-colors hover:border-[#16130F] hover:bg-[#16130F] hover:text-[#F7F4EE]"
                             >

@@ -47,6 +47,7 @@ const emptyForm: ProductInput = {
     genders: ['unisex'],
     images: {},
     sizes: { men: [], women: [], waist: [], inseam: [] },
+    colors: [],
     fabricType: '',
     isActive: true,
     isBasic: false,
@@ -370,6 +371,7 @@ export function ProductsManager({
                     : [p.category === 'Men' ? 'men' : p.category === 'Women' ? 'women' : 'unisex'],
             images: p.images ?? {},
             sizes: p.sizes,
+            colors: p.colors ?? [],
             fabricType: p.fabricType,
             isActive: p.isActive,
             isBasic: p.isBasic,
@@ -407,9 +409,16 @@ export function ProductsManager({
                     return;
                 }
             }
+            // Drop half-filled colour rows (no name) before saving.
+            const payload: ProductInput = {
+                ...form,
+                colors: (form.colors ?? [])
+                    .map((c) => ({ name: c.name.trim(), hex: c.hex }))
+                    .filter((c) => c.name.length > 0)
+            };
             const result = editing
-                ? await updateProductAction(editing.uuid, form)
-                : await createProductAction(form);
+                ? await updateProductAction(editing.uuid, payload)
+                : await createProductAction(payload);
             if (!result.ok) {
                 setError(result.error);
                 setSaving(false);
@@ -821,6 +830,80 @@ export function ProductsManager({
                                     />
                                 </Field>
                             </div>
+                            <Field label="Colores disponibles (pedido rápido)">
+                                <p className="text-xs text-gray-500 dark:text-zinc-400 -mt-1 mb-2">
+                                    Colores que el cliente puede elegir en la página de
+                                    pedido rápido. Dejalo vacío para permitir color libre.
+                                </p>
+                                <div className="space-y-2">
+                                    {(form.colors ?? []).map((c, i) => (
+                                        <div key={i} className="flex items-center gap-2">
+                                            <input
+                                                type="color"
+                                                value={c.hex || '#000000'}
+                                                onChange={(e) =>
+                                                    setForm((f) => ({
+                                                        ...f,
+                                                        colors: (f.colors ?? []).map((x, xi) =>
+                                                            xi === i
+                                                                ? { ...x, hex: e.target.value }
+                                                                : x
+                                                        )
+                                                    }))
+                                                }
+                                                className="w-10 h-10 rounded-lg border border-gray-300 dark:border-zinc-700 cursor-pointer bg-transparent shrink-0"
+                                                aria-label="Color"
+                                            />
+                                            <input
+                                                type="text"
+                                                value={c.name}
+                                                onChange={(e) =>
+                                                    setForm((f) => ({
+                                                        ...f,
+                                                        colors: (f.colors ?? []).map((x, xi) =>
+                                                            xi === i
+                                                                ? { ...x, name: e.target.value }
+                                                                : x
+                                                        )
+                                                    }))
+                                                }
+                                                placeholder="Nombre del color (ej. Azul marino)"
+                                                className="flex-1 p-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setForm((f) => ({
+                                                        ...f,
+                                                        colors: (f.colors ?? []).filter(
+                                                            (_, xi) => xi !== i
+                                                        )
+                                                    }))
+                                                }
+                                                className="p-2 text-gray-400 hover:text-red-600 shrink-0"
+                                                aria-label="Quitar color"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setForm((f) => ({
+                                                ...f,
+                                                colors: [
+                                                    ...(f.colors ?? []),
+                                                    { name: '', hex: '#1e3a8a' }
+                                                ]
+                                            }))
+                                        }
+                                        className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-bold text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/30 rounded-lg transition-colors"
+                                    >
+                                        <Plus size={15} /> Agregar color
+                                    </button>
+                                </div>
+                            </Field>
                             <Field label="Imágenes del producto">
                                 <p className="text-xs text-gray-500 dark:text-zinc-400 -mt-1 mb-2">
                                     Subí varias fotos por variante. La primera se usa
