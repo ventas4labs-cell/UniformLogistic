@@ -84,7 +84,6 @@ export function MaquilaModule({ inHouse, stations, workByStation }: Props) {
                         stations.find((s) => s.id === selected)?.name || 'Estación'
                     }
                     items={workByStation[selected] || []}
-                    completedOrderIds={inHouse.initialCompletedOrderIds}
                 />
             )}
         </div>

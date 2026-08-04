@@ -13,7 +13,6 @@ import {
 import type { Order } from '@/lib/types';
 import { markPickedUpAction } from '@/app/(admin)/admin/_stage-actions';
 import { OrderProductsSummary } from '@/components/admin/order-products-summary';
-import { StageCompleteToggle } from '@/components/admin/stage-complete-toggle';
 
 export interface StationWorkItem {
     order: Order;
@@ -31,13 +30,11 @@ const phaseOf = (w: StationWorkItem): Phase =>
 export function ExternalStationPanel({
     stationId,
     stationName,
-    items,
-    completedOrderIds
+    items
 }: {
     stationId: string;
     stationName: string;
     items: StationWorkItem[];
-    completedOrderIds: string[];
 }) {
     const router = useRouter();
     const [picked, setPicked] = useState<Record<string, boolean>>(() =>
@@ -47,17 +44,6 @@ export function ExternalStationPanel({
                 .map((w) => [w.order.uuid as string, !!w.pickedUpAt])
         )
     );
-    // Stage completion is a separate admin step from pickup.
-    const [completed, setCompleted] = useState<Set<string>>(
-        () => new Set(completedOrderIds)
-    );
-    const handleCompletionChange = (uuid: string, next: boolean) =>
-        setCompleted((prev) => {
-            const n = new Set(prev);
-            if (next) n.add(uuid);
-            else n.delete(uuid);
-            return n;
-        });
     const [busyId, setBusyId] = useState<string | null>(null);
     const [errorId, setErrorId] = useState<string | null>(null);
     const [, startTransition] = useTransition();
@@ -161,14 +147,9 @@ export function ExternalStationPanel({
                                             {w.order.companyName || '—'}
                                         </p>
                                     </div>
-                                    {/* Stage completion — a separate step from pickup. */}
-                                    <StageCompleteToggle
-                                        orderUuid={uuid}
-                                        orderRef={w.order.id}
-                                        stage="maquila"
-                                        isCompleted={!!uuid && completed.has(uuid)}
-                                        onLocalChange={handleCompletionChange}
-                                    />
+                                    {/* Completion is controlled by the station, surfaced
+                                        here as its pickup-readiness badge. */}
+                                    <StatusPill phase={phase} />
                                 </div>
 
                                 <div className="mt-2">
@@ -176,7 +157,6 @@ export function ExternalStationPanel({
                                 </div>
 
                                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                                    <StatusPill phase={phase} />
                                     <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-bold text-orange-800 dark:bg-orange-950/50 dark:text-orange-300">
                                         {totalPieces} pzas
                                     </span>

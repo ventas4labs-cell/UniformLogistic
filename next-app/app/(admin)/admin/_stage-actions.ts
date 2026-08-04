@@ -191,8 +191,14 @@ export async function setReadyForPickupAction(
         .eq('order_id', orderUuid)
         .eq('station_user_id', user.id);
     if (error) return { error: error.message };
+
+    // The external station controls its own stage completion: flagging an
+    // order "listo para recoger" completes the stage; undoing reopens it.
+    if (ready) await markStageComplete(supabase, orderUuid, station.stage, user.id);
+    else await unmarkStageComplete(supabase, orderUuid, station.stage);
+
+    for (const p of STAGE_PATHS) revalidatePath(p);
     revalidatePath('/station');
-    revalidatePath('/admin/maquila');
     return {};
 }
 
