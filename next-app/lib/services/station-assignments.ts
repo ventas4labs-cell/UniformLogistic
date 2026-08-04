@@ -10,6 +10,9 @@ export interface StationAssignment {
     stationUserId: string;
     assignedAt: string;
     assignedBy: string | null;
+    // Pickup lifecycle: station flags ready → admin marks collected.
+    readyForPickupAt: string | null;
+    pickedUpAt: string | null;
     // Joined fields when loading for the admin assignment UI.
     stationUserEmail?: string;
     stationUserName?: string;
@@ -21,6 +24,8 @@ interface RawRow {
     station_user_id: string;
     assigned_at: string;
     assigned_by: string | null;
+    ready_for_pickup_at: string | null;
+    picked_up_at: string | null;
 }
 
 interface RawRowWithUser extends RawRow {
@@ -31,6 +36,9 @@ interface RawRowWithUser extends RawRow {
     } | null;
 }
 
+const ASSIGNMENT_COLS =
+    'order_id, station_user_id, assigned_at, assigned_by, ready_for_pickup_at, picked_up_at';
+
 /** All assignments for a given list of orders, with the station user name/stage joined. */
 export async function fetchAssignmentsForOrders(
     supabase: SupabaseClient,
@@ -40,7 +48,7 @@ export async function fetchAssignmentsForOrders(
     const { data, error } = await supabase
         .from('station_assignments')
         .select(
-            'order_id, station_user_id, assigned_at, assigned_by, station_user:station_users(email, display_name, stage)'
+            `${ASSIGNMENT_COLS}, station_user:station_users(email, display_name, stage)`
         )
         .in('order_id', orderIds);
     if (error) throw error;
@@ -49,9 +57,67 @@ export async function fetchAssignmentsForOrders(
         stationUserId: r.station_user_id,
         assignedAt: r.assigned_at,
         assignedBy: r.assigned_by,
+        readyForPickupAt: r.ready_for_pickup_at,
+        pickedUpAt: r.picked_up_at,
         stationUserEmail: r.station_user?.email,
         stationUserName: r.station_user?.display_name,
         stationUserStage: r.station_user?.stage
+    }));
+}
+
+// ─── Pickup status ───────────────────────────────────────────────────
+
+export interface PickupStatus {
+    readyForPickupAt: string | null;
+    pickedUpAt: string | null;
+}
+
+/** Pickup status per order for one station — powers the station board's
+ *  "listo para recoger" control. */
+export async function fetchPickupStatusForStation(
+    supabase: SupabaseClient,
+    stationUserId: string
+): Promise<Map<string, PickupStatus>> {
+    const out = new Map<string, PickupStatus>();
+    const { data, error } = await supabase
+        .from('station_assignments')
+        .select('order_id, ready_for_pickup_at, picked_up_at')
+        .eq('station_user_id', stationUserId);
+    if (error) throw error;
+    for (const r of (data || []) as RawRow[]) {
+        out.set(r.order_id, {
+            readyForPickupAt: r.ready_for_pickup_at,
+            pickedUpAt: r.picked_up_at
+        });
+    }
+    return out;
+}
+
+export interface StationWorkRow {
+    stationUserId: string;
+    orderId: string;
+    readyForPickupAt: string | null;
+    pickedUpAt: string | null;
+}
+
+/** Every assignment whose station handles `stage`, with pickup status —
+ *  drives the admin per-station view (e.g. all maquila outsourced work). */
+export async function fetchAssignmentsForStage(
+    supabase: SupabaseClient,
+    stage: string
+): Promise<StationWorkRow[]> {
+    const { data, error } = await supabase
+        .from('station_assignments')
+        .select(
+            'order_id, station_user_id, ready_for_pickup_at, picked_up_at, station_user:station_users!inner(stage)'
+        )
+        .eq('station_user.stage', stage);
+    if (error) throw error;
+    return ((data || []) as unknown as RawRowWithUser[]).map((r) => ({
+        stationUserId: r.station_user_id,
+        orderId: r.order_id,
+        readyForPickupAt: r.ready_for_pickup_at,
+        pickedUpAt: r.picked_up_at
     }));
 }
 

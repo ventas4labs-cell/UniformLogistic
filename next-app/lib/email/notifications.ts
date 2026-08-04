@@ -10,6 +10,7 @@ import {
     quoteAdminNotice,
     orderCompletedEmail,
     deliveryScheduledEmail,
+    deliveryDeliveredEmail,
     invoiceOverdueEmail,
     fastOrderReceivedEmail,
     fastOrderAdminNotice,
@@ -207,6 +208,43 @@ export async function sendDeliveryScheduledEmail(
         await sendEmail({ to, subject: t.subject, html: t.html, text: t.text });
     } catch (e) {
         console.error('[email] delivery scheduled notice failed', e);
+    }
+}
+
+/**
+ * Notify the customer their order was just delivered (the courier tapped
+ * "entregado" on the driver link). Best-effort — never throws.
+ */
+export async function sendDeliveryDeliveredEmail(
+    supabase: SupabaseClient,
+    orderUuid: string
+): Promise<void> {
+    try {
+        const { data, error } = await supabase
+            .from('orders')
+            .select('order_number, company:companies ( name, email, contact_name )')
+            .eq('id', orderUuid)
+            .maybeSingle();
+        if (error || !data) return;
+        const row = data as unknown as {
+            order_number: number;
+            company:
+                | { name: string; email: string; contact_name: string }
+                | { name: string; email: string; contact_name: string }[]
+                | null;
+        };
+        const company = pickOne(row.company);
+        const to = (company?.email || '').trim();
+        if (!to) return;
+
+        const t = deliveryDeliveredEmail({
+            orderRef: `ORDEN-${String(row.order_number).padStart(5, '0')}`,
+            companyName: company?.name || '',
+            contactName: company?.contact_name || ''
+        });
+        await sendEmail({ to, subject: t.subject, html: t.html, text: t.text });
+    } catch (e) {
+        console.error('[email] delivery delivered notice failed', e);
     }
 }
 

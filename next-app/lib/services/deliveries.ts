@@ -80,6 +80,7 @@ export async function isValidDriverToken(
 }
 
 export interface DriverPlanOrder {
+    orderId: string;
     orderRef: string;
     companyName: string;
     contactName: string;
@@ -89,6 +90,7 @@ export interface DriverPlanOrder {
 }
 
 interface RawPlanRow {
+    order_id: string;
     scheduled_date: string;
     order:
         | {
@@ -115,7 +117,7 @@ export async function fetchDeliveryPlan(
     const { data, error } = await supabase
         .from('order_deliveries')
         .select(
-            'scheduled_date, order:orders ( order_number, company:companies ( name, contact_name ), items:order_items ( product_name, size, quantity ) )'
+            'order_id, scheduled_date, order:orders ( order_number, company:companies ( name, contact_name ), items:order_items ( product_name, size, quantity ) )'
         )
         .not('scheduled_date', 'is', null)
         .is('delivered_at', null)
@@ -132,6 +134,7 @@ export async function fetchDeliveryPlan(
             quantity: it.quantity
         }));
         out.push({
+            orderId: r.order_id,
             orderRef: `ORDEN-${String(order.order_number).padStart(5, '0')}`,
             companyName: company?.name || '',
             contactName: company?.contact_name || '',

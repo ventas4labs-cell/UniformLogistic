@@ -18,12 +18,9 @@ export async function AdminShell({ children }: Props) {
     const fastActions = resolveFastActions(store.get(FAST_ACTIONS_COOKIE)?.value);
 
     return (
-        <div className="min-h-screen bg-gray-100 dark:bg-zinc-950 transition-colors">
-            <header className="sticky top-0 z-30 flex items-center gap-3 px-4 sm:px-6 py-3 bg-white/80 dark:bg-zinc-900/80 backdrop-blur border-b border-gray-200 dark:border-zinc-800">
+        <div className="min-h-screen bg-zinc-100 dark:bg-zinc-950 transition-colors">
+            <header className="sticky top-0 z-30 flex items-center gap-2 sm:gap-3 px-3 sm:px-6 py-2.5 bg-white/80 dark:bg-zinc-900/80 backdrop-blur border-b border-zinc-200 dark:border-zinc-800">
                 <AdminMenu />
-                <span className="text-sm font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100 hidden sm:inline">
-                    Uniform Logistic
-                </span>
                 <AdminFastActions initial={fastActions} />
             </header>
 

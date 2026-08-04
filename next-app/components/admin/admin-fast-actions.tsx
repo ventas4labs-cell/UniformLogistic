@@ -44,7 +44,7 @@ export function AdminFastActions({ initial }: { initial: string[] }) {
                         ? 'bg-orange-600 text-white'
                         : action.primary
                           ? 'text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-950/30'
-                          : 'text-gray-600 dark:text-zinc-300 hover:bg-orange-50 dark:hover:bg-orange-950/30 hover:text-orange-700 dark:hover:text-orange-300'
+                          : 'text-zinc-600 dark:text-zinc-300 hover:bg-orange-50 dark:hover:bg-orange-950/30 hover:text-orange-700 dark:hover:text-orange-300'
                 }`;
                 const inner = (
                     <>
