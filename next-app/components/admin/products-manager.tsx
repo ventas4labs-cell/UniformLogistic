@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     Plus,
@@ -15,7 +15,9 @@ import {
     Sticker,
     Sparkles,
     Printer,
-    AlertTriangle
+    AlertTriangle,
+    Search,
+    SearchX
 } from 'lucide-react';
 import type { AdminProduct, ProductInput, BomItem } from '@/lib/services/products';
 import type { ProductGender } from '@/lib/types';
@@ -479,6 +481,114 @@ export function ProductsManager({
         });
     };
 
+    // ── Buscador / filtros ───────────────────────────────────────────
+    const [search, setSearch] = useState('');
+    const [typeFilter, setTypeFilter] = useState('all');
+    const [genderFilter, setGenderFilter] = useState('all');
+    const [fabricFilter, setFabricFilter] = useState('all');
+    const [companyFilter, setCompanyFilter] = useState('all');
+    const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>(
+        'all'
+    );
+    const [basicOnly, setBasicOnly] = useState(false);
+    const [noCabysOnly, setNoCabysOnly] = useState(false);
+
+    // Dropdown options come from the catalog itself, so "Tipo" and
+    // "Tela" always reflect what admin actually typed (Chaleco, Gorra,
+    // Columbia…) rather than a hard-coded list that drifts.
+    const typeOptions = useMemo(
+        () =>
+            Array.from(
+                new Set(
+                    initialProducts
+                        .map((p) => (p.typeLabel || '').trim())
+                        .filter(Boolean)
+                )
+            ).sort((a, b) => a.localeCompare(b, 'es')),
+        [initialProducts]
+    );
+    const fabricOptions = useMemo(
+        () =>
+            Array.from(
+                new Set(
+                    initialProducts
+                        .map((p) => (p.fabricType || '').trim())
+                        .filter(Boolean)
+                )
+            ).sort((a, b) => a.localeCompare(b, 'es')),
+        [initialProducts]
+    );
+
+    const filtersActive =
+        search.trim() !== '' ||
+        typeFilter !== 'all' ||
+        genderFilter !== 'all' ||
+        fabricFilter !== 'all' ||
+        companyFilter !== 'all' ||
+        statusFilter !== 'all' ||
+        basicOnly ||
+        noCabysOnly;
+
+    const clearFilters = () => {
+        setSearch('');
+        setTypeFilter('all');
+        setGenderFilter('all');
+        setFabricFilter('all');
+        setCompanyFilter('all');
+        setStatusFilter('all');
+        setBasicOnly(false);
+        setNoCabysOnly(false);
+    };
+
+    const visibleProducts = useMemo(() => {
+        // Every space-separated term must match somewhere in the row, so
+        // "polo azul" narrows instead of widening.
+        const terms = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+        return initialProducts.filter((p) => {
+            if (terms.length > 0) {
+                const haystack = [
+                    p.id,
+                    p.name,
+                    p.typeLabel,
+                    p.fabricType,
+                    p.codigoCabys,
+                    p.description,
+                    ...(p.colors ?? []).map((c) => c.name)
+                ]
+                    .filter(Boolean)
+                    .join(' ')
+                    .toLowerCase();
+                if (!terms.every((t) => haystack.includes(t))) return false;
+            }
+            if (typeFilter !== 'all' && (p.typeLabel || '').trim() !== typeFilter)
+                return false;
+            if (fabricFilter !== 'all' && (p.fabricType || '').trim() !== fabricFilter)
+                return false;
+            if (genderFilter !== 'all') {
+                const genders =
+                    p.genders && p.genders.length > 0 ? p.genders : ([] as string[]);
+                if (!genders.includes(genderFilter as ProductGender)) return false;
+            }
+            if (companyFilter !== 'all' && !(p.companyIds ?? []).includes(companyFilter))
+                return false;
+            if (statusFilter === 'active' && !p.isActive) return false;
+            if (statusFilter === 'inactive' && p.isActive) return false;
+            if (basicOnly && !p.isBasic) return false;
+            if (noCabysOnly && (p.codigoCabys || '').trim() !== '') return false;
+            return true;
+        });
+    }, [
+        initialProducts,
+        search,
+        typeFilter,
+        fabricFilter,
+        genderFilter,
+        companyFilter,
+        statusFilter,
+        basicOnly,
+        noCabysOnly
+    ]);
+
     return (
         <div>
             {!embedded && (
@@ -499,6 +609,113 @@ export function ProductsManager({
                     >
                         <Plus size={18} /> Nuevo Producto
                     </button>
+                </div>
+            </div>
+            )}
+
+            {!embedded && initialProducts.length > 0 && (
+            <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm p-3 sm:p-4 mb-4">
+                <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+                    {/* Search */}
+                    <div className="relative flex-1 min-w-0">
+                        <Search
+                            size={16}
+                            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-zinc-500 pointer-events-none"
+                        />
+                        <input
+                            type="search"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Buscar por código, nombre, tipo, tela, color o CABYS…"
+                            aria-label="Buscar productos"
+                            className="w-full pl-9 pr-9 py-2.5 rounded-xl border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30 transition-colors"
+                        />
+                        {search && (
+                            <button
+                                type="button"
+                                onClick={() => setSearch('')}
+                                aria-label="Limpiar búsqueda"
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700"
+                            >
+                                <X size={14} />
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Dropdown filters */}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <FilterSelect
+                            label="Tipo"
+                            value={typeFilter}
+                            onChange={setTypeFilter}
+                            options={typeOptions.map((t) => ({ value: t, label: t }))}
+                        />
+                        <FilterSelect
+                            label="Género"
+                            value={genderFilter}
+                            onChange={setGenderFilter}
+                            options={(['men', 'women', 'unisex'] as ProductGender[]).map(
+                                (g) => ({ value: g, label: GENDER_LABEL[g] })
+                            )}
+                        />
+                        <FilterSelect
+                            label="Tela"
+                            value={fabricFilter}
+                            onChange={setFabricFilter}
+                            options={fabricOptions.map((f) => ({ value: f, label: f }))}
+                        />
+                        <FilterSelect
+                            label="Empresa"
+                            value={companyFilter}
+                            onChange={setCompanyFilter}
+                            options={companies.map((c) => ({
+                                value: c.id,
+                                label: c.name
+                            }))}
+                        />
+                        <FilterSelect
+                            label="Estado"
+                            value={statusFilter}
+                            onChange={(v) =>
+                                setStatusFilter(v as 'all' | 'active' | 'inactive')
+                            }
+                            options={[
+                                { value: 'active', label: 'Activos' },
+                                { value: 'inactive', label: 'Inactivos' }
+                            ]}
+                        />
+                    </div>
+                </div>
+
+                {/* Quick toggles + result count */}
+                <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-zinc-800">
+                    <TogglePill
+                        active={basicOnly}
+                        onClick={() => setBasicOnly((v) => !v)}
+                    >
+                        Solo básicos
+                    </TogglePill>
+                    <TogglePill
+                        active={noCabysOnly}
+                        onClick={() => setNoCabysOnly((v) => !v)}
+                    >
+                        Sin CABYS
+                    </TogglePill>
+
+                    <span className="ml-auto text-xs font-semibold text-gray-500 dark:text-zinc-400 tabular-nums">
+                        {visibleProducts.length === initialProducts.length
+                            ? `${initialProducts.length} producto${initialProducts.length === 1 ? '' : 's'}`
+                            : `${visibleProducts.length} de ${initialProducts.length}`}
+                    </span>
+                    {filtersActive && (
+                        <button
+                            type="button"
+                            onClick={clearFilters}
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/30 px-2.5 py-1.5 rounded-lg transition-colors"
+                        >
+                            <X size={13} /> Limpiar filtros
+                        </button>
+                    )}
                 </div>
             </div>
             )}
@@ -528,8 +745,24 @@ export function ProductsManager({
                                     Sin productos registrados.
                                 </td>
                             </tr>
+                        ) : visibleProducts.length === 0 ? (
+                            <tr>
+                                <td colSpan={10} className="p-8 text-center text-gray-500 dark:text-zinc-400">
+                                    <SearchX size={32} className="mx-auto mb-2 opacity-30" />
+                                    <p className="font-semibold text-gray-700 dark:text-zinc-300">
+                                        Ningún producto coincide con la búsqueda.
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={clearFilters}
+                                        className="mt-3 inline-flex items-center gap-1.5 text-sm font-bold text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/30 px-3 py-1.5 rounded-lg transition-colors"
+                                    >
+                                        <X size={14} /> Limpiar filtros
+                                    </button>
+                                </td>
+                            </tr>
                         ) : (
-                            initialProducts.map((p) => (
+                            visibleProducts.map((p) => (
                                 <tr key={p.uuid} className="hover:bg-gray-50 dark:hover:bg-zinc-800">
                                     <td className="p-4">
                                         {p.image ? (
@@ -1507,6 +1740,68 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
             <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-1">{label}</label>
             {children}
         </div>
+    );
+}
+
+// Compact labelled dropdown for the product finder. The label doubles as
+// the "all" option ("Tipo: todos") so the control reads as a sentence and
+// costs no vertical space; it turns orange while narrowing the list.
+function FilterSelect({
+    label,
+    value,
+    onChange,
+    options
+}: {
+    label: string;
+    value: string;
+    onChange: (v: string) => void;
+    options: { value: string; label: string }[];
+}) {
+    const active = value !== 'all';
+    return (
+        <select
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            aria-label={label}
+            className={`text-sm font-semibold rounded-xl border px-3 py-2.5 outline-none cursor-pointer transition-colors focus:ring-2 focus:ring-orange-500/30 max-w-[11rem] ${
+                active
+                    ? 'border-orange-400 dark:border-orange-700 bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-300'
+                    : 'border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300'
+            }`}
+        >
+            <option value="all">{label}: todos</option>
+            {options.map((o) => (
+                <option key={o.value} value={o.value}>
+                    {o.label}
+                </option>
+            ))}
+        </select>
+    );
+}
+
+// On/off filter chip (Solo básicos, Sin CABYS).
+function TogglePill({
+    active,
+    onClick,
+    children
+}: {
+    active: boolean;
+    onClick: () => void;
+    children: React.ReactNode;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            aria-pressed={active}
+            className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-colors ${
+                active
+                    ? 'bg-orange-600 border-orange-600 text-white'
+                    : 'bg-white dark:bg-zinc-800 border-gray-200 dark:border-zinc-700 text-gray-600 dark:text-zinc-300 hover:border-orange-300 hover:text-orange-700 dark:hover:text-orange-300'
+            }`}
+        >
+            {children}
+        </button>
     );
 }
 
