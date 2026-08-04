@@ -7,7 +7,6 @@ import {
     Loader2,
     ChevronDown,
     ChevronUp,
-    Package,
     CheckCircle2,
     AlertTriangle,
     X,
@@ -18,10 +17,7 @@ import {
 } from 'lucide-react';
 import type { Order } from '@/lib/types';
 import type { InsumoCompletion } from '@/lib/services/insumo-completions';
-import {
-    aggregateInsumos,
-    aggregateInsumosGlobal,
-} from '@/lib/stage-utils';
+import { aggregateInsumos } from '@/lib/stage-utils';
 import {
     reportMissingInsumoAction,
     setInsumoPreparationAction,
@@ -643,7 +639,6 @@ export function OperatorBoard({
     const [tab, setTab] = useState<StageTab>('pending');
     const [searchTerm, setSearchTerm] = useState('');
     const [companyFilter, setCompanyFilter] = useState<string>('all');
-    const [showGlobalInsumos, setShowGlobalInsumos] = useState(false);
     const [pending, startTransition] = useTransition();
     const router = useRouter();
 
@@ -705,13 +700,6 @@ export function OperatorBoard({
         all: orders.length
     };
 
-    // Pre-completion orders for the global insumo summary — exclude
-    // completed/cancelled since they don't need insumos prepared.
-    const activeOrders = filtered.filter(
-        (o) => o.status !== 'completed' && o.status !== 'cancelled'
-    );
-    const globalInsumos = aggregateInsumosGlobal(activeOrders);
-
     return (
         <div>
             <div className="flex justify-between items-center mb-6">
@@ -748,42 +736,6 @@ export function OperatorBoard({
                     </button>
                 </div>
             </div>
-
-            {/* Global insumo summary toggle */}
-            {globalInsumos.length > 0 && (
-                <div className="mb-4">
-                    <button
-                        onClick={() => setShowGlobalInsumos(!showGlobalInsumos)}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-xl text-sm font-bold hover:bg-purple-700 transition-colors shadow-sm"
-                    >
-                        <Package size={16} />
-                        Resumen de insumos ({globalInsumos.length})
-                        {showGlobalInsumos ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                    </button>
-                    {showGlobalInsumos && (
-                        <div className="mt-2 bg-white dark:bg-zinc-900 rounded-xl shadow-sm border border-purple-200 dark:border-purple-900/50 p-4">
-                            <h3 className="text-xs font-bold text-purple-700 dark:text-purple-300 uppercase tracking-wide mb-3">
-                                Insumos totales (pedidos activos)
-                            </h3>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                                {globalInsumos.map((ins) => (
-                                    <div
-                                        key={ins.name}
-                                        className="flex items-center justify-between bg-purple-50 dark:bg-purple-950/30 rounded-lg px-3 py-2.5"
-                                    >
-                                        <span className="text-sm text-purple-900 dark:text-purple-200 truncate">
-                                            {ins.name}
-                                        </span>
-                                        <span className="font-bold text-purple-700 dark:text-purple-300 text-sm shrink-0 ml-2">
-                                            {ins.totalQty}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
 
             {/* Order cards grid */}
             {filtered.length === 0 ? (

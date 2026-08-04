@@ -7,6 +7,8 @@ import type { Order } from '@/lib/types';
 import { signOutAction } from '@/app/login/actions';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { StageCompleteToggle } from '@/components/admin/stage-complete-toggle';
+import { StationPickupControl } from '@/components/station/station-pickup-control';
+import type { PickupStatus } from '@/lib/services/station-assignments';
 import { StageTabBar, type StageTab } from '@/components/admin/stage-tab-bar';
 import type { StageKey } from '@/lib/services/stage-completions';
 import { SubmitInvoiceModal } from '@/components/station/submit-invoice-modal';
@@ -31,6 +33,8 @@ interface Props {
     initialProgress?: ItemProgress;
     /** orderId → fabric already reported. Corte stations only. */
     fabricReportsByOrder?: Record<string, CorteFabricReport[]>;
+    /** orderId → pickup status. Maquila stations only. */
+    pickupByOrder?: Record<string, PickupStatus>;
 }
 
 // External station shell — same per-card pattern as the admin stage
@@ -42,7 +46,8 @@ export function StationBoard({
     initialOrders,
     initialCompletedOrderIds,
     initialProgress,
-    fabricReportsByOrder = {}
+    fabricReportsByOrder = {},
+    pickupByOrder = {}
 }: Props) {
     const router = useRouter();
     const [orders] = useState<Order[]>(initialOrders);
@@ -175,6 +180,9 @@ export function StationBoard({
                             fabricReports={
                                 (order.uuid && fabricReportsByOrder[order.uuid]) || []
                             }
+                            pickup={
+                                (order.uuid && pickupByOrder[order.uuid]) || null
+                            }
                         />
                     ))}
                 </div>
@@ -189,7 +197,8 @@ function OrderCard({
     isCompleted,
     onLocalChange,
     initialProgress,
-    fabricReports = []
+    fabricReports = [],
+    pickup = null
 }: {
     order: Order;
     stage: StageKey;
@@ -197,8 +206,12 @@ function OrderCard({
     onLocalChange: (uuid: string, next: boolean) => void;
     initialProgress?: ItemProgress;
     fabricReports?: CorteFabricReport[];
+    pickup?: PickupStatus | null;
 }) {
     const totalPieces = order.items.reduce((s, i) => s + i.quantity, 0);
+    // Maquila stations flag "listo para recoger" instead of self-completing;
+    // the office completes the stage when it records the pickup.
+    const isMaquila = stage === 'maquila';
 
     return (
         <div
@@ -226,13 +239,15 @@ function OrderCard({
                             )}
                         </p>
                     </div>
-                    <StageCompleteToggle
-                        orderUuid={order.uuid}
-                        orderRef={order.id}
-                        stage={stage}
-                        isCompleted={isCompleted}
-                        onLocalChange={onLocalChange}
-                    />
+                    {!isMaquila && (
+                        <StageCompleteToggle
+                            orderUuid={order.uuid}
+                            orderRef={order.id}
+                            stage={stage}
+                            isCompleted={isCompleted}
+                            onLocalChange={onLocalChange}
+                        />
+                    )}
                 </div>
 
                 <OrderProductsSummary items={order.items} />
@@ -250,6 +265,16 @@ function OrderCard({
                     <p className="text-xs text-gray-500 dark:text-zinc-400 mt-2 italic line-clamp-2">
                         {order.notes}
                     </p>
+                )}
+
+                {isMaquila && (
+                    <div className="mt-3">
+                        <StationPickupControl
+                            orderUuid={order.uuid}
+                            pickedUpAt={pickup?.pickedUpAt ?? null}
+                            initialReadyAt={pickup?.readyForPickupAt ?? null}
+                        />
+                    </div>
                 )}
             </div>
 

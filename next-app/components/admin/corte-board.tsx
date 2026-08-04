@@ -96,8 +96,8 @@ function OrderCard({
         <div
             className={`bg-white dark:bg-zinc-900 rounded-xl shadow-sm border overflow-hidden ${
                 isCompleted
-                    ? 'border-green-200 dark:border-green-900/40'
-                    : 'border-gray-200 dark:border-zinc-800'
+                    ? 'border-emerald-200 dark:border-emerald-900/40'
+                    : 'border-zinc-200 dark:border-zinc-800'
             }`}
         >
             <div className="p-4">
@@ -106,10 +106,10 @@ function OrderCard({
                         <p className="font-mono text-sm font-bold text-orange-600 dark:text-orange-400">
                             {order.id}
                         </p>
-                        <p className="font-semibold text-gray-900 dark:text-zinc-100 truncate">
+                        <p className="font-semibold text-zinc-900 dark:text-zinc-100 truncate">
                             {order.companyName || '—'}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                             {new Date(order.dateCreated).toLocaleDateString()}
                             {order.deliveryDate && (
                                 <span className="ml-2">
@@ -133,7 +133,7 @@ function OrderCard({
                     <span className="bg-orange-100 dark:bg-orange-950/50 text-orange-800 dark:text-orange-300 text-xs font-bold px-2 py-1 rounded-full">
                         {totalPieces} pzas
                     </span>
-                    <span className="bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-300 text-xs font-bold px-2 py-1 rounded-full">
+                    <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 text-xs font-bold px-2 py-1 rounded-full">
                         {items.length} líneas
                     </span>
                     {localExtras.length > 0 && (
@@ -159,7 +159,7 @@ function OrderCard({
                 carries the full spec (producto, tela, color, talla,
                 cantidad), so there's no second table repeating the items
                 underneath. */}
-            <div className="border-t border-gray-100 dark:border-zinc-800 p-4">
+            <div className="border-t border-zinc-100 dark:border-zinc-800 p-4">
                 <StagePartialEditor
                     // Includes optimistic extras so a just-added piece
                     // shows in the tracker without waiting for a refresh.
@@ -182,7 +182,7 @@ function OrderCard({
             </div>
 
                     {/* Add-extra affordance */}
-                    <div className="p-3 border-t border-gray-100 dark:border-zinc-800">
+                    <div className="p-3 border-t border-zinc-100 dark:border-zinc-800">
                         {showExtraForm ? (
                             <form
                                 onSubmit={submitExtra}
@@ -374,11 +374,11 @@ export function CorteBoard({
         <div>
             <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-zinc-100 flex items-center gap-2">
+                    <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                         <Scissors size={24} className="text-yellow-600 dark:text-yellow-400" />
                         Corte
                     </h2>
-                    <p className="text-gray-500 dark:text-zinc-400 text-sm">
+                    <p className="text-zinc-500 dark:text-zinc-400 text-sm">
                         Pedidos en corte: planifica las tallas, telas, colores y cantidades.
                     </p>
                 </div>
@@ -399,7 +399,7 @@ export function CorteBoard({
                     <MissingReportsHistoryButton stage="corte" />
                     <button
                         onClick={() => router.refresh()}
-                        className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"
+                        className="w-11 h-11 flex items-center justify-center text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-lg"
                         title="Recargar"
                         aria-label="Recargar"
                     >
@@ -409,7 +409,7 @@ export function CorteBoard({
             </div>
 
             {/* Assignment-scope tabs: full visibility of external-station work */}
-            <div className="inline-flex items-center gap-1 p-1 mb-4 bg-gray-100 dark:bg-zinc-800 rounded-xl">
+            <div className="inline-flex items-center gap-1 p-1 mb-4 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
                 {(
                     [
                         { key: 'all', label: 'Todos', count: orders.length },
@@ -420,10 +420,10 @@ export function CorteBoard({
                         key={t.key}
                         type="button"
                         onClick={() => setAssignTab(t.key)}
-                        className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-colors ${
+                        className={`inline-flex items-center gap-1.5 px-4 min-h-11 rounded-lg text-sm font-bold transition-colors ${
                             assignTab === t.key
-                                ? 'bg-white dark:bg-zinc-900 shadow-sm text-gray-900 dark:text-zinc-100'
-                                : 'text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-200'
+                                ? 'bg-white dark:bg-zinc-900 shadow-sm text-zinc-900 dark:text-zinc-100'
+                                : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'
                         }`}
                     >
                         {t.key === 'assigned' && <HardHat size={14} />}
@@ -432,7 +432,7 @@ export function CorteBoard({
                             className={`min-w-[1.3rem] px-1 rounded-full text-[11px] leading-5 ${
                                 assignTab === t.key
                                     ? 'bg-orange-100 dark:bg-orange-950/50 text-orange-700 dark:text-orange-300'
-                                    : 'bg-gray-200 dark:bg-zinc-700 text-gray-600 dark:text-zinc-300'
+                                    : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300'
                             }`}
                         >
                             {t.count}
@@ -442,7 +442,7 @@ export function CorteBoard({
             </div>
 
             {filtered.length === 0 ? (
-                <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm p-12 text-center text-gray-500 dark:text-zinc-400">
+                <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm p-12 text-center text-zinc-500 dark:text-zinc-400">
                     {assignTab === 'assigned'
                         ? 'Ningún pedido de corte está asignado a una estación externa.'
                         : tab === 'pending'
@@ -470,7 +470,7 @@ export function CorteBoard({
             )}
 
             {pending && (
-                <div className="fixed bottom-4 right-4 bg-gray-900 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 text-sm">
+                <div className="fixed bottom-4 right-4 bg-zinc-900 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 text-sm">
                     <Loader2 className="animate-spin" size={14} />
                     Actualizando...
                 </div>

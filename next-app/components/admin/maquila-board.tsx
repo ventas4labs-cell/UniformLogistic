@@ -7,13 +7,12 @@ import {
     RefreshCw,
     Loader2,
     ChevronDown,
-    ChevronUp,
-    Package
+    ChevronUp
 } from 'lucide-react';
 import { ProductThumb, useProductZoom } from '@/components/admin/product-thumb';
 import type { Order } from '@/lib/types';
 import type { InsumoCompletion } from '@/lib/services/insumo-completions';
-import { aggregateInsumos, aggregateInsumosGlobal } from '@/lib/stage-utils';
+import { aggregateInsumos } from '@/lib/stage-utils';
 import { StageCompleteToggle } from '@/components/admin/stage-complete-toggle';
 import type { StageTab } from '@/components/admin/stage-tab-bar';
 import { CollapsibleSearch } from '@/components/admin/collapsible-search';
@@ -216,7 +215,6 @@ export function MaquilaBoard({
     const [searchTerm, setSearchTerm] = useState('');
     const [companyFilter, setCompanyFilter] = useState<string>('all');
     const [pending] = useTransition();
-    const [showSummary, setShowSummary] = useState(false);
     const router = useRouter();
 
     const handleLocalChange = (uuid: string, next: boolean) => {
@@ -250,8 +248,6 @@ export function MaquilaBoard({
         done: orders.filter((o) => o.uuid && completed.has(o.uuid)).length,
         all: orders.length
     };
-
-    const globalInsumos = aggregateInsumosGlobal(filtered);
 
     return (
         <div>
@@ -291,38 +287,6 @@ export function MaquilaBoard({
                     </button>
                 </div>
             </div>
-
-            {globalInsumos.length > 0 && (
-                <div className="mb-4">
-                    <button
-                        onClick={() => setShowSummary(!showSummary)}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-xl text-sm font-bold hover:bg-purple-700 transition-colors shadow-sm"
-                    >
-                        <Package size={16} />
-                        Resumen de insumos ({globalInsumos.length})
-                        {showSummary ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                    </button>
-                    {showSummary && (
-                        <div className="mt-2 bg-white dark:bg-zinc-900 rounded-xl shadow-sm border border-purple-200 dark:border-purple-900/50 p-4">
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                                {globalInsumos.map((ins) => (
-                                    <div
-                                        key={ins.name}
-                                        className="flex items-center justify-between bg-purple-50 dark:bg-purple-950/30 rounded-lg px-3 py-2.5"
-                                    >
-                                        <span className="text-sm text-purple-900 dark:text-purple-200 truncate">
-                                            {ins.name}
-                                        </span>
-                                        <span className="font-bold text-purple-700 dark:text-purple-300 text-sm shrink-0 ml-2">
-                                            {ins.totalQty}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
 
             {filtered.length === 0 ? (
                 <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm p-12 text-center text-gray-500 dark:text-zinc-400">

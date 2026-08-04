@@ -5,7 +5,6 @@ import {
     ClipboardList,
     Factory,
     Package,
-    Receipt,
     ShieldCheck,
     Sticker,
     XCircle
@@ -87,13 +86,10 @@ export default async function AdminHomePage() {
         <div className="space-y-8">
             {/* ── Header ───────────────────────────────────────────── */}
             <header>
-                <p className="text-xs uppercase tracking-widest font-semibold text-orange-600 dark:text-orange-400">
-                    Panel de administración
-                </p>
-                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900 dark:text-zinc-100 mt-1">
+                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100">
                     Inicio
                 </h1>
-                <p className="text-gray-500 dark:text-zinc-400 text-sm mt-1">
+                <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">
                     {active.length} pedido{active.length === 1 ? '' : 's'} activo
                     {active.length === 1 ? '' : 's'} · {piecesInProduction} pieza
                     {piecesInProduction === 1 ? '' : 's'} en producción
@@ -108,7 +104,7 @@ export default async function AdminHomePage() {
 
             {/* ── Order KPIs ───────────────────────────────────────── */}
             <section>
-                <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500 dark:text-zinc-400 mb-3">
+                <h2 className="text-sm font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-3">
                     Pedidos
                 </h2>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -149,10 +145,10 @@ export default async function AdminHomePage() {
 
             {/* ── Per-stage workload ───────────────────────────────── */}
             <section>
-                <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500 dark:text-zinc-400 mb-3">
+                <h2 className="text-sm font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-3">
                     Pendientes por etapa
                 </h2>
-                <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-200 dark:border-zinc-800 p-4">
+                <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4">
                     <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
                         {stagePending.map(({ stage, label, pending }) => (
                             <Link
@@ -162,18 +158,18 @@ export default async function AdminHomePage() {
                                         ? '/admin/operador'
                                         : `/admin/${stage}`
                                 }
-                                className="rounded-xl bg-gray-50 dark:bg-zinc-800/50 hover:bg-orange-50 dark:hover:bg-orange-950/30 p-3 text-center transition-colors"
+                                className="rounded-xl bg-zinc-50 dark:bg-zinc-800/50 hover:bg-orange-50 dark:hover:bg-orange-950/30 p-3 min-h-[4.5rem] flex flex-col justify-center text-center transition-colors"
                             >
                                 <div
-                                    className={`text-2xl font-extrabold leading-none ${
+                                    className={`font-display text-3xl font-extrabold leading-none ${
                                         pending === 0
-                                            ? 'text-green-600 dark:text-green-400'
+                                            ? 'text-emerald-600 dark:text-emerald-400'
                                             : 'text-orange-600 dark:text-orange-400'
                                     }`}
                                 >
                                     {pending}
                                 </div>
-                                <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-zinc-400 mt-1 truncate">
+                                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mt-1 truncate">
                                     {label}
                                 </div>
                             </Link>
@@ -184,10 +180,10 @@ export default async function AdminHomePage() {
 
             {/* ── Catalog stats ────────────────────────────────────── */}
             <section>
-                <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500 dark:text-zinc-400 mb-3">
+                <h2 className="text-sm font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-3">
                     Catálogo
                 </h2>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     <StatCard
                         label="Empresas"
                         value={companies.length}
@@ -211,14 +207,6 @@ export default async function AdminHomePage() {
                         Icon={Sticker}
                         accent="zinc"
                         href="/admin/logos"
-                    />
-                    <StatCard
-                        label="Facturas a pagar"
-                        value={invoicesToPay}
-                        sub="pendientes de pago"
-                        Icon={Receipt}
-                        accent={invoicesToPay > 0 ? 'orange' : 'zinc'}
-                        href="/admin/station-invoices"
                     />
                 </div>
             </section>
@@ -248,27 +236,27 @@ function StatCard({
             ? 'bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300'
             : accent === 'emerald'
               ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300'
-              : 'bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-zinc-300';
+              : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300';
     return (
         <Link
             href={href}
-            className="group bg-white dark:bg-zinc-900 rounded-2xl border border-gray-200 dark:border-zinc-800 p-4 flex items-center gap-3 hover:border-orange-200 dark:hover:border-orange-500/40 hover:shadow-md transition-all"
+            className="group bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4 flex items-center gap-3 hover:border-orange-200 dark:hover:border-orange-500/40 hover:shadow-md transition-all"
         >
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${ring}`}>
                 <Icon size={18} />
             </div>
             <div className="min-w-0 flex-1">
-                <div className="text-xs text-gray-500 dark:text-zinc-400 font-medium truncate">
+                <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium truncate">
                     {label}
                 </div>
-                <div className="text-xl font-extrabold text-gray-900 dark:text-zinc-100 leading-none mt-0.5">
+                <div className="font-display text-2xl font-extrabold text-zinc-900 dark:text-zinc-100 leading-none mt-0.5">
                     {value}
                 </div>
-                <div className="text-[11px] text-gray-500 dark:text-zinc-400">{sub}</div>
+                <div className="text-[11px] text-zinc-500 dark:text-zinc-400">{sub}</div>
             </div>
             <ArrowRight
                 size={16}
-                className="text-gray-300 dark:text-zinc-600 group-hover:text-orange-500 group-hover:translate-x-0.5 transition-all shrink-0"
+                className="text-zinc-300 dark:text-zinc-600 group-hover:text-orange-500 group-hover:translate-x-0.5 transition-all shrink-0"
             />
         </Link>
     );

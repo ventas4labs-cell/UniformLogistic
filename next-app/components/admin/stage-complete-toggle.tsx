@@ -91,7 +91,7 @@ export function StageCompleteToggle({
                 aria-pressed={isCompleted}
                 className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
                     isCompleted
-                        ? 'bg-green-600 text-white hover:bg-green-700'
+                        ? 'bg-emerald-600 text-white hover:bg-emerald-700'
                         : 'bg-white dark:bg-zinc-900 border-2 border-orange-500 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/40'
                 }`}
             >
@@ -114,10 +114,10 @@ export function StageCompleteToggle({
                         className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-sm p-6"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <h3 className="text-lg font-bold text-gray-900 dark:text-zinc-100 mb-2">
+                        <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-2">
                             ¿Marcar {stageLabel.toLowerCase()} completo?
                         </h3>
-                        <p className="text-sm text-gray-600 dark:text-zinc-400">
+                        <p className="text-sm text-zinc-600 dark:text-zinc-400">
                             {orderRef ? (
                                 <>
                                     Vas a marcar la etapa{' '}
@@ -136,14 +136,14 @@ export function StageCompleteToggle({
                                 </>
                             )}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-zinc-500 mt-2 italic">
+                        <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-2 italic">
                             Podés deshacerlo después tocando el mismo botón.
                         </p>
                         <div className="flex gap-3 mt-5">
                             <button
                                 type="button"
                                 onClick={() => setConfirmOpen(false)}
-                                className="flex-1 py-2.5 border border-gray-300 dark:border-zinc-700 rounded-lg font-bold text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 text-sm"
+                                className="flex-1 py-2.5 border border-zinc-300 dark:border-zinc-700 rounded-lg font-bold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-sm"
                             >
                                 Cancelar
                             </button>
@@ -153,7 +153,7 @@ export function StageCompleteToggle({
                                     setConfirmOpen(false);
                                     runToggle(true);
                                 }}
-                                className="flex-1 py-2.5 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 text-sm flex items-center justify-center gap-1.5"
+                                className="flex-1 py-2.5 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 text-sm flex items-center justify-center gap-1.5"
                             >
                                 <Check size={14} strokeWidth={3} />
                                 Sí, marcar completo

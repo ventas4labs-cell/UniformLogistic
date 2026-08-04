@@ -1,6 +1,9 @@
 import { createClient } from '@/utils/supabase/server';
 import { fetchStationUser } from '@/lib/services/station-users';
-import { fetchOrderIdsAssignedTo } from '@/lib/services/station-assignments';
+import {
+    fetchOrderIdsAssignedTo,
+    fetchPickupStatusForStation
+} from '@/lib/services/station-assignments';
 import { fetchOrdersByIds } from '@/lib/services/orders';
 import { fetchStageCompletions, STAGE_LABELS } from '@/lib/services/stage-completions';
 import { fetchStageItemProgress } from '@/lib/services/stage-item-progress';
@@ -21,16 +24,21 @@ export default async function StationPage() {
     if (!station) return null;
 
     const orderIds = await fetchOrderIdsAssignedTo(supabase, user.id);
-    const [orders, completedSet, progress, fabricReportsByOrder] = await Promise.all([
-        fetchOrdersByIds(supabase, orderIds),
-        fetchStageCompletions(supabase, station.stage),
-        fetchStageItemProgress(supabase, station.stage),
-        // Only corte reports fabric consumption; skip the query for the
-        // other stations rather than fetching rows nothing will render.
-        station.stage === 'corte'
-            ? fetchCorteFabricReports(supabase, orderIds)
-            : Promise.resolve({})
-    ]);
+    const [orders, completedSet, progress, fabricReportsByOrder, pickupMap] =
+        await Promise.all([
+            fetchOrdersByIds(supabase, orderIds),
+            fetchStageCompletions(supabase, station.stage),
+            fetchStageItemProgress(supabase, station.stage),
+            // Only corte reports fabric consumption; skip the query for the
+            // other stations rather than fetching rows nothing will render.
+            station.stage === 'corte'
+                ? fetchCorteFabricReports(supabase, orderIds)
+                : Promise.resolve({}),
+            // Pickup lifecycle only applies to maquila stations.
+            station.stage === 'maquila'
+                ? fetchPickupStatusForStation(supabase, user.id)
+                : Promise.resolve(new Map())
+        ]);
 
     return (
         <StationBoard
@@ -46,6 +54,7 @@ export default async function StationPage() {
             )}
             initialProgress={progress}
             fabricReportsByOrder={fabricReportsByOrder}
+            pickupByOrder={Object.fromEntries(pickupMap)}
         />
     );
 }

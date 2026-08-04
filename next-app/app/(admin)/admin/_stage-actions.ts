@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { createClient } from '@/utils/supabase/server';
+import { createClient, createServiceClient } from '@/utils/supabase/server';
 import {
     updateOrderStatus,
     addExtraOrderItem,
@@ -158,6 +158,75 @@ export async function unmarkStageCompleteAction(
     await unmarkStageComplete(supabase, orderUuid, stage);
     for (const p of STAGE_PATHS) revalidatePath(p);
     revalidatePath('/station');
+}
+
+// ─── Outsourced-work pickup lifecycle ────────────────────────────────
+// An external station flags its finished work "listo para recoger"; the
+// office later marks it "recogido", which also completes that stage
+// in-house (the goods are back and the order can move on).
+
+/**
+ * External station flags (or un-flags) an order ready for the office to
+ * collect. Caller must be the station user assigned to the order; the
+ * privileged write then runs with the service-role client.
+ */
+export async function setReadyForPickupAction(
+    orderUuid: string,
+    ready: boolean
+): Promise<{ error?: string }> {
+    const supabase = await createClient();
+    const {
+        data: { user }
+    } = await supabase.auth.getUser();
+    if (!user) return { error: 'No autenticado.' };
+    const station = await fetchStationUser(supabase, user.id);
+    if (!station || !station.isActive) return { error: 'No autorizado.' };
+    if (!(await isStationAssignedToOrder(supabase, user.id, orderUuid))) {
+        return { error: 'No autorizado para este pedido.' };
+    }
+    const service = createServiceClient();
+    const { error } = await service
+        .from('station_assignments')
+        .update({ ready_for_pickup_at: ready ? new Date().toISOString() : null })
+        .eq('order_id', orderUuid)
+        .eq('station_user_id', user.id);
+    if (error) return { error: error.message };
+    revalidatePath('/station');
+    revalidatePath('/admin/maquila');
+    return {};
+}
+
+/**
+ * Office records that an outsourced order was collected from
+ * `stationUserId`. Admin-only. Pickup is tracked independently of stage
+ * completion — the admin marks the maquila stage complete separately.
+ */
+export async function markPickedUpAction(
+    orderUuid: string,
+    stationUserId: string,
+    pickedUp: boolean
+): Promise<{ error?: string }> {
+    const supabase = await createClient();
+    const {
+        data: { user }
+    } = await supabase.auth.getUser();
+    if (!user) return { error: 'No autenticado.' };
+    if (!isAdminEmail(user.email)) return { error: 'No autorizado.' };
+
+    const service = createServiceClient();
+    const { error } = await service
+        .from('station_assignments')
+        .update({
+            picked_up_at: pickedUp ? new Date().toISOString() : null,
+            picked_up_by: pickedUp ? user.id : null
+        })
+        .eq('order_id', orderUuid)
+        .eq('station_user_id', stationUserId);
+    if (error) return { error: error.message };
+
+    revalidatePath('/admin/maquila');
+    revalidatePath('/station');
+    return {};
 }
 
 // ─── Partial stage progress (per-item) ───────────────────────────────

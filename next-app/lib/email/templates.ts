@@ -250,6 +250,31 @@ export function deliveryScheduledEmail(d: DeliveryScheduledEmailData): RenderedE
     };
 }
 
+// ── 3c. Delivered — to the customer ──────────────────────────────────
+export interface DeliveryDeliveredEmailData {
+    orderRef: string;
+    companyName: string;
+    contactName: string;
+}
+
+export function deliveryDeliveredEmail(d: DeliveryDeliveredEmailData): RenderedEmail {
+    const greet = d.contactName || d.companyName;
+    const body = `
+    <p style="margin:0 0 14px 0;">${greet ? `Hola ${esc(greet)},` : 'Hola,'}</p>
+    <p style="margin:0 0 6px 0;">Tu pedido <strong style="color:${ORANGE};">${esc(d.orderRef)}</strong> fue <strong>entregado</strong>. ¡Gracias por confiar en Uniform Logistic!</p>
+    <p style="margin:14px 0 0 0;color:${MUTED};font-size:14px;">Si algo no está en orden con tu entrega, respondé este correo y lo resolvemos.</p>`;
+    return {
+        subject: `Tu pedido ${d.orderRef} fue entregado — Uniform Logistic`,
+        html: layout({
+            title: 'Pedido entregado',
+            preheader: `${d.orderRef} fue entregado`,
+            body
+        }),
+        text:
+            `${greet ? `Hola ${greet},\n\n` : ''}Tu pedido ${d.orderRef} fue entregado. ¡Gracias por confiar en Uniform Logistic!\n\n${SUPPORT_EMAIL}`
+    };
+}
+
 // ── 4. Overdue invoices reminder — to the customer ───────────────────
 export interface OverdueEmailData {
     companyName: string;
