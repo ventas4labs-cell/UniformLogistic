@@ -25,6 +25,10 @@ interface Props {
     isCompleted: boolean;
     /** Flip the board's completion state when a save completes/uncompletes. */
     onCompletedChange: (uuid: string, next: boolean) => void;
+    /** When true, saving progress is reporting-only and never touches the
+     *  board's completion (maquila: completion is owned by "listo para
+     *  recoger", not by line counts). */
+    decoupleCompletion?: boolean;
 }
 
 const clamp = (n: number, max: number) => Math.max(0, Math.min(max, n));
@@ -34,7 +38,8 @@ export function StagePartialEditor({
     stage,
     initialProgress,
     isCompleted,
-    onCompletedChange
+    onCompletedChange,
+    decoupleCompletion = false
 }: Props) {
     const items = order.items;
     const totalPieces = useMemo(
@@ -89,7 +94,10 @@ export function StagePartialEditor({
                 return;
             }
             setSaved(snapshot);
-            if (order.uuid) onCompletedChange(order.uuid, !!res.completed);
+            // Maquila reports progress without it (un)completing the stage.
+            if (order.uuid && !decoupleCompletion) {
+                onCompletedChange(order.uuid, !!res.completed);
+            }
         });
     };
 

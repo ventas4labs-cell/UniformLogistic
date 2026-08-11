@@ -11,8 +11,8 @@ import {
     HardHat
 } from 'lucide-react';
 import type { Order } from '@/lib/types';
+import type { ItemProgress } from '@/lib/services/stage-item-progress';
 import { markPickedUpAction } from '@/app/(admin)/admin/_stage-actions';
-import { OrderProductsSummary } from '@/components/admin/order-products-summary';
 
 export interface StationWorkItem {
     order: Order;
@@ -24,17 +24,35 @@ type Phase = 'in-progress' | 'ready' | 'picked';
 const phaseOf = (w: StationWorkItem): Phase =>
     w.pickedUpAt ? 'picked' : w.readyForPickupAt ? 'ready' : 'in-progress';
 
-// Admin view of one external maquila station's outsourced orders. The
-// station flags each "listo para recoger"; the office records the pickup
-// here, which also completes the maquila stage in-house.
+// Readable size label for a line (Hombre M, 32, etc.).
+const GENDER_ES: Record<string, string> = { Men: 'Hombre', Women: 'Mujer' };
+const sizeLabel = (sel: {
+    gender?: string;
+    size?: string;
+    waist?: number;
+}): string =>
+    [
+        sel.gender ? (GENDER_ES[sel.gender] ?? sel.gender) : '',
+        sel.size,
+        sel.waist ? `${sel.waist}` : ''
+    ]
+        .filter(Boolean)
+        .join(' ');
+
+// Admin view of one external maquila station's outsourced orders. Shows
+// how far along each order is (pieces done per line, reported by the
+// station), its pickup status, and lets the office record a pickup.
+// Completion is the station's — the office never marks the stage here.
 export function ExternalStationPanel({
     stationId,
     stationName,
-    items
+    items,
+    progressByItem
 }: {
     stationId: string;
     stationName: string;
     items: StationWorkItem[];
+    progressByItem: ItemProgress;
 }) {
     const router = useRouter();
     const [picked, setPicked] = useState<Record<string, boolean>>(() =>
@@ -47,6 +65,9 @@ export function ExternalStationPanel({
     const [busyId, setBusyId] = useState<string | null>(null);
     const [errorId, setErrorId] = useState<string | null>(null);
     const [, startTransition] = useTransition();
+
+    const doneFor = (itemUuid: string | undefined, total: number): number =>
+        itemUuid ? Math.min(progressByItem[itemUuid] ?? 0, total) : 0;
 
     const isPicked = (w: StationWorkItem) =>
         w.order.uuid ? (picked[w.order.uuid] ?? !!w.pickedUpAt) : !!w.pickedUpAt;
@@ -72,14 +93,26 @@ export function ExternalStationPanel({
     // Ready-to-collect first, then in-progress, collected last.
     const sorted = useMemo(() => {
         const rank: Record<Phase, number> = { ready: 0, 'in-progress': 1, picked: 2 };
-        return items
-            .slice()
-            .sort((a, b) => rank[phaseOf(a)] - rank[phaseOf(b)]);
+        return items.slice().sort((a, b) => rank[phaseOf(a)] - rank[phaseOf(b)]);
     }, [items]);
 
     const readyCount = items.filter(
         (w) => phaseOf(w) === 'ready' && !isPicked(w)
     ).length;
+
+    // Per-station rollup: total pieces done vs. total across all its orders.
+    const rollup = useMemo(() => {
+        let done = 0;
+        let total = 0;
+        for (const w of items) {
+            for (const it of w.order.items) {
+                total += it.quantity;
+                done += doneFor(it.uuid, it.quantity);
+            }
+        }
+        return { done, total, pct: total > 0 ? Math.round((done / total) * 100) : 0 };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [items, progressByItem]);
 
     if (items.length === 0) {
         return (
@@ -97,13 +130,17 @@ export function ExternalStationPanel({
 
     return (
         <div>
-            <div className="mb-4 flex items-baseline justify-between gap-2">
+            <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                 <h2 className="flex items-center gap-2 text-xl font-bold text-zinc-900 dark:text-zinc-100">
                     <HardHat size={22} className="text-orange-600 dark:text-orange-400" />
                     {stationName}
                 </h2>
                 <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                    {items.length} pedido{items.length === 1 ? '' : 's'}
+                    {items.length} pedido{items.length === 1 ? '' : 's'} ·{' '}
+                    <span className="font-bold text-zinc-700 dark:text-zinc-200">
+                        {rollup.done}/{rollup.total} pzas
+                    </span>{' '}
+                    ({rollup.pct}%)
                     {readyCount > 0 && (
                         <span className="ml-2 font-bold text-orange-600 dark:text-orange-400">
                             · {readyCount} listo{readyCount === 1 ? '' : 's'} para recoger
@@ -121,11 +158,19 @@ export function ExternalStationPanel({
                         : w.readyForPickupAt
                           ? 'ready'
                           : 'in-progress';
-                    const totalPieces = w.order.items.reduce(
-                        (s, i) => s + i.quantity,
-                        0
-                    );
+
+                    const lines = w.order.items.map((it) => {
+                        const total = it.quantity;
+                        const done = doneFor(it.uuid, total);
+                        return { it, done, total, full: total > 0 && done >= total };
+                    });
+                    const totalPieces = lines.reduce((s, l) => s + l.total, 0);
+                    const donePieces = lines.reduce((s, l) => s + l.done, 0);
+                    const pct =
+                        totalPieces > 0 ? Math.round((donePieces / totalPieces) * 100) : 0;
+                    const allDone = totalPieces > 0 && donePieces >= totalPieces;
                     const busy = busyId === uuid;
+
                     return (
                         <div
                             key={uuid || w.order.id}
@@ -147,23 +192,68 @@ export function ExternalStationPanel({
                                             {w.order.companyName || '—'}
                                         </p>
                                     </div>
-                                    {/* Completion is controlled by the station, surfaced
-                                        here as its pickup-readiness badge. */}
                                     <StatusPill phase={phase} />
                                 </div>
 
-                                <div className="mt-2">
-                                    <OrderProductsSummary items={w.order.items} />
+                                {/* Progress — pieces the station has reported done */}
+                                <div className="mt-3">
+                                    <div className="mb-1 flex items-baseline justify-between text-xs">
+                                        <span className="font-bold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+                                            Avance
+                                        </span>
+                                        <span className="font-bold text-zinc-700 dark:text-zinc-200">
+                                            {donePieces}/{totalPieces} pzas ·{' '}
+                                            <span
+                                                className={
+                                                    allDone
+                                                        ? 'text-emerald-600 dark:text-emerald-400'
+                                                        : 'text-orange-600 dark:text-orange-400'
+                                                }
+                                            >
+                                                {pct}%
+                                            </span>
+                                        </span>
+                                    </div>
+                                    <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                                        <div
+                                            className={`h-full rounded-full transition-all ${
+                                                allDone ? 'bg-emerald-500' : 'bg-orange-500'
+                                            }`}
+                                            style={{ width: `${pct}%` }}
+                                        />
+                                    </div>
                                 </div>
 
-                                <div className="mt-3 flex flex-wrap items-center gap-2">
-                                    <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-bold text-orange-800 dark:bg-orange-950/50 dark:text-orange-300">
-                                        {totalPieces} pzas
-                                    </span>
-                                    <span className="rounded-full bg-zinc-100 px-2 py-1 text-xs font-bold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                                        {w.order.items.length} líneas
-                                    </span>
-                                </div>
+                                {/* Per-line done/total */}
+                                <ul className="mt-3 space-y-1 border-t border-zinc-100 pt-2 dark:border-zinc-800">
+                                    {lines.map((l, i) => {
+                                        const label = sizeLabel(l.it.selection || {});
+                                        return (
+                                            <li
+                                                key={l.it.uuid || i}
+                                                className="flex items-center justify-between gap-2 text-sm"
+                                            >
+                                                <span className="min-w-0 truncate text-zinc-700 dark:text-zinc-300">
+                                                    {l.it.productName}
+                                                    {label ? (
+                                                        <span className="text-zinc-400 dark:text-zinc-500">
+                                                            {' '}· {label}
+                                                        </span>
+                                                    ) : null}
+                                                </span>
+                                                <span
+                                                    className={`shrink-0 font-mono font-bold tabular-nums ${
+                                                        l.full
+                                                            ? 'text-emerald-600 dark:text-emerald-400'
+                                                            : 'text-zinc-700 dark:text-zinc-200'
+                                                    }`}
+                                                >
+                                                    {l.done}/{l.total}
+                                                </span>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
                             </div>
 
                             <div className="border-t border-zinc-100 p-3 dark:border-zinc-800">
@@ -225,20 +315,20 @@ export function ExternalStationPanel({
 function StatusPill({ phase }: { phase: Phase }) {
     if (phase === 'picked') {
         return (
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
                 <CheckCircle2 size={12} /> Recogido
             </span>
         );
     }
     if (phase === 'ready') {
         return (
-            <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-1 text-xs font-bold text-orange-700 dark:bg-orange-950/50 dark:text-orange-300">
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-orange-100 px-2.5 py-1 text-xs font-bold text-orange-700 dark:bg-orange-950/50 dark:text-orange-300">
                 <PackageCheck size={12} /> Listo para recoger
             </span>
         );
     }
     return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-bold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-bold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
             <Clock size={12} /> En proceso
         </span>
     );

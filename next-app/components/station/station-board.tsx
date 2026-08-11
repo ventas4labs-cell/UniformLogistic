@@ -288,6 +288,7 @@ function OrderCard({
                     initialProgress={initialProgress || {}}
                     isCompleted={isCompleted}
                     onCompletedChange={onLocalChange}
+                    decoupleCompletion={isMaquila}
                 />
             </div>
 

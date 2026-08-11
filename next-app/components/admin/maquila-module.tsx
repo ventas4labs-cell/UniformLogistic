@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Home, HardHat } from 'lucide-react';
 import type { Order } from '@/lib/types';
 import type { InsumoCompletion } from '@/lib/services/insumo-completions';
+import type { ItemProgress } from '@/lib/services/stage-item-progress';
 import { MaquilaBoard } from '@/components/admin/maquila-board';
 import {
     ExternalStationPanel,
@@ -23,6 +24,8 @@ interface Props {
     };
     stations: MaquilaStationInfo[];
     workByStation: Record<string, StationWorkItem[]>;
+    /** order_item_id → pieces done, for the per-line progress display. */
+    progressByItem: ItemProgress;
 }
 
 const readyCountOf = (items: StationWorkItem[] | undefined): number =>
@@ -31,7 +34,12 @@ const readyCountOf = (items: StationWorkItem[] | undefined): number =>
 // The Maquila module reframed around who's producing: "En taller" is the
 // in-house board (unchanged); every other tab is one external maquila
 // station's outsourced orders, where the office records pickups.
-export function MaquilaModule({ inHouse, stations, workByStation }: Props) {
+export function MaquilaModule({
+    inHouse,
+    stations,
+    workByStation,
+    progressByItem
+}: Props) {
     const [selected, setSelected] = useState<string>('interno');
 
     return (
@@ -84,6 +92,7 @@ export function MaquilaModule({ inHouse, stations, workByStation }: Props) {
                         stations.find((s) => s.id === selected)?.name || 'Estación'
                     }
                     items={workByStation[selected] || []}
+                    progressByItem={progressByItem}
                 />
             )}
         </div>

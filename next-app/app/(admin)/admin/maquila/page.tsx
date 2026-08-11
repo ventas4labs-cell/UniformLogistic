@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { fetchAllOrders, fetchOrdersByIds } from '@/lib/services/orders';
 import { fetchStageCompletions } from '@/lib/services/stage-completions';
+import { fetchStageItemProgress } from '@/lib/services/stage-item-progress';
 import { fetchCompletionsForOrders } from '@/lib/services/insumo-completions';
 import {
     fetchOrdersOutsourcedToStage,
@@ -21,14 +22,23 @@ export default async function MaquilaPage() {
         .map((o) => o.uuid)
         .filter((id): id is string => !!id);
 
-    const [completed, insumoCompletions, outsourced, stationUsers, stageAssignments] =
-        await Promise.all([
-            fetchStageCompletions(supabase, 'maquila'),
-            fetchCompletionsForOrders(supabase, orderIds),
-            fetchOrdersOutsourcedToStage(supabase, orderIds, 'maquila'),
-            fetchStationUsers(supabase),
-            fetchAssignmentsForStage(supabase, 'maquila')
-        ]);
+    const [
+        completed,
+        insumoCompletions,
+        outsourced,
+        stationUsers,
+        stageAssignments,
+        progressByItem
+    ] = await Promise.all([
+        fetchStageCompletions(supabase, 'maquila'),
+        fetchCompletionsForOrders(supabase, orderIds),
+        fetchOrdersOutsourcedToStage(supabase, orderIds, 'maquila'),
+        fetchStationUsers(supabase),
+        fetchAssignmentsForStage(supabase, 'maquila'),
+        // Per-line pieces-done for every maquila order, so the admin panel
+        // can show how far along each outsourced order is.
+        fetchStageItemProgress(supabase, 'maquila')
+    ]);
 
     // In-house board: maquila orders NOT sent to an external workshop.
     const inHouseOrders = maquilaOrders.filter(
@@ -71,6 +81,7 @@ export default async function MaquilaPage() {
             }}
             stations={maquilaStations.map((s) => ({ id: s.id, name: s.displayName }))}
             workByStation={workByStation}
+            progressByItem={progressByItem}
         />
     );
 }

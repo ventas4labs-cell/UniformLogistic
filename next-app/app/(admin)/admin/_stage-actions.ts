@@ -259,6 +259,16 @@ export async function saveStageProgressAction(
     try {
         await saveStageItemProgress(supabase, orderUuid, stage, entries, user.id);
 
+        // Maquila completion is owned solely by the station's explicit
+        // "listo para recoger" signal, so recording progress there is
+        // reporting only — it must never (un)complete the stage. Every
+        // other stage reconciles completion from the line counts.
+        if (stage === 'maquila') {
+            for (const p of STAGE_PATHS) revalidatePath(p);
+            revalidatePath('/station');
+            return {};
+        }
+
         // Reconcile the binary completion against the true line
         // quantities (read from the DB, not the client payload).
         const { data: items, error } = await supabase
