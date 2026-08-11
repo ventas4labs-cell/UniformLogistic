@@ -29,10 +29,16 @@ export function StageCompletionStrip({
     applicableStages,
     compact = false
 }: Props) {
-    const stages =
+    // Show every applicable stage PLUS any stage that's actually been
+    // completed — a completion is real work done, so it must never be
+    // hidden just because the product's stages_json doesn't list it.
+    const applicable =
         applicableStages && applicableStages.length > 0
-            ? STAGE_ORDER.filter((s) => applicableStages.includes(s))
+            ? applicableStages
             : STAGE_ORDER;
+    const stages = STAGE_ORDER.filter(
+        (s) => applicable.includes(s) || completed.has(s)
+    );
     const total = stages.length;
     const done = stages.filter((s) => completed.has(s)).length;
     const allDone = total > 0 && done === total;

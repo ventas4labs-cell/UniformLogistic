@@ -25,7 +25,7 @@ import {
     reopenMissingReportAction
 } from '@/app/(admin)/admin/_stage-actions';
 import { StageControlPanel } from '@/components/admin/stage-control-panel';
-import { type StageKey } from '@/lib/services/stage-completions';
+import { STAGE_ORDER, type StageKey } from '@/lib/services/stage-completions';
 import { orderApplicableStages } from '@/lib/stage-utils';
 import { OrderAssignmentsPanel } from '@/components/admin/order-assignments-panel';
 import type { StationUser } from '@/lib/services/station-users';
@@ -166,9 +166,14 @@ export function OrdersTable({
         if (!o.uuid) return 'pending';
         const map = completedAtByOrder.get(o.uuid) || {};
         const applicable = orderApplicableStages(o);
-        const done = applicable.filter((s) => !!map[s]).length;
+        // Count a completed stage even if the product's stages_json didn't
+        // list it — otherwise real work done is invisible to the admin.
+        const effective = STAGE_ORDER.filter(
+            (s) => applicable.includes(s) || !!map[s]
+        );
+        const done = effective.filter((s) => !!map[s]).length;
         if (done === 0) return 'pending';
-        if (done === applicable.length) return 'done';
+        if (effective.length > 0 && done === effective.length) return 'done';
         return 'in-progress';
     };
     const [pending, startTransition] = useTransition();

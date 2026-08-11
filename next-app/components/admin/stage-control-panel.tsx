@@ -41,10 +41,16 @@ export function StageControlPanel({
     applicableStages,
     onLocalToggle
 }: Props) {
-    const stages =
+    // Show every applicable stage PLUS any stage that's already completed,
+    // so a completion is never hidden just because the product's
+    // stages_json doesn't list that stage.
+    const applicable =
         applicableStages && applicableStages.length > 0
-            ? STAGE_ORDER.filter((s) => applicableStages.includes(s))
+            ? applicableStages
             : STAGE_ORDER;
+    const stages = STAGE_ORDER.filter(
+        (s) => applicable.includes(s) || !!completedAt[s]
+    );
     const done = stages.filter((s) => !!completedAt[s]).length;
     const total = stages.length;
     const allDone = total > 0 && done === total;
