@@ -76,10 +76,15 @@ const isMeaningful = (t: string) =>
  */
 function isFabricBomLine(bomName: string, fabricType: string): boolean {
     const tokens = tokenize(bomName);
-    // "Tela ripstop negro", "Tela malla blanca". Note "Entretela" is a
-    // single token and correctly does NOT match — interlining is not
-    // the fabric being cut.
-    if (tokens.some((t) => t === 'tela' || t === 'telas')) return true;
+    // Rows that NAME a fabric lead with the word "tela": "Tela ripstop
+    // negro", "Tela malla blanca", "Tela sonata azul". We match only
+    // that LEADING position, not "tela" anywhere in the name — otherwise
+    // notions that merely mention it get counted as fabric and inflate
+    // the estimate (e.g. "Cinta reflectiva tela 2\"", a reflective tape,
+    // would add its 5.7 m to the fabric total). "Entretela" is a single
+    // token and still correctly does NOT match — interlining is not the
+    // fabric being cut.
+    if (tokens[0] === 'tela' || tokens[0] === 'telas') return true;
     // Fabrics named by brand rather than prefixed: BOM "Cordura Beige"
     // against tela "Cordura beige".
     if (!fabricType) return false;
@@ -88,29 +93,98 @@ function isFabricBomLine(bomName: string, fabricType: string): boolean {
     return tokens.some((t) => want.has(t));
 }
 
+// ─── Unit reconciliation ─────────────────────────────────────────────
+// Fabric is quoted by length (m/cm/mm/yd/in) or, rarely, weight (kg/g).
+// Rows already in one unit sum directly; rows in different-but-
+// compatible units must be converted to a canonical unit before summing
+// or "2 m + 30 cm" becomes 32 instead of 2.3. Factors convert TO the
+// canonical unit of each dimension (metros / kilos).
+type FabricDim = 'length' | 'weight';
+const LENGTH_TO_M: Record<string, number> = {
+    m: 1,
+    cm: 0.01,
+    mm: 0.001,
+    yd: 0.9144,
+    in: 0.0254
+};
+const WEIGHT_TO_KG: Record<string, number> = { kg: 1, g: 0.001, gr: 0.001 };
+const CANONICAL_UNIT: Record<FabricDim, string> = { length: 'm', weight: 'kg' };
+
+const unitDimension = (unit: string): FabricDim | null => {
+    if (unit in LENGTH_TO_M) return 'length';
+    if (unit in WEIGHT_TO_KG) return 'weight';
+    return null;
+};
+
+const toCanonical = (amount: number, unit: string, dim: FabricDim): number =>
+    dim === 'length' ? amount * LENGTH_TO_M[unit] : amount * WEIGHT_TO_KG[unit];
+
 /**
- * Expected fabric for one line: sum of its fabric BOM rows × quantity.
- * Returns null when the product declares no identifiable fabric row.
+ * Combine the matched fabric rows of one line into a single (qty, unit).
+ * When every row shares a unit we keep it as-is (so a BOM entirely in
+ * yardas or kilos is reported in that unit). When units differ we
+ * convert to the canonical unit of the dominant dimension — mixing
+ * metros and kilos has no meaning, so the minority dimension is dropped
+ * from the total rather than fabricating a nonsense sum.
+ */
+function sumFabricParts(
+    parts: { amount: number; unit: string }[]
+): { qty: number; unit: string } {
+    const firstUnit = parts[0].unit;
+    if (parts.every((p) => p.unit === firstUnit)) {
+        return { qty: parts.reduce((s, p) => s + p.amount, 0), unit: firstUnit };
+    }
+    let lengthRows = 0;
+    let weightRows = 0;
+    for (const p of parts) {
+        const d = unitDimension(p.unit);
+        if (d === 'length') lengthRows += 1;
+        else if (d === 'weight') weightRows += 1;
+    }
+    // No recognized units at all — can't convert, so fall back to a raw
+    // sum under the first unit (matches the pre-conversion behaviour).
+    if (lengthRows === 0 && weightRows === 0) {
+        return { qty: parts.reduce((s, p) => s + p.amount, 0), unit: firstUnit };
+    }
+    const target: FabricDim =
+        lengthRows > weightRows
+            ? 'length'
+            : weightRows > lengthRows
+                ? 'weight'
+                : unitDimension(firstUnit) ?? 'length';
+    let total = 0;
+    for (const p of parts) {
+        if (unitDimension(p.unit) === target) {
+            total += toCanonical(p.amount, p.unit, target);
+        }
+    }
+    return { qty: total, unit: CANONICAL_UNIT[target] };
+}
+
+/**
+ * Expected fabric for one line: sum of its fabric BOM rows × quantity,
+ * reconciling any mixed units. Returns null when the product declares no
+ * identifiable fabric row.
  */
 function expectedForItem(
     item: CartItem
 ): { qty: number; unit: string } | null {
     if (!item.bom || item.bom.length === 0) return null;
     const sizeLabel = extractSizeLabel(item.selection.size);
-    let total = 0;
-    let unit: string | null = null;
-    let matched = false;
+    const parts: { amount: number; unit: string }[] = [];
     for (const b of item.bom) {
         if (!isFabricBomLine(b.name, item.fabricType || '')) continue;
         const perUnit = resolveBomQty(b, sizeLabel);
         if (perUnit <= 0) continue;
-        matched = true;
-        total += perUnit * item.quantity;
-        // First declared unit wins; BOM rows often leave it blank.
-        if (!unit && b.unit) unit = b.unit;
+        // Blank units default to metros — the house unit, and what the
+        // BOM editor assumes when the field is left empty.
+        parts.push({
+            amount: perUnit * item.quantity,
+            unit: (b.unit || DEFAULT_FABRIC_UNIT).trim().toLowerCase()
+        });
     }
-    if (!matched) return null;
-    return { qty: total, unit: unit || DEFAULT_FABRIC_UNIT };
+    if (parts.length === 0) return null;
+    return sumFabricParts(parts);
 }
 
 /**
