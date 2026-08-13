@@ -177,7 +177,14 @@ export function StagePartialEditor({
                                     min={0}
                                     max={item.quantity}
                                     disabled={!id || pending}
-                                    value={value}
+                                    // Show an empty field for 0 (with a "0"
+                                    // placeholder) rather than a literal "0".
+                                    // On the stations' tablets focus-select
+                                    // doesn't reliably clear the seeded "0",
+                                    // so typing 10 produced "010"; with nothing
+                                    // to prepend to, the entry stays clean.
+                                    value={value === 0 ? '' : value}
+                                    placeholder="0"
                                     onChange={(e) =>
                                         id && setLine(id, parseInt(e.target.value || '0', 10), item.quantity)
                                     }
