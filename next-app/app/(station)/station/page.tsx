@@ -9,6 +9,7 @@ import { fetchStageCompletions, STAGE_LABELS } from '@/lib/services/stage-comple
 import { fetchStageItemProgress } from '@/lib/services/stage-item-progress';
 import { fetchCorteFabricReports } from '@/lib/services/corte-fabric-reports';
 import { StationBoard } from '@/components/station/station-board';
+import { StationSessionRecovery } from '@/components/session-recovery';
 
 // Restricted dashboard shown to external station users (corte /
 // maquila / bordado / ploter / …). They only see the orders admin
@@ -41,6 +42,10 @@ export default async function StationPage() {
         ]);
 
     return (
+        // Kiosk tablets sit open for hours; when the session lapses the
+        // board silently re-authenticates from the station's own access
+        // token instead of failing the save with "No autenticado".
+        <StationSessionRecovery accessToken={station.accessToken}>
         <StationBoard
             station={{
                 id: station.id,
@@ -56,5 +61,6 @@ export default async function StationPage() {
             fabricReportsByOrder={fabricReportsByOrder}
             pickupByOrder={Object.fromEntries(pickupMap)}
         />
+        </StationSessionRecovery>
     );
 }

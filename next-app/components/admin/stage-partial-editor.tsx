@@ -9,6 +9,7 @@ import type { CartItem, Order } from '@/lib/types';
 import { STAGE_LABELS, type StageKey } from '@/lib/services/stage-completions';
 import type { ItemProgress } from '@/lib/services/stage-item-progress';
 import { saveStageProgressAction } from '@/app/(admin)/admin/_stage-actions';
+import { isAuthError, useSessionRecovery } from '@/components/session-recovery';
 
 // ─── Partial per-item progress editor ────────────────────────────────
 // Used by stages that finish an order in batches (Bordado). Each line
@@ -60,6 +61,10 @@ export function StagePartialEditor({
     const [draft, setDraft] = useState<Record<string, number>>(seed);
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
+    // Kiosk screens outlive their session; when one lapses we reconnect
+    // and retry rather than surfacing "No autenticado" and losing input.
+    const recoverSession = useSessionRecovery();
+    const [reconnecting, setReconnecting] = useState(false);
     // Tapping a line's thumbnail opens the product full-size.
     const { openZoom, zoomModal } = useProductZoom();
 
@@ -88,9 +93,26 @@ export function StagePartialEditor({
             .map((i) => ({ orderItemId: i.uuid as string, qtyDone: draft[i.uuid as string] ?? 0 }));
         const snapshot = { ...draft };
         startTransition(async () => {
-            const res = await saveStageProgressAction(order.uuid as string, stage, entries);
+            let res = await saveStageProgressAction(order.uuid as string, stage, entries);
+
+            // Session lapsed mid-shift: silently re-authenticate and
+            // replay the exact same save once. `entries` is already
+            // captured, so the operator's counts survive the round trip.
+            if (isAuthError(res.error) && recoverSession) {
+                setReconnecting(true);
+                const restored = await recoverSession();
+                setReconnecting(false);
+                if (restored) {
+                    res = await saveStageProgressAction(order.uuid as string, stage, entries);
+                }
+            }
+
             if (res.error) {
-                setError(res.error);
+                setError(
+                    isAuthError(res.error)
+                        ? 'Se cerró la sesión. Volvé a abrir el enlace de tu estación e intentá de nuevo — tu avance no se guardó.'
+                        : res.error
+                );
                 return;
             }
             setSaved(snapshot);
@@ -235,7 +257,9 @@ export function StagePartialEditor({
                     <Save size={15} />
                 )}
                 {pending
-                    ? 'Guardando…'
+                    ? reconnecting
+                        ? 'Reconectando…'
+                        : 'Guardando…'
                     : allFull
                         ? 'Guardar y completar'
                         : dirty

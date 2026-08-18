@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { PackageCheck, Loader2, CheckCircle2, Undo2 } from 'lucide-react';
 import { setReadyForPickupAction } from '@/app/(admin)/admin/_stage-actions';
+import { isAuthError, useSessionRecovery } from '@/components/session-recovery';
 
 // Maquila station's collection signal. The station flags their finished
 // order "listo para recoger"; once the office records it collected
@@ -18,6 +19,8 @@ export function StationPickupControl({
 }) {
     const [readyAt, setReadyAt] = useState<string | null>(initialReadyAt);
     const [error, setError] = useState<string | null>(null);
+    // Station kiosks can outlive their session — reconnect and retry.
+    const recoverSession = useSessionRecovery();
     const [pending, startTransition] = useTransition();
 
     // Already collected by the office — nothing left for the station.
@@ -36,7 +39,10 @@ export function StationPickupControl({
         // Optimistic — a client timestamp is only used to flip the UI.
         setReadyAt(ready ? new Date().toISOString() : null);
         startTransition(async () => {
-            const res = await setReadyForPickupAction(orderUuid, ready);
+            let res = await setReadyForPickupAction(orderUuid, ready);
+            if (isAuthError(res.error) && recoverSession && (await recoverSession())) {
+                res = await setReadyForPickupAction(orderUuid, ready);
+            }
             if (res.error) {
                 setReadyAt(prev);
                 setError('No se pudo actualizar. Probá de nuevo.');

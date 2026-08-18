@@ -14,6 +14,7 @@ import {
 import type { Order } from '@/lib/types';
 import type { CorteFabricReport } from '@/lib/services/corte-fabric-reports';
 import { saveCorteFabricReportAction } from '@/app/(admin)/admin/_stage-actions';
+import { isAuthError, useSessionRecovery } from '@/components/session-recovery';
 
 // ─── Corte fabric consumption report ─────────────────────────────────
 // One input per tela the order is cut from. Where the product BOM lets
@@ -65,6 +66,8 @@ export function CorteFabricReportPanel({
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
     const [justSaved, setJustSaved] = useState(false);
+    // Station kiosks can outlive their session — reconnect and retry.
+    const recoverSession = useSessionRecovery();
 
     // Totals for the collapsed header, grouped by unit so we never add
     // metros to kilos.
@@ -105,9 +108,12 @@ export function CorteFabricReportPanel({
             notes: draft[l.fabricType]?.note ?? ''
         }));
         startTransition(async () => {
-            const res = await saveCorteFabricReportAction(order.uuid as string, entries);
+            let res = await saveCorteFabricReportAction(order.uuid as string, entries);
+            if (isAuthError(res.error) && recoverSession && (await recoverSession())) {
+                res = await saveCorteFabricReportAction(order.uuid as string, entries);
+            }
             if (res.error) {
-                setError(res.error);
+                setError(isAuthError(res.error) ? 'Se cerró la sesión. Volvé a abrir el enlace de tu estación e intentá de nuevo.' : res.error);
                 return;
             }
             setSaved(snapshot);
