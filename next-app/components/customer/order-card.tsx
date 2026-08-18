@@ -1,4 +1,5 @@
 import {
+    Boxes,
     Calendar,
     CheckCircle2,
     Clock,
@@ -23,10 +24,21 @@ export function OrderCard({
     order: Order;
     progress: CustomerOrderProgress;
 }) {
-    const { bucket, statusLabel, stages, doneCount, totalStages, totalPieces, deliveredPieces } =
-        progress;
-    const partiallyDelivered =
-        bucket !== 'completed' && deliveredPieces > 0 && deliveredPieces < totalPieces;
+    const {
+        bucket,
+        statusLabel,
+        stages,
+        doneCount,
+        totalStages,
+        totalPieces,
+        dispatchedPieces,
+        stockedPieces,
+        delivered
+    } = progress;
+    // Show what's been sent out for delivery vs. moved into the customer's
+    // own stock — never conflate "dispatched" with "delivered".
+    const showDispatched = !delivered && dispatchedPieces > 0;
+    const showStocked = stockedPieces > 0;
 
     const accent =
         bucket === 'ready'
@@ -93,10 +105,16 @@ export function OrderCard({
                             Entrega {order.deliveryDate}
                         </span>
                     )}
-                    {partiallyDelivered && (
+                    {showStocked && (
+                        <span className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 font-semibold">
+                            <Boxes size={13} />
+                            {stockedPieces}/{totalPieces} en tu bodega
+                        </span>
+                    )}
+                    {showDispatched && (
                         <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
                             <Truck size={13} />
-                            {deliveredPieces}/{totalPieces} entregadas
+                            {dispatchedPieces}/{totalPieces} despachadas
                         </span>
                     )}
                 </div>

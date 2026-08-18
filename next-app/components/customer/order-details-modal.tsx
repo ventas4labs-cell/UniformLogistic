@@ -9,6 +9,7 @@ import {
     Calendar,
     Clock,
     Truck,
+    Boxes,
     Package,
     ImageIcon
 } from 'lucide-react';
@@ -69,7 +70,8 @@ function OrderDetailsModal({
 }) {
     const dialogRef = useDialog(onClose);
 
-    const { bucket, statusLabel, stages, totalPieces, deliveredPieces } = progress;
+    const { bucket, statusLabel, stages, totalPieces, dispatchedPieces, stockedPieces, delivered } =
+        progress;
 
     return (
         <div
@@ -136,10 +138,16 @@ function OrderDetailsModal({
                                 OC {order.purchaseOrder}
                             </span>
                         )}
-                        {deliveredPieces > 0 && (
+                        {stockedPieces > 0 && (
+                            <span className="inline-flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 font-semibold">
+                                <Boxes size={13} />
+                                {stockedPieces}/{totalPieces} en tu bodega
+                            </span>
+                        )}
+                        {!delivered && dispatchedPieces > 0 && (
                             <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold">
                                 <Truck size={13} />
-                                {deliveredPieces}/{totalPieces} entregadas
+                                {dispatchedPieces}/{totalPieces} despachadas
                             </span>
                         )}
                     </div>

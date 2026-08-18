@@ -16,17 +16,22 @@ import { OrdersTable } from '@/components/admin/orders-table';
 import type { Order } from '@/lib/types';
 
 // An order is "done" for the completed list once every line is fully
-// covered by one channel — all pieces dispatched to the customer, or all
-// pieces pushed into the company's stock.
+// covered — the pieces that left production, whether to delivery or to
+// the customer's stock, sum to the ordered quantity. Combining both
+// channels (rather than requiring one to cover alone) is what prevents
+// the same piece being double-counted across the two ledgers.
 function fullyCovered(
     order: Order,
-    totalsByItem: Map<string, number> | undefined
+    dispatchByItem: Map<string, number> | undefined,
+    stockByItem: Map<string, number> | undefined
 ): boolean {
-    if (!totalsByItem || order.items.length === 0) return false;
+    if (order.items.length === 0) return false;
     let anyQty = false;
     for (const it of order.items) {
         if (!it.uuid) return false;
-        if ((totalsByItem.get(it.uuid) || 0) < it.quantity) return false;
+        const out =
+            (dispatchByItem?.get(it.uuid) || 0) + (stockByItem?.get(it.uuid) || 0);
+        if (out < it.quantity) return false;
         if (it.quantity > 0) anyQty = true;
     }
     return anyQty;
@@ -68,11 +73,19 @@ export default async function AdminOrdersPage() {
     type CompletedEntry = { orderId: string; reason: 'dispatched' | 'stock' };
     const completedOrders = orders.flatMap((o): CompletedEntry[] => {
         if (!o.uuid || o.status === 'cancelled') return [];
-        if (fullyCovered(o, dispatchTotals.get(o.uuid)))
-            return [{ orderId: o.uuid, reason: 'dispatched' }];
-        if (fullyCovered(o, stockTotals.get(o.uuid)))
-            return [{ orderId: o.uuid, reason: 'stock' }];
-        return [];
+        const disp = dispatchTotals.get(o.uuid);
+        const stk = stockTotals.get(o.uuid);
+        if (!fullyCovered(o, disp, stk)) return [];
+        // Both channels together cover the order — label it by whichever
+        // holds more pieces, for the archive's "despachado/en stock" tag.
+        const sumBy = (m: Map<string, number> | undefined) =>
+            o.items.reduce((s, it) => s + (it.uuid ? m?.get(it.uuid) || 0 : 0), 0);
+        return [
+            {
+                orderId: o.uuid,
+                reason: sumBy(stk) > sumBy(disp) ? 'stock' : 'dispatched'
+            }
+        ];
     });
     const completionsList = Array.from(completions.entries()).flatMap(
         ([orderId, perStage]) => Array.from(perStage.values()).map((c) => ({

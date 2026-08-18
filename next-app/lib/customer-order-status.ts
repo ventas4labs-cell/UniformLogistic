@@ -38,7 +38,12 @@ export interface CustomerOrderProgress {
     doneCount: number;
     totalStages: number;
     totalPieces: number;
-    deliveredPieces: number;
+    // Pieces packed & sent out for delivery (NOT necessarily received).
+    dispatchedPieces: number;
+    // Pieces moved into the customer's own stock ("Mi almacén").
+    stockedPieces: number;
+    // True only once the delivery module confirms an actual delivery.
+    delivered: boolean;
 }
 
 export function deriveOrderProgress(
@@ -112,6 +117,8 @@ export function deriveOrderProgress(
         doneCount,
         totalStages,
         totalPieces,
-        deliveredPieces: dispatchedPieces
+        dispatchedPieces,
+        stockedPieces,
+        delivered
     };
 }

@@ -1,4 +1,4 @@
-import { Boxes, Layers, Package, Wallet } from 'lucide-react';
+import { Boxes, Package, Wallet } from 'lucide-react';
 import { createClient } from '@/utils/supabase/server';
 import { fetchStockForUser, summarizeStock, type StockRow } from '@/lib/services/stock';
 
@@ -37,7 +37,7 @@ export default async function StockPage() {
                 </p>
             </header>
 
-            <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <section className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                 <Kpi
                     label="Productos distintos"
                     value={summary.byProduct.size}
@@ -51,13 +51,6 @@ export default async function StockPage() {
                     sub={`${summary.totalAvailable.toLocaleString('es-CR')} disponibles`}
                     Icon={Boxes}
                     accent="blue"
-                />
-                <Kpi
-                    label="Reservadas"
-                    value={(summary.totalOnHand - summary.totalAvailable).toLocaleString('es-CR')}
-                    sub="comprometidas en pedidos"
-                    Icon={Layers}
-                    accent="purple"
                 />
                 <Kpi
                     label="Valor estimado"
@@ -156,7 +149,6 @@ function ProductBlock({
                     <tr className="text-left">
                         <th className="px-4 py-2 font-semibold text-zinc-600">Talla</th>
                         <th className="px-4 py-2 font-semibold text-zinc-600 text-right">En bodega</th>
-                        <th className="px-4 py-2 font-semibold text-zinc-600 text-right">Reservadas</th>
                         <th className="px-4 py-2 font-semibold text-zinc-600 text-right">Disponibles</th>
                         <th className="px-4 py-2 font-semibold text-zinc-600 text-right">Valor</th>
                     </tr>
@@ -170,9 +162,6 @@ function ProductBlock({
                                     {r.size}
                                 </td>
                                 <td className="px-4 py-2 text-right">{r.quantityOnHand}</td>
-                                <td className="px-4 py-2 text-right text-zinc-500">
-                                    {r.quantityReserved || '—'}
-                                </td>
                                 <td
                                     className={`px-4 py-2 text-right font-bold ${lowStock ? 'text-amber-600' : 'text-emerald-700'}`}
                                 >

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
-import { Download, Search, RefreshCw, Loader2, Eye, Receipt, Pencil, Trash2, Filter, Calendar, User, Building2, Bell, X, AlertTriangle, CheckCircle2, Undo2, Plus, History, ShoppingCart, Clock, Boxes, Truck, Ruler, Inbox, Check } from 'lucide-react';
+import { Download, Search, SearchX, RefreshCw, Loader2, Eye, Receipt, Pencil, Trash2, Calendar, User, Building2, Bell, X, AlertTriangle, CheckCircle2, Undo2, Plus, History, ShoppingCart, Clock, Boxes, Truck, Ruler, Inbox, Check } from 'lucide-react';
 import type { Order } from '@/lib/types';
 import type { AdminProduct } from '@/lib/services/products';
 import type { MissingInsumoReport } from '@/lib/services/missing-insumos';
@@ -34,6 +34,7 @@ import { FacturaModal } from '@/components/admin/factura-modal';
 import { OrderEditModal } from '@/components/admin/order-edit-modal';
 import { OrderDetailModal, type OrderModel3D } from '@/components/admin/order-detail-modal';
 import { useRouter } from 'next/navigation';
+import { FilterSelect, TogglePill } from '@/components/admin/filter-controls';
 import { useDialog } from '@/lib/use-dialog';
 
 export function OrdersTable({
@@ -130,12 +131,15 @@ export function OrdersTable({
 
     // Search expands/collapses from an icon button in the header. Stays
     // open as long as there's text or focus.
-    const [searchOpen, setSearchOpen] = useState(false);
 
     // Filter popover (Estado + Empresa). Closed by default to keep the
     // header tidy; opens to a panel below the title bar.
-    const [filterOpen, setFilterOpen] = useState(false);
     const [companyFilter, setCompanyFilter] = useState<string>('all');
+    // Station assignment ('all' | 'none' | stationUserId), plus the two
+    // attention toggles.
+    const [stationFilter, setStationFilter] = useState<string>('all');
+    const [alertsOnly, setAlertsOnly] = useState(false);
+    const [overdueOnly, setOverdueOnly] = useState(false);
 
     // Distinct company list, derived once per render from the visible
     // orders. Sorted A→Z so the dropdown is scannable.
@@ -366,19 +370,62 @@ export function OrdersTable({
     const activeOrders = orders.filter((o) => !isCompleted(o));
     const completedList = orders.filter((o) => isCompleted(o));
 
+    // Delivery date already past on an order that's still in play.
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const isOverdue = (o: Order): boolean => {
+        if (!o.deliveryDate) return false;
+        if (bucketFor(o) === 'cancelled') return false;
+        const d = new Date(o.deliveryDate);
+        return !Number.isNaN(d.getTime()) && d < startOfToday;
+    };
+
+    const filtersActive =
+        searchTerm.trim() !== '' ||
+        bucketFilter !== 'all' ||
+        companyFilter !== 'all' ||
+        stationFilter !== 'all' ||
+        alertsOnly ||
+        overdueOnly;
+
+    const clearFilters = () => {
+        setSearchTerm('');
+        setBucketFilter('all');
+        setCompanyFilter('all');
+        setStationFilter('all');
+        setAlertsOnly(false);
+        setOverdueOnly(false);
+    };
+
     const filtered = activeOrders.filter((o) => {
         if (bucketFilter !== 'all' && bucketFor(o) !== bucketFilter) return false;
         if (companyFilter !== 'all' && o.companyName !== companyFilter) return false;
-        const term = searchTerm.toLowerCase();
-        if (!term) return true;
-        return (
-            o.customerName?.toLowerCase().includes(term) ||
-            o.companyName?.toLowerCase().includes(term) ||
-            o.id?.toLowerCase().includes(term) ||
-            // Match by article: any order containing an item whose name
-            // includes the term surfaces in the results.
-            o.items.some((i) => i.productName?.toLowerCase().includes(term))
-        );
+        if (stationFilter !== 'all') {
+            const assigned = o.uuid ? assignmentsByOrder.get(o.uuid) : undefined;
+            if (stationFilter === 'none') {
+                if (assigned && assigned.size > 0) return false;
+            } else if (!assigned?.has(stationFilter)) {
+                return false;
+            }
+        }
+        if (alertsOnly && unresolvedCountFor(o.uuid) === 0) return false;
+        if (overdueOnly && !isOverdue(o)) return false;
+        // Every space-separated term must match somewhere, so
+        // "banco polo" narrows instead of widening.
+        const terms = searchTerm.trim().toLowerCase().split(/\s+/).filter(Boolean);
+        if (terms.length === 0) return true;
+        const haystack = [
+            o.id,
+            o.companyName,
+            o.customerName,
+            o.purchaseOrder,
+            o.notes,
+            ...o.items.map((i) => i.productName)
+        ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+        return terms.every((t) => haystack.includes(t));
     });
 
     const bucketCounts = activeOrders.reduce(
@@ -398,66 +445,6 @@ export function OrdersTable({
                     <p className="text-gray-500 dark:text-zinc-400 text-sm">Logística y control de producción.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    {/* Search: icon button by default; expands inline to a
-                        full input while focused or while there's text. */}
-                    {searchOpen || searchTerm ? (
-                        <div className="relative w-64">
-                            <Search
-                                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-zinc-500"
-                                size={16}
-                            />
-                            <input
-                                type="search"
-                                autoFocus
-                                placeholder="Buscar por orden, empresa, cliente o artículo…"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                onBlur={() => {
-                                    if (!searchTerm) setSearchOpen(false);
-                                }}
-                                className="w-full pl-9 pr-8 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 bg-white dark:bg-zinc-900 text-sm"
-                            />
-                            {searchTerm && (
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setSearchTerm('');
-                                        setSearchOpen(false);
-                                    }}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-gray-400 hover:text-gray-700 dark:hover:text-zinc-300"
-                                    aria-label="Limpiar búsqueda"
-                                >
-                                    <X size={14} />
-                                </button>
-                            )}
-                        </div>
-                    ) : (
-                        <button
-                            type="button"
-                            onClick={() => setSearchOpen(true)}
-                            className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"
-                            title="Buscar pedidos"
-                            aria-label="Buscar pedidos"
-                        >
-                            <Search size={18} />
-                        </button>
-                    )}
-                    <button
-                        type="button"
-                        onClick={() => setFilterOpen((o) => !o)}
-                        className={`relative p-2 rounded-lg ${
-                            filterOpen || bucketFilter !== 'all' || companyFilter !== 'all'
-                                ? 'bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300'
-                                : 'text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700'
-                        }`}
-                        title="Filtros"
-                        aria-label="Filtros"
-                    >
-                        <Filter size={18} />
-                        {(bucketFilter !== 'all' || companyFilter !== 'all') && (
-                            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-orange-600 ring-2 ring-white dark:ring-zinc-950" />
-                        )}
-                    </button>
                     <button
                         type="button"
                         onClick={() => setShowAllNotifs(true)}
@@ -553,132 +540,128 @@ export function OrdersTable({
                 </div>
             </div>
 
-            {/* Filter popover. The trigger icon lives in the header
-                action row (search / refresh / filter). When open the
-                panel renders here so it doesn't push the title row
-                around. Pills below summarize the active filters when
-                the panel is closed so admin still has a visual cue. */}
-            {filterOpen && (
-                <div className="mb-4 bg-white dark:bg-zinc-900 rounded-xl shadow-sm border border-gray-200 dark:border-zinc-800 p-4 space-y-4">
-                    <div>
-                        <h4 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-zinc-500 mb-2">
-                            Estado
-                        </h4>
-                        <div className="flex flex-wrap gap-2">
-                            {(
-                                [
-                                    { key: 'all', label: 'Todos', count: orders.length, color: 'bg-gray-900 dark:bg-zinc-100 text-white dark:text-zinc-900' },
-                                    { key: 'pending', label: 'Sin iniciar', count: bucketCounts['pending'] || 0, color: 'bg-gray-200 dark:bg-zinc-800 text-gray-700 dark:text-zinc-300' },
-                                    { key: 'in-progress', label: 'En proceso', count: bucketCounts['in-progress'] || 0, color: 'bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300' },
-                                    { key: 'done', label: 'Listas', count: bucketCounts['done'] || 0, color: 'bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-300' },
-                                    { key: 'cancelled', label: 'Canceladas', count: bucketCounts['cancelled'] || 0, color: 'bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300' }
-                                ] as const
-                            ).map((b) => {
-                                if (b.key !== 'all' && b.count === 0) return null;
-                                const active = bucketFilter === b.key;
-                                return (
-                                    <button
-                                        key={b.key}
-                                        onClick={() => setBucketFilter(b.key)}
-                                        className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors flex items-center gap-1.5 ${
-                                            active
-                                                ? b.color + ' shadow-md'
-                                                : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-300 hover:bg-gray-200 dark:hover:bg-zinc-700'
-                                        }`}
-                                    >
-                                        {b.label} ({b.count})
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    <div>
-                        <h4 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-zinc-500 mb-2">
-                            Empresa
-                        </h4>
-                        <div className="flex items-center gap-2">
-                            <select
-                                value={companyFilter}
-                                onChange={(e) => setCompanyFilter(e.target.value)}
-                                className="flex-1 max-w-md p-2 border border-gray-300 dark:border-zinc-700 rounded-lg text-sm bg-white dark:bg-zinc-900 focus:ring-2 focus:ring-orange-500 outline-none"
-                            >
-                                <option value="all">Todas las empresas ({distinctCompanies.length})</option>
-                                {distinctCompanies.map((name) => (
-                                    <option key={name} value={name}>
-                                        {name}
-                                    </option>
-                                ))}
-                            </select>
-                            {companyFilter !== 'all' && (
-                                <button
-                                    type="button"
-                                    onClick={() => setCompanyFilter('all')}
-                                    className="text-xs font-bold text-gray-500 dark:text-zinc-400 hover:text-orange-600 dark:hover:text-orange-400"
-                                >
-                                    Limpiar
-                                </button>
-                            )}
-                        </div>
-                    </div>
-
-                    {(bucketFilter !== 'all' || companyFilter !== 'all') && (
-                        <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-zinc-800">
-                            <span className="text-xs text-gray-500 dark:text-zinc-500">
-                                {filtered.length} de {orders.length} pedidos
-                            </span>
+            {/* Finder bar — same pattern as Productos: always-visible
+                search, dropdown filters, quick toggles, live count. */}
+            {orders.length > 0 && (
+            <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm p-3 sm:p-4 mb-4">
+                <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+                    <div className="relative flex-1 min-w-0">
+                        <Search
+                            size={16}
+                            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-zinc-500 pointer-events-none"
+                        />
+                        <input
+                            type="search"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder="Buscar por orden, empresa, cliente, artículo, OC o nota…"
+                            aria-label="Buscar pedidos"
+                            className="w-full pl-9 pr-9 py-2.5 rounded-xl border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30 transition-colors"
+                        />
+                        {searchTerm && (
                             <button
                                 type="button"
-                                onClick={() => {
-                                    setBucketFilter('all');
-                                    setCompanyFilter('all');
-                                }}
-                                className="text-xs font-bold text-orange-600 dark:text-orange-400 hover:underline"
+                                onClick={() => setSearchTerm('')}
+                                aria-label="Limpiar búsqueda"
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700"
                             >
-                                Limpiar todos los filtros
+                                <X size={14} />
                             </button>
-                        </div>
-                    )}
-                </div>
-            )}
+                        )}
+                    </div>
 
-            {/* Active-filter summary shown when the popover is closed
-                so admin still sees which filters are in effect. */}
-            {!filterOpen && (bucketFilter !== 'all' || companyFilter !== 'all') && (
-                <div className="flex flex-wrap items-center gap-2 mb-4 text-xs">
-                    <span className="text-gray-500 dark:text-zinc-500 font-semibold">Filtros activos:</span>
-                    {bucketFilter !== 'all' && (
+                    <div className="flex flex-wrap items-center gap-2">
+                        <FilterSelect
+                            label="Estado"
+                            value={bucketFilter}
+                            onChange={(v) => setBucketFilter(v as BucketFilter)}
+                            options={(
+                                [
+                                    { key: 'pending', label: 'Sin iniciar' },
+                                    { key: 'in-progress', label: 'En proceso' },
+                                    { key: 'done', label: 'Listas' },
+                                    { key: 'cancelled', label: 'Canceladas' }
+                                ] as const
+                            ).map((b) => ({
+                                value: b.key,
+                                label: `${b.label} (${bucketCounts[b.key] || 0})`
+                            }))}
+                        />
+                        <FilterSelect
+                            label="Empresa"
+                            value={companyFilter}
+                            onChange={setCompanyFilter}
+                            options={distinctCompanies.map((name) => ({
+                                value: name,
+                                label: name
+                            }))}
+                        />
+                        {stationUsers.length > 0 && (
+                            <FilterSelect
+                                label="Estación"
+                                value={stationFilter}
+                                onChange={setStationFilter}
+                                options={[
+                                    { value: 'none', label: 'Sin asignar' },
+                                    ...stationUsers.map((u) => ({
+                                        value: u.id,
+                                        label: u.displayName || u.email
+                                    }))
+                                ]}
+                            />
+                        )}
+                    </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-zinc-800">
+                    <TogglePill active={alertsOnly} onClick={() => setAlertsOnly((v) => !v)}>
+                        Con alertas
+                    </TogglePill>
+                    <TogglePill
+                        active={overdueOnly}
+                        onClick={() => setOverdueOnly((v) => !v)}
+                    >
+                        Entrega vencida
+                    </TogglePill>
+
+                    <span className="ml-auto text-xs font-semibold text-gray-500 dark:text-zinc-400 tabular-nums">
+                        {filtered.length === activeOrders.length
+                            ? `${activeOrders.length} pedido${activeOrders.length === 1 ? '' : 's'}`
+                            : `${filtered.length} de ${activeOrders.length}`}
+                    </span>
+                    {filtersActive && (
                         <button
                             type="button"
-                            onClick={() => setBucketFilter('all')}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 font-bold hover:bg-orange-200 dark:hover:bg-orange-950/60"
-                            title="Quitar filtro de estado"
+                            onClick={clearFilters}
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/30 px-2.5 py-1.5 rounded-lg transition-colors"
                         >
-                            {bucketFilter === 'pending' && 'Sin iniciar'}
-                            {bucketFilter === 'in-progress' && 'En proceso'}
-                            {bucketFilter === 'done' && 'Listas'}
-                            {bucketFilter === 'cancelled' && 'Canceladas'}
-                            <X size={11} />
-                        </button>
-                    )}
-                    {companyFilter !== 'all' && (
-                        <button
-                            type="button"
-                            onClick={() => setCompanyFilter('all')}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 font-bold hover:bg-orange-200 dark:hover:bg-orange-950/60"
-                            title="Quitar filtro de empresa"
-                        >
-                            {companyFilter}
-                            <X size={11} />
+                            <X size={13} /> Limpiar filtros
                         </button>
                     )}
                 </div>
+            </div>
             )}
 
             {/* Card grid */}
             {filtered.length === 0 ? (
                 <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm p-12 text-center text-gray-500 dark:text-zinc-400">
-                    No se encontraron pedidos.
+                    {filtersActive ? (
+                        <>
+                            <SearchX size={32} className="mx-auto mb-2 opacity-30" />
+                            <p className="font-semibold text-gray-700 dark:text-zinc-300">
+                                Ningún pedido coincide con la búsqueda.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={clearFilters}
+                                className="mt-3 inline-flex items-center gap-1.5 text-sm font-bold text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/30 px-3 py-1.5 rounded-lg transition-colors"
+                            >
+                                <X size={14} /> Limpiar filtros
+                            </button>
+                        </>
+                    ) : (
+                        'No hay pedidos activos.'
+                    )}
                 </div>
             ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
