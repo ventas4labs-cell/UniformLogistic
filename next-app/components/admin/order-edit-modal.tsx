@@ -74,7 +74,12 @@ export function OrderEditModal({
             productName: it.productName,
             size: it.selection.size || '',
             quantity: it.quantity,
-            productUuid: null
+            // Carry the real product UUID by matching the line's code
+            // against the catalogue. Sending null here used to detach
+            // the row from its product on save, which emptied the
+            // order's insumos. The server re-resolves this from the
+            // code as well, so a miss here is no longer destructive.
+            productUuid: products.find((p) => p.id === it.productId)?.uuid ?? null
         }))
     );
 

@@ -515,6 +515,30 @@ export const updateOrderFull = async (
         .eq('order_id', orderUuid);
     if (fetchError) throw fetchError;
 
+    // Re-resolve product_id from product_code for every submitted line.
+    // The client is not a trustworthy source for this: the edit modal
+    // cannot map an existing row back to its product UUID and sends
+    // productUuid=null, so trusting it wiped product_id on every line of
+    // any edited order — silently detaching the BOM and emptying
+    // "Insumos necesarios" (orders 82, 97, 98 were corrupted this way).
+    // Resolving server-side keeps the link intact no matter what the
+    // client sends. Codes with no product (extras, retired codes) stay
+    // null, which is the correct representation for them.
+    const submittedCodes = [...new Set(items.map((i) => i.productCode).filter(Boolean))];
+    const codeToUuid = new Map<string, string>();
+    if (submittedCodes.length > 0) {
+        const { data: prodRows, error: prodError } = await supabase
+            .from('products')
+            .select('id, product_code')
+            .in('product_code', submittedCodes);
+        if (prodError) throw prodError;
+        for (const r of (prodRows || []) as { id: string; product_code: string }[]) {
+            codeToUuid.set(r.product_code, r.id);
+        }
+    }
+    const resolveProductId = (i: OrderItemInput): string | null =>
+        i.productUuid || codeToUuid.get(i.productCode) || null;
+
     const existingIds = new Set((existing || []).map((r) => r.id as string));
     const submittedIds = new Set(
         items.filter((i) => i.id).map((i) => i.id as string)
@@ -537,7 +561,7 @@ export const updateOrderFull = async (
             product_name: i.productName,
             size: i.size,
             quantity: i.quantity,
-            product_id: i.productUuid
+            product_id: resolveProductId(i)
         }));
     if (toInsert.length > 0) {
         const { error: insError } = await supabase
@@ -555,7 +579,7 @@ export const updateOrderFull = async (
                 product_name: item.productName,
                 size: item.size,
                 quantity: item.quantity,
-                product_id: item.productUuid
+                product_id: resolveProductId(item)
             })
             .eq('id', item.id!);
         if (updError) throw updError;
