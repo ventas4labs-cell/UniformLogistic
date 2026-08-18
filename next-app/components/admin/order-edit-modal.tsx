@@ -58,18 +58,16 @@ export function OrderEditModal({
     const [deliveryDate, setDeliveryDate] = useState(isoDate(order.deliveryDate));
     const [notes, setNotes] = useState(order.notes || '');
     const [items, setItems] = useState<DraftItem[]>(() =>
-        order.items.map((it, idx) => ({
-            // The Order type doesn't expose the row id, so existing
-            // items can't be matched back to their DB row from this
-            // modal. We use a stable synthetic id derived from index +
-            // payload so React keys are stable and the server reconcile
-            // sees them as "existing" via uuid lookup. The server-side
-            // action receives undefined for `id`, so on save these are
-            // treated as deletes + inserts (full replacement). This is
-            // intentional: the API surface today doesn't return item
-            // ids, and a delete-then-insert is simpler than threading
-            // ids through every layer. See note in commit message.
-            id: `${idx}-${it.productId}-${it.selection.size || ''}`,
+        order.items.map((it) => ({
+            // The real order_items.id (CartItem.uuid). Passing it lets the
+            // server UPDATE the row in place. It used to send a synthetic
+            // id that the server ignored, so every save deleted and
+            // re-inserted all lines with fresh ids — and because
+            // order_stage_item_progress, order_dispatch_items and
+            // order_stock_entry_items are ON DELETE CASCADE, that
+            // destroyed the order's reported progress, dispatches and
+            // stock entries on every edit.
+            id: it.uuid,
             productCode: it.productId,
             productName: it.productName,
             size: it.selection.size || '',
@@ -158,13 +156,12 @@ export function OrderEditModal({
         const orderUuid = order.uuid;
         startSaving(async () => {
             try {
-                // Server-side reconcile: any item with an id is updated;
-                // items without an id are inserted; missing ids are
-                // deleted. See note in DraftItem — we currently treat
-                // every existing item as id-less, so the server does a
-                // wholesale replacement of the items list. That keeps
-                // the API simple at the cost of churning rows even when
-                // nothing changed.
+                // Server-side reconcile: any item with an id is
+                // updated in place; items without an id are inserted;
+                // ids present in the DB but absent here are deleted.
+                // Existing lines carry their real order_items.id, so an
+                // edit no longer churns every row — which is what kept
+                // the order's progress / dispatch / stock history alive.
                 await updateOrderAction(
                     orderUuid,
                     {
@@ -173,6 +170,9 @@ export function OrderEditModal({
                         notes: notes.trim() || null
                     },
                     items.map((i) => ({
+                        // Preserve the row identity so the server updates
+                        // in place instead of delete + re-insert.
+                        id: i.id,
                         productCode: i.productCode,
                         productName: i.productName,
                         size: i.size,
