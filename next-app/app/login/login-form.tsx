@@ -3,16 +3,57 @@
 import Link from 'next/link';
 import { useActionState, useState } from 'react';
 import { ArrowLeft, Eye, EyeOff, Loader2, LogOut } from 'lucide-react';
-import { signInAction, signOutAction, signUpAction, type AuthState } from './actions';
+import {
+    signInAction,
+    signOutAction,
+    signUpAction,
+    activateCompanyAccountAction,
+    tokenFallbackLoginAction,
+    resendActivationAction,
+    type AuthState
+} from './actions';
 
-export function LoginForm({ currentEmail }: { currentEmail?: string | null }) {
+export function LoginForm({
+    currentEmail,
+    company,
+    notice
+}: {
+    currentEmail?: string | null;
+    company?: {
+        name: string;
+        prefillEmail: string;
+        activated: boolean;
+        passwordSet: boolean;
+    } | null;
+    // Banner derived from the ?reason=<code> the activation routes redirect
+    // back with. Shown until the user submits a form (which replaces it with
+    // that action's own feedback).
+    notice?: { ok: boolean; text: string } | null;
+}) {
     const [isSignUp, setIsSignUp] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
-    const action = isSignUp ? signUpAction : signInAction;
+    // Company-link states: `activating` = first login, needs to set a
+    // password; `awaitingConfirm` = password set, waiting on the email
+    // confirmation click.
+    const activating = !!company && !company.activated && !company.passwordSet;
+    const awaitingConfirm = !!company && !company.activated && !!company.passwordSet;
+    const action = activating
+        ? activateCompanyAccountAction
+        : isSignUp
+          ? signUpAction
+          : signInAction;
     const [state, formAction, pending] = useActionState<AuthState | undefined, FormData>(
         action,
         undefined
     );
+    const [resendState, resendAction, resendPending] = useActionState<
+        AuthState | undefined,
+        FormData
+    >(resendActivationAction, undefined);
+    const [fallbackState, fallbackAction, fallbackPending] = useActionState<
+        AuthState | undefined,
+        FormData
+    >(tokenFallbackLoginAction, undefined);
 
     return (
         <div className="relative min-h-screen w-full bg-black text-white overflow-hidden flex flex-col">
@@ -100,12 +141,27 @@ export function LoginForm({ currentEmail }: { currentEmail?: string | null }) {
                         />
                     </div>
 
+                    {/* Company welcome (arrived via their /o link) */}
+                    {company && !isSignUp && (
+                        <p className="text-center text-sm font-semibold text-orange-300 mb-2">
+                            Bienvenido, {company.name}
+                        </p>
+                    )}
+
                     {/* Title */}
                     <h1 className="text-center text-3xl font-bold tracking-tight">
-                        {isSignUp ? 'Crea tu cuenta' : 'Inicia sesión en Uniform Logistic'}
+                        {isSignUp
+                            ? 'Crea tu cuenta'
+                            : company && !company.activated
+                              ? 'Activá tu cuenta'
+                              : 'Inicia sesión en Uniform Logistic'}
                     </h1>
                     <p className="text-center text-zinc-400 text-sm mt-3 mb-10">
-                        {isSignUp ? (
+                        {activating ? (
+                            'Creá tu contraseña para activar el acceso de tu empresa. Te enviaremos un correo para confirmarla.'
+                        ) : awaitingConfirm ? (
+                            'Revisá tu correo para confirmar tu cuenta y activar el acceso.'
+                        ) : isSignUp ? (
                             <>
                                 ¿Ya tienes cuenta?{' '}
                                 <button
@@ -117,6 +173,10 @@ export function LoginForm({ currentEmail }: { currentEmail?: string | null }) {
                                 </button>
                                 .
                             </>
+                        ) : company ? (
+                            // Returning company arriving via their link — they
+                            // have an account, so never prompt them to register.
+                            'Ingresá con tu correo y contraseña.'
                         ) : (
                             <>
                                 ¿No tienes cuenta?{' '}
@@ -153,6 +213,21 @@ export function LoginForm({ currentEmail }: { currentEmail?: string | null }) {
                         </div>
                     )}
 
+                    {/* Redirect notice (e.g. just activated) — shown until a
+                        form submission replaces it with that action's own
+                        feedback. */}
+                    {notice && !state?.error && !state?.message && (
+                        <div
+                            className={`p-3 rounded-lg text-sm mb-4 border ${
+                                notice.ok
+                                    ? 'bg-emerald-900/30 border-emerald-700/50 text-emerald-200'
+                                    : 'bg-red-900/30 border-red-700/50 text-red-200'
+                            }`}
+                        >
+                            {notice.text}
+                        </div>
+                    )}
+
                     {/* Status */}
                     {state?.error && (
                         <div className="bg-red-900/30 border border-red-700/50 text-red-200 p-3 rounded-lg text-sm mb-4">
@@ -165,7 +240,37 @@ export function LoginForm({ currentEmail }: { currentEmail?: string | null }) {
                         </div>
                     )}
 
+                    {/* Password set — waiting on the email confirmation */}
+                    {awaitingConfirm && (
+                        <div className="rounded-lg border border-white/10 bg-zinc-900/70 p-5 text-center">
+                            <p className="text-sm text-zinc-300">
+                                Ya creaste tu contraseña. Revisá tu correo y tocá el
+                                enlace para activar tu cuenta.
+                            </p>
+                            {resendState?.message && (
+                                <p className="mt-3 text-xs text-emerald-300">
+                                    {resendState.message}
+                                </p>
+                            )}
+                            {resendState?.error && (
+                                <p className="mt-3 text-xs text-red-300">
+                                    {resendState.error}
+                                </p>
+                            )}
+                            <form action={resendAction} className="mt-4">
+                                <button
+                                    type="submit"
+                                    disabled={resendPending}
+                                    className="text-sm font-semibold text-white hover:underline disabled:opacity-60"
+                                >
+                                    Reenviar correo de confirmación
+                                </button>
+                            </form>
+                        </div>
+                    )}
+
                     {/* Form */}
+                    {!awaitingConfirm && (
                     <form action={formAction} className="space-y-5">
                         {isSignUp && (
                             <>
@@ -186,6 +291,7 @@ export function LoginForm({ currentEmail }: { currentEmail?: string | null }) {
                             type="email"
                             required
                             autoComplete="email"
+                            defaultValue={!isSignUp ? company?.prefillEmail : undefined}
                         />
 
                         <div>
@@ -196,13 +302,13 @@ export function LoginForm({ currentEmail }: { currentEmail?: string | null }) {
                                 >
                                     Contraseña
                                 </label>
-                                {!isSignUp && (
-                                    <a
-                                        href="#"
+                                {!isSignUp && !activating && (
+                                    <Link
+                                        href="/restablecer"
                                         className="text-sm font-semibold text-white hover:underline"
                                     >
                                         ¿Olvidaste tu contraseña?
-                                    </a>
+                                    </Link>
                                 )}
                             </div>
                             <div className="relative">
@@ -211,7 +317,10 @@ export function LoginForm({ currentEmail }: { currentEmail?: string | null }) {
                                     name="password"
                                     type={showPassword ? 'text' : 'password'}
                                     required
-                                    autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                                    minLength={activating ? 8 : undefined}
+                                    autoComplete={
+                                        isSignUp || activating ? 'new-password' : 'current-password'
+                                    }
                                     className="w-full bg-zinc-900/70 border border-white/10 hover:border-white/20 focus:border-white/40 focus:bg-zinc-900 rounded-lg pl-4 pr-11 py-3 text-white placeholder:text-zinc-500 outline-none transition-colors"
                                 />
                                 <button
@@ -225,7 +334,22 @@ export function LoginForm({ currentEmail }: { currentEmail?: string | null }) {
                                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                                 </button>
                             </div>
+                            {activating && (
+                                <p className="mt-1.5 text-xs text-zinc-500">
+                                    Mínimo 8 caracteres.
+                                </p>
+                            )}
                         </div>
+
+                        {activating && (
+                            <DarkField
+                                label="Repetí la contraseña"
+                                name="password_confirm"
+                                type="password"
+                                required
+                                autoComplete="new-password"
+                            />
+                        )}
 
                         <button
                             type="submit"
@@ -234,6 +358,8 @@ export function LoginForm({ currentEmail }: { currentEmail?: string | null }) {
                         >
                             {pending ? (
                                 <Loader2 className="animate-spin" size={18} />
+                            ) : activating ? (
+                                'Activá tu cuenta'
                             ) : isSignUp ? (
                                 'Crear mi cuenta'
                             ) : (
@@ -241,6 +367,26 @@ export function LoginForm({ currentEmail }: { currentEmail?: string | null }) {
                             )}
                         </button>
                     </form>
+                    )}
+
+                    {/* Rollout fallback: until they activate, the link's
+                        token still works as the password (old behavior). */}
+                    {activating && (
+                        <form action={fallbackAction} className="mt-4">
+                            {fallbackState?.error && (
+                                <p className="mb-2 text-center text-xs text-red-300">
+                                    {fallbackState.error}
+                                </p>
+                            )}
+                            <button
+                                type="submit"
+                                disabled={fallbackPending}
+                                className="w-full text-sm font-semibold text-zinc-400 hover:text-white transition-colors disabled:opacity-60"
+                            >
+                                Entrar sin contraseña por ahora
+                            </button>
+                        </form>
+                    )}
 
                     <p className="text-center text-xs text-zinc-500 mt-8">
                         Al iniciar sesión aceptas nuestros{' '}
@@ -266,13 +412,15 @@ function DarkField({
     name,
     type = 'text',
     required,
-    autoComplete
+    autoComplete,
+    defaultValue
 }: {
     label: string;
     name: string;
     type?: string;
     required?: boolean;
     autoComplete?: string;
+    defaultValue?: string;
 }) {
     return (
         <div>
@@ -285,6 +433,7 @@ function DarkField({
                 type={type}
                 required={required}
                 autoComplete={autoComplete}
+                defaultValue={defaultValue}
                 className="w-full bg-zinc-900/70 border border-white/10 hover:border-white/20 focus:border-white/40 focus:bg-zinc-900 rounded-lg px-4 py-3 text-white placeholder:text-zinc-500 outline-none transition-colors"
             />
         </div>

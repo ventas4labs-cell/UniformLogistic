@@ -275,6 +275,71 @@ export function deliveryDeliveredEmail(d: DeliveryDeliveredEmailData): RenderedE
     };
 }
 
+// ── 3d. Company account activation — confirm email ───────────────────
+export interface CompanyActivationEmailData {
+    companyName: string;
+    activationUrl: string;
+    /** Human expiry, e.g. "48 horas". */
+    expiresIn: string;
+}
+
+export function companyActivationEmail(d: CompanyActivationEmailData): RenderedEmail {
+    const body = `
+    <p style="margin:0 0 14px 0;">Hola${d.companyName ? ` <strong>${esc(d.companyName)}</strong>` : ''},</p>
+    <p style="margin:0 0 6px 0;">Confirmá este correo para activar el acceso de tu empresa al portal de Uniform Logistic.</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0;">
+      <tr><td style="border-radius:9999px;background:${ORANGE};">
+        <a href="${esc(d.activationUrl)}" style="display:inline-block;padding:14px 30px;font-weight:800;color:#F7F4EE;text-decoration:none;border-radius:9999px;">Activá tu cuenta</a>
+      </td></tr>
+    </table>
+    <p style="margin:0 0 6px 0;color:${MUTED};font-size:13px;">Este enlace vence en ${esc(d.expiresIn)}. Si no lo pediste, ignorá este correo — tu cuenta no se activará.</p>
+    <p style="margin:14px 0 0 0;color:${MUTED};font-size:12px;word-break:break-all;">O copiá y pegá este enlace: ${esc(d.activationUrl)}</p>`;
+    return {
+        subject: 'Activá tu cuenta — Uniform Logistic',
+        html: layout({
+            title: 'Activá tu cuenta',
+            preheader: 'Confirmá tu correo para activar el acceso al portal',
+            body
+        }),
+        text:
+            `Hola${d.companyName ? ` ${d.companyName}` : ''},\n\n` +
+            `Confirmá este correo para activar tu cuenta del portal de Uniform Logistic:\n${d.activationUrl}\n\n` +
+            `El enlace vence en ${d.expiresIn}. Si no lo pediste, ignorá este correo.\n${SUPPORT_EMAIL}`
+    };
+}
+
+// ── 3e. Company password reset ───────────────────────────────────────
+export interface PasswordResetEmailData {
+    companyName: string;
+    resetUrl: string;
+    expiresIn: string;
+}
+
+export function passwordResetEmail(d: PasswordResetEmailData): RenderedEmail {
+    const body = `
+    <p style="margin:0 0 14px 0;">Hola${d.companyName ? ` <strong>${esc(d.companyName)}</strong>` : ''},</p>
+    <p style="margin:0 0 6px 0;">Recibimos una solicitud para restablecer la contraseña de tu cuenta. Tocá el botón para elegir una nueva.</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0;">
+      <tr><td style="border-radius:9999px;background:${ORANGE};">
+        <a href="${esc(d.resetUrl)}" style="display:inline-block;padding:14px 30px;font-weight:800;color:#F7F4EE;text-decoration:none;border-radius:9999px;">Restablecer contraseña</a>
+      </td></tr>
+    </table>
+    <p style="margin:0 0 6px 0;color:${MUTED};font-size:13px;">Este enlace vence en ${esc(d.expiresIn)}. Si no lo pediste, ignorá este correo — tu contraseña no cambiará.</p>
+    <p style="margin:14px 0 0 0;color:${MUTED};font-size:12px;word-break:break-all;">O copiá y pegá este enlace: ${esc(d.resetUrl)}</p>`;
+    return {
+        subject: 'Restablecé tu contraseña — Uniform Logistic',
+        html: layout({
+            title: 'Restablecer contraseña',
+            preheader: 'Elegí una nueva contraseña para tu cuenta',
+            body
+        }),
+        text:
+            `Hola${d.companyName ? ` ${d.companyName}` : ''},\n\n` +
+            `Para restablecer tu contraseña, abrí este enlace:\n${d.resetUrl}\n\n` +
+            `Vence en ${d.expiresIn}. Si no lo pediste, ignorá este correo.\n${SUPPORT_EMAIL}`
+    };
+}
+
 // ── 4. Overdue invoices reminder — to the customer ───────────────────
 export interface OverdueEmailData {
     companyName: string;

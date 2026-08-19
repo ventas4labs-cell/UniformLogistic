@@ -1,27 +1,23 @@
 // ─── Company order-link entry point ─────────────────────────────────
-// Each empresa is given a bookmark like
-//     https://app/o/<accessToken>
-// where <accessToken> is a stable random slug stored on companies.
-// Visiting it server-side:
-//   1. Looks the company up by access_token (service-role read; the
-//      column has a unique index).
-//   2. signInWithPassword as the company's order user, using the token
-//      itself as the password (provisionOrderLink set it that way;
-//      regenerate rotates both in lockstep).
-//   3. Redirects the now-authenticated company user to /catalog.
+// Each empresa is given a bookmark like https://app/o/<accessToken>.
+// It NO LONGER silently signs them in. Instead it lands them on the
+// login page, greeting the company by name, where they either log in
+// with their email + password or (first time) activate their account.
 //
-// Same cookie-jar mechanics as the station /s/[token] route: session
-// cookies are written onto the *redirect response* so they ride the
-// 302 and overwrite any existing session (e.g. an admin testing the
-// link while logged in).
+// The token itself is kept OUT of the URL — it rides in a short-lived
+// httpOnly cookie so the login/activation flow can identify the company
+// and, during rollout, offer the token fallback for accounts that
+// haven't set a password yet.
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
 import { createServiceClient } from '@/utils/supabase/server';
 import { fetchCompanyByAccessToken } from '@/lib/services/companies';
 
 export const dynamic = 'force-dynamic';
+
+// Short-lived cookie that names the company whose link was opened.
+export const COMPANY_LINK_COOKIE = 'ul_company_link';
 
 export async function GET(
     request: NextRequest,
@@ -39,38 +35,20 @@ export async function GET(
 
     const service = createServiceClient();
     const company = await fetchCompanyByAccessToken(service, token);
-    if (!company || !company.orderUserEmail) {
+    if (!company) {
         return fail('invalid-link');
     }
 
-    // Build the success redirect up front so the supabase client can
-    // write session cookies directly onto it.
-    const response = NextResponse.redirect(`${origin}/catalog`);
-
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                getAll() {
-                    return request.cookies.getAll();
-                },
-                setAll(cookiesToSet) {
-                    cookiesToSet.forEach(({ name, value, options }) => {
-                        response.cookies.set(name, value, options);
-                    });
-                }
-            }
-        }
+    // Land on login, scoped to this company by its (non-secret) id.
+    const response = NextResponse.redirect(
+        `${origin}/login?empresa=${company.id}`
     );
-
-    const { error } = await supabase.auth.signInWithPassword({
-        email: company.orderUserEmail,
-        password: token
+    response.cookies.set(COMPANY_LINK_COOKIE, token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 60 * 30
     });
-    if (error) {
-        return fail('signin-failed');
-    }
-
     return response;
 }

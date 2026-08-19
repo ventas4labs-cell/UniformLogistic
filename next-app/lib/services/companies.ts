@@ -187,6 +187,149 @@ export const fetchCompanyByAccessToken = async (
     return data ? mapRow(data as CompanyRow) : null;
 };
 
+// ─── Company login / activation ─────────────────────────────────────
+
+export interface CompanyActivation {
+    id: string;
+    name: string;
+    /** Real contact email on file, if any (may be null for older rows). */
+    email: string | null;
+    /** Email the company typed at first login, awaiting confirmation. */
+    pendingEmail: string | null;
+    orderUserId: string;
+    passwordSetAt: string | null;
+    activatedAt: string | null;
+}
+
+/** Non-secret welcome + activation state for the login page (looked up
+ *  by the company id the /o link redirect carries). */
+export const fetchCompanyActivation = async (
+    serviceSupabase: SupabaseClient,
+    companyId: string
+): Promise<CompanyActivation | null> => {
+    const { data, error } = await serviceSupabase
+        .from('companies')
+        .select(
+            'id, name, email, pending_email, order_user_id, password_set_at, activated_at, is_active'
+        )
+        .eq('id', companyId)
+        .eq('is_active', true)
+        .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    const r = data as {
+        id: string;
+        name: string;
+        email: string | null;
+        pending_email: string | null;
+        order_user_id: string | null;
+        password_set_at: string | null;
+        activated_at: string | null;
+    };
+    return {
+        id: r.id,
+        name: r.name,
+        email: r.email,
+        pendingEmail: r.pending_email,
+        orderUserId: r.order_user_id || '',
+        passwordSetAt: r.password_set_at,
+        activatedAt: r.activated_at
+    };
+};
+
+export interface CompanyByActivationToken {
+    id: string;
+    name: string;
+    accessToken: string;
+    orderUserId: string;
+    pendingEmail: string | null;
+    activationExpiresAt: string | null;
+    activatedAt: string | null;
+}
+
+/** Resolve a company from a /activar/<token> confirmation token. */
+export const fetchCompanyByActivationToken = async (
+    serviceSupabase: SupabaseClient,
+    token: string
+): Promise<CompanyByActivationToken | null> => {
+    const { data, error } = await serviceSupabase
+        .from('companies')
+        .select(
+            'id, name, access_token, order_user_id, pending_email, activation_expires_at, activated_at'
+        )
+        .eq('activation_token', token)
+        .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    const r = data as {
+        id: string;
+        name: string;
+        access_token: string | null;
+        order_user_id: string | null;
+        pending_email: string | null;
+        activation_expires_at: string | null;
+        activated_at: string | null;
+    };
+    return {
+        id: r.id,
+        name: r.name,
+        accessToken: r.access_token || '',
+        orderUserId: r.order_user_id || '',
+        pendingEmail: r.pending_email,
+        activationExpiresAt: r.activation_expires_at,
+        activatedAt: r.activated_at
+    };
+};
+
+/** Find an activated company by its confirmed login email (for reset). */
+export const fetchActivatedCompanyByEmail = async (
+    serviceSupabase: SupabaseClient,
+    email: string
+): Promise<{ id: string; name: string; orderUserId: string } | null> => {
+    const { data, error } = await serviceSupabase
+        .from('companies')
+        .select('id, name, order_user_id')
+        .ilike('email', email)
+        .not('activated_at', 'is', null)
+        .eq('is_active', true)
+        .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    const r = data as { id: string; name: string; order_user_id: string | null };
+    return { id: r.id, name: r.name, orderUserId: r.order_user_id || '' };
+};
+
+/** Resolve a company from a /restablecer/<token> reset token. */
+export const fetchCompanyByResetToken = async (
+    serviceSupabase: SupabaseClient,
+    token: string
+): Promise<{
+    id: string;
+    name: string;
+    orderUserId: string;
+    resetExpiresAt: string | null;
+} | null> => {
+    const { data, error } = await serviceSupabase
+        .from('companies')
+        .select('id, name, order_user_id, reset_expires_at')
+        .eq('reset_token', token)
+        .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    const r = data as {
+        id: string;
+        name: string;
+        order_user_id: string | null;
+        reset_expires_at: string | null;
+    };
+    return {
+        id: r.id,
+        name: r.name,
+        orderUserId: r.order_user_id || '',
+        resetExpiresAt: r.reset_expires_at
+    };
+};
+
 /** Persist the provisioned order-link fields onto the company row. */
 export const setCompanyOrderLink = async (
     serviceSupabase: SupabaseClient,

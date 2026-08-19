@@ -11,6 +11,8 @@ import {
     orderCompletedEmail,
     deliveryScheduledEmail,
     deliveryDeliveredEmail,
+    companyActivationEmail,
+    passwordResetEmail,
     invoiceOverdueEmail,
     fastOrderReceivedEmail,
     fastOrderAdminNotice,
@@ -246,6 +248,35 @@ export async function sendDeliveryDeliveredEmail(
     } catch (e) {
         console.error('[email] delivery delivered notice failed', e);
     }
+}
+
+/**
+ * Send the account-activation confirmation to a company's chosen email.
+ * The recipient is passed directly (it's the pending email they just
+ * entered, not yet on the company row). Returns the send result so the
+ * caller can surface a failure — activation depends on it arriving.
+ */
+export async function sendCompanyActivationEmail(
+    to: string,
+    companyName: string,
+    activationUrl: string,
+    expiresIn: string
+): Promise<{ ok: boolean; error?: string }> {
+    const t = companyActivationEmail({ companyName, activationUrl, expiresIn });
+    const res = await sendEmail({ to, subject: t.subject, html: t.html, text: t.text });
+    return { ok: res.ok, error: res.error };
+}
+
+/** Send the password-reset link to a company. Recipient passed directly. */
+export async function sendPasswordResetEmail(
+    to: string,
+    companyName: string,
+    resetUrl: string,
+    expiresIn: string
+): Promise<{ ok: boolean; error?: string }> {
+    const t = passwordResetEmail({ companyName, resetUrl, expiresIn });
+    const res = await sendEmail({ to, subject: t.subject, html: t.html, text: t.text });
+    return { ok: res.ok, error: res.error };
 }
 
 export interface OverdueReminderResult {
