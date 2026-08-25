@@ -176,6 +176,7 @@ function OrderCard({
     onLocalPrepChange,
     onCommitPrep,
     stationNames,
+    isOutsourced = false,
 }: {
     order: Order;
     isCompleted: boolean;
@@ -186,6 +187,13 @@ function OrderCard({
     onLocalPrepChange: (orderId: string, insumoName: string, qty: number) => void;
     onCommitPrep: (orderId: string, insumoName: string, qty: number) => Promise<void>;
     stationNames: string[];
+    /**
+     * True when a BODEGA station is preparing this order. Distinct from
+     * stationNames, which lists assignments across every stage (corte,
+     * maquila…) for the badge and the PDF header — an order merely bound
+     * for corte later must not read as "not ours" here.
+     */
+    isOutsourced?: boolean;
 }) {
     const [expanded, setExpanded] = useState(false);
     const [reportingInsumo, setReportingInsumo] = useState<string | null>(null);
@@ -237,6 +245,13 @@ function OrderCard({
                 isCompleted
                     ? 'border-green-200 dark:border-green-900/40'
                     : 'border-gray-200 dark:border-zinc-800'
+            } ${
+                // Produced by an external workshop — dimmed so nobody on
+                // this board starts working it by mistake. Brightens on
+                // hover/focus so the details stay readable when needed.
+                isOutsourced
+                    ? 'opacity-60 hover:opacity-100 focus-within:opacity-100 transition-opacity'
+                    : ''
             }`}
         >
             <div className="p-4">
@@ -867,6 +882,7 @@ export function OperatorBoard({
                             stationNames={
                                 (order.uuid && stationNamesByOrder[order.uuid]) || []
                             }
+                            isOutsourced={stationsFor(order).length > 0}
                         />
                         ))}
                     </div>
@@ -887,6 +903,7 @@ export function OperatorBoard({
                             stationNames={
                                 (order.uuid && stationNamesByOrder[order.uuid]) || []
                             }
+                            isOutsourced={stationsFor(order).length > 0}
                         />
                                 ))}
                             </div>

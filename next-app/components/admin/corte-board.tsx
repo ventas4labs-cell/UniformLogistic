@@ -100,6 +100,13 @@ function OrderCard({
                 isCompleted
                     ? 'border-emerald-200 dark:border-emerald-900/40'
                     : 'border-zinc-200 dark:border-zinc-800'
+            } ${
+                // Produced by an external workshop — dimmed so nobody on
+                // this board starts working it by mistake. Brightens on
+                // hover/focus so the details stay readable when needed.
+                stationNames.length > 0
+                    ? 'opacity-60 hover:opacity-100 focus-within:opacity-100 transition-opacity'
+                    : ''
             }`}
         >
             <div className="p-4">
