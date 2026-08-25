@@ -15,6 +15,7 @@ import { StageCompleteToggle } from '@/components/admin/stage-complete-toggle';
 import type { StageTab } from '@/components/admin/stage-tab-bar';
 import { StageBoardFilters } from '@/components/admin/stage-board-filters';
 import { CollapsibleSearch } from '@/components/admin/collapsible-search';
+import { FilterSelect } from '@/components/admin/filter-controls';
 import { addCorteExtraItemAction } from '@/app/(admin)/admin/_stage-actions';
 import { OrderProductsSummary } from '@/components/admin/order-products-summary';
 import { StagePartialEditor } from '@/components/admin/stage-partial-editor';
@@ -315,6 +316,9 @@ export function CorteBoard({
     // Assignment scope: all corte orders, or only those handed to an
     // external corte station.
     const [assignTab, setAssignTab] = useState<'all' | 'assigned'>('all');
+    // Which external station's work to show: 'all', 'none' (in-house
+    // only), or a specific station name.
+    const [stationFilter, setStationFilter] = useState<string>('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [companyFilter, setCompanyFilter] = useState<string>('all');
     const [pending] = useTransition();
@@ -323,6 +327,19 @@ export function CorteBoard({
     const stationsFor = (o: Order): string[] =>
         (o.uuid && assignedStationsByOrder[o.uuid]) || [];
     const assignedCount = orders.filter((o) => stationsFor(o).length > 0).length;
+
+    // Stations that actually carry corte work, so the dropdown never
+    // offers an option that would return nothing.
+    const stationOptions = useMemo(
+        () =>
+            Array.from(
+                new Set(Object.values(assignedStationsByOrder).flat())
+            ).sort((a, b) => a.localeCompare(b, 'es')),
+        [assignedStationsByOrder]
+    );
+    // Picking one station is a visibility view like "Asignados": show all
+    // of that station's work, not just what's still pending.
+    const singleStation = stationFilter !== 'all' && stationFilter !== 'none';
 
     const handleLocalCompletionChange = (uuid: string, next: boolean) => {
         setCompleted((prev) => {
@@ -335,23 +352,30 @@ export function CorteBoard({
 
     // Assignment scope is applied first, then the pending/done/all tab.
     const scoped = useMemo(
-        () =>
-            assignTab === 'assigned'
-                ? orders.filter((o) => stationsFor(o).length > 0)
-                : orders,
+        () => {
+            let list = orders;
+            if (stationFilter === 'none') {
+                list = list.filter((o) => stationsFor(o).length === 0);
+            } else if (singleStation) {
+                list = list.filter((o) => stationsFor(o).includes(stationFilter));
+            } else if (assignTab === 'assigned') {
+                list = list.filter((o) => stationsFor(o).length > 0);
+            }
+            return list;
+        },
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [orders, assignTab, assignedStationsByOrder]
+        [orders, assignTab, stationFilter, singleStation, assignedStationsByOrder]
     );
 
     const tabFiltered = useMemo(() => {
         // "Asignados" is a visibility view — show every assigned order so
         // the default pending sub-filter never hides ones an external
         // station already completed.
-        if (assignTab === 'assigned') return scoped;
+        if (assignTab === 'assigned' || singleStation) return scoped;
         if (tab === 'all') return scoped;
         if (tab === 'done') return scoped.filter((o) => o.uuid && completed.has(o.uuid));
         return scoped.filter((o) => !(o.uuid && completed.has(o.uuid)));
-    }, [scoped, completed, tab, assignTab]);
+    }, [scoped, completed, tab, assignTab, singleStation]);
 
     const filtered = tabFiltered.filter((o) => {
         if (companyFilter !== 'all' && o.companyName !== companyFilter) return false;
@@ -408,8 +432,11 @@ export function CorteBoard({
                 </div>
             </div>
 
-            {/* Assignment-scope tabs: full visibility of external-station work */}
-            <div className="inline-flex items-center gap-1 p-1 mb-4 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
+            {/* Assignment scope + station picker. The two stay in sync:
+                choosing one station resets the scope tab (and vice versa)
+                so the UI never highlights two contradictory filters. */}
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+            <div className="inline-flex items-center gap-1 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
                 {(
                     [
                         { key: 'all', label: 'Todos', count: orders.length },
@@ -419,7 +446,10 @@ export function CorteBoard({
                     <button
                         key={t.key}
                         type="button"
-                        onClick={() => setAssignTab(t.key)}
+                        onClick={() => {
+                            setAssignTab(t.key);
+                            setStationFilter('all');
+                        }}
                         className={`inline-flex items-center gap-1.5 px-4 min-h-11 rounded-lg text-sm font-bold transition-colors ${
                             assignTab === t.key
                                 ? 'bg-white dark:bg-zinc-900 shadow-sm text-zinc-900 dark:text-zinc-100'
@@ -441,9 +471,40 @@ export function CorteBoard({
                 ))}
             </div>
 
+            {stationOptions.length > 0 && (
+                <div className="flex items-center gap-2">
+                    <FilterSelect
+                        label="Estación"
+                        value={stationFilter}
+                        onChange={(v) => {
+                            setStationFilter(v);
+                            if (v !== 'all') setAssignTab('all');
+                        }}
+                        options={[
+                            { value: 'none', label: 'Sin asignar (interno)' },
+                            ...stationOptions.map((n) => ({ value: n, label: n }))
+                        ]}
+                    />
+                    {stationFilter !== 'all' && (
+                        <button
+                            type="button"
+                            onClick={() => setStationFilter('all')}
+                            className="inline-flex items-center gap-1 text-xs font-bold text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/30 px-2 py-1.5 rounded-lg transition-colors"
+                        >
+                            <X size={13} /> Quitar
+                        </button>
+                    )}
+                </div>
+            )}
+            </div>
+
             {filtered.length === 0 ? (
                 <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm p-12 text-center text-zinc-500 dark:text-zinc-400">
-                    {assignTab === 'assigned'
+                    {singleStation
+                        ? `${stationFilter} no tiene pedidos de corte asignados.`
+                        : stationFilter === 'none'
+                        ? 'Todos los pedidos de corte están asignados a una estación externa.'
+                        : assignTab === 'assigned'
                         ? 'Ningún pedido de corte está asignado a una estación externa.'
                         : tab === 'pending'
                             ? 'No hay pedidos pendientes de corte.'
