@@ -20,6 +20,12 @@ interface Props {
     /** Board raising the report — recorded so the receive step can be
      * surfaced back on the right board. */
     stage?: string;
+    /**
+     * Order is produced by an external station — the completion toggle
+     * goes read-only. Reporting a missing insumo stays available: the
+     * office still needs to flag a shortage it discovers.
+     */
+    locked?: boolean;
 }
 
 /**
@@ -29,7 +35,14 @@ interface Props {
  * `missing_insumo_reports`). Shared by the operator and maquila boards
  * so both stages can act on the same insumo state.
  */
-export function InsumoRow({ ins, orderUuid, isCompleted, onToggleComplete, stage }: Props) {
+export function InsumoRow({
+    ins,
+    orderUuid,
+    isCompleted,
+    onToggleComplete,
+    stage,
+    locked = false
+}: Props) {
     const [reporting, setReporting] = useState(false);
     const [sent, setSent] = useState(false);
 
@@ -63,13 +76,20 @@ export function InsumoRow({ ins, orderUuid, isCompleted, onToggleComplete, stage
                     </span>
                     {orderUuid && (
                         <button
+                            disabled={locked}
                             onClick={() => onToggleComplete(!isCompleted)}
                             className={`rounded-full p-1 transition-colors ${
                                 isCompleted
                                     ? 'bg-green-600 text-white hover:bg-green-700'
                                     : 'bg-white dark:bg-zinc-900 border border-gray-300 dark:border-zinc-700 text-gray-400 dark:text-zinc-500 hover:border-green-500 hover:text-green-600'
                             }`}
-                            title={isCompleted ? 'Marcar como pendiente' : 'Marcar como completo'}
+                            title={
+                                locked
+                                    ? 'Producido por una estación externa'
+                                    : isCompleted
+                                      ? 'Marcar como pendiente'
+                                      : 'Marcar como completo'
+                            }
                         >
                             <Check size={12} strokeWidth={3} />
                         </button>

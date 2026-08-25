@@ -24,6 +24,11 @@ interface Props {
     // Local-state mutator so the parent board can optimistically flip
     // the completion before the action round-trips.
     onLocalChange: (orderUuid: string, next: boolean) => void;
+    /**
+     * Order is being produced by an external station — the board shows it
+     * dimmed and read-only so nobody here marks work they didn't do.
+     */
+    locked?: boolean;
 }
 
 // Single round icon-only toggle. Pending = outlined orange circle.
@@ -36,14 +41,16 @@ export function StageCompleteToggle({
     isCompleted,
     completedAt,
     orderRef,
-    onLocalChange
+    onLocalChange,
+    locked = false
 }: Props) {
     const [pending, startTransition] = useTransition();
     const [confirmOpen, setConfirmOpen] = useState(false);
-    const disabled = !orderUuid || pending;
+    const disabled = !orderUuid || pending || locked;
     const stageLabel = STAGE_LABELS[stage];
 
     const tooltip = (() => {
+        if (locked) return 'Producido por una estación externa';
         if (isCompleted) {
             const when = completedAt ? new Date(completedAt) : null;
             const whenLabel = when

@@ -125,6 +125,7 @@ function OrderCard({
                         </p>
                     </div>
                     <StageCompleteToggle
+                        locked={stationNames.length > 0}
                         orderUuid={order.uuid}
                         orderRef={order.id}
                         stage="empaque"
@@ -224,7 +225,12 @@ function OrderCard({
                 <button
                     type="button"
                     onClick={onDispatch}
-                    disabled={!order.uuid || allOut}
+                    disabled={!order.uuid || allOut || stationNames.length > 0}
+                    title={
+                        stationNames.length > 0
+                            ? 'Producido por una estación externa'
+                            : undefined
+                    }
                     className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-colors shadow-sm ${
                         allOut
                             ? 'bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-300 cursor-not-allowed'

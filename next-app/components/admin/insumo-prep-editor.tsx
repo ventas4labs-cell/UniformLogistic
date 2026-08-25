@@ -10,6 +10,8 @@ interface Props {
     preparedQty: number;
     onLocalChange: (orderId: string, insumoName: string, qty: number) => void;
     onCommit: (orderId: string, insumoName: string, qty: number) => Promise<void>;
+    /** Produced by an external station — the editor goes read-only. */
+    locked?: boolean;
 }
 
 // Compact inline editor for "how much of this insumo have we prepared
@@ -25,7 +27,8 @@ export function InsumoPrepEditor({
     totalQty,
     preparedQty,
     onLocalChange,
-    onCommit
+    onCommit,
+    locked = false
 }: Props) {
     const [text, setText] = useState(() => preparedQty > 0 ? String(preparedQty) : '');
     const [pending, startTransition] = useTransition();
@@ -64,6 +67,7 @@ export function InsumoPrepEditor({
                         Preparado
                     </label>
                     <input
+                        disabled={locked}
                         type="text"
                         inputMode="decimal"
                         value={text}
@@ -121,6 +125,7 @@ export function InsumoPrepEditor({
                 </span>
                 {safe > 0 && (
                     <button
+                        disabled={locked}
                         type="button"
                         onClick={() => {
                             setText('');

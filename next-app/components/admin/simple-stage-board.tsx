@@ -156,6 +156,7 @@ function OrderCard({
                         </p>
                     </div>
                     <StageCompleteToggle
+                        locked={stationNames.length > 0}
                         orderUuid={order.uuid}
                         orderRef={order.id}
                         stage={stage}
@@ -198,6 +199,7 @@ function OrderCard({
                 {allowPartial ? (
                     <div className="p-4 flex-1">
                         <StagePartialEditor
+                        locked={stationNames.length > 0}
                             order={order}
                             stage={stage}
                             initialProgress={initialProgress || {}}

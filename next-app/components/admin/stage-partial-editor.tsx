@@ -30,6 +30,11 @@ interface Props {
      *  board's completion (maquila: completion is owned by "listo para
      *  recoger", not by line counts). */
     decoupleCompletion?: boolean;
+    /**
+     * Order is produced by an external station — inputs and the save
+     * button go read-only so nobody records progress they didn't make.
+     */
+    locked?: boolean;
 }
 
 const clamp = (n: number, max: number) => Math.max(0, Math.min(max, n));
@@ -40,7 +45,8 @@ export function StagePartialEditor({
     initialProgress,
     isCompleted,
     onCompletedChange,
-    decoupleCompletion = false
+    decoupleCompletion = false,
+    locked = false
 }: Props) {
     const items = order.items;
     const totalPieces = useMemo(
@@ -198,7 +204,7 @@ export function StagePartialEditor({
                                     inputMode="numeric"
                                     min={0}
                                     max={item.quantity}
-                                    disabled={!id || pending}
+                                    disabled={!id || pending || locked}
                                     // Show an empty field for 0 (with a "0"
                                     // placeholder) rather than a literal "0".
                                     // On the stations' tablets focus-select
@@ -224,7 +230,7 @@ export function StagePartialEditor({
                                 <button
                                     type="button"
                                     onClick={() => id && setLine(id, item.quantity, item.quantity)}
-                                    disabled={!id || pending || full}
+                                    disabled={!id || pending || full || locked}
                                     className="text-[11px] font-bold px-2 py-1 rounded-md text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/40 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
                                 >
                                     Todo
@@ -242,7 +248,7 @@ export function StagePartialEditor({
             <button
                 type="button"
                 onClick={handleSave}
-                disabled={!canSave}
+                disabled={!canSave || locked}
                 className={`w-full py-2.5 rounded-lg font-bold text-sm flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                     allFull
                         ? 'bg-green-600 hover:bg-green-700 text-white'

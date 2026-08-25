@@ -274,6 +274,7 @@ function OrderCard({
                     </div>
                     <div className="flex flex-col items-end gap-1.5 shrink-0">
                         <StageCompleteToggle
+                        locked={isOutsourced}
                             orderUuid={order.uuid}
                             orderRef={order.id}
                             stage="bodega"
@@ -482,6 +483,7 @@ function OrderCard({
                                                         )}
                                                         {order.uuid && (
                                                             <button
+                                                                disabled={isOutsourced}
                                                                 onClick={() =>
                                                                     onToggleInsumo(order.uuid!, ins.name, !isCompleted)
                                                                 }
@@ -516,6 +518,7 @@ function OrderCard({
                                                 </div>
                                                 {isPrepOpen && order.uuid && (
                                                     <InsumoPrepEditor
+                                                        locked={isOutsourced}
                                                         orderId={order.uuid}
                                                         insumoName={ins.name}
                                                         totalQty={ins.totalQty}

@@ -128,6 +128,7 @@ function OrderCard({
                         </p>
                     </div>
                     <StageCompleteToggle
+                        locked={stationNames.length > 0}
                         orderUuid={order.uuid}
                         orderRef={order.id}
                         stage="corte"
@@ -170,6 +171,7 @@ function OrderCard({
                 underneath. */}
             <div className="border-t border-zinc-100 dark:border-zinc-800 p-4">
                 <StagePartialEditor
+                        locked={stationNames.length > 0}
                     // Includes optimistic extras so a just-added piece
                     // shows in the tracker without waiting for a refresh.
                     order={{ ...order, items }}
@@ -185,6 +187,7 @@ function OrderCard({
                 same roll — so it reads the same `items` list. */}
             <div className="px-4 pb-4">
                 <CorteFabricReportPanel
+                    locked={stationNames.length > 0}
                     order={{ ...order, items }}
                     initialReports={fabricReports}
                 />
@@ -290,7 +293,7 @@ function OrderCard({
                             <button
                                 type="button"
                                 onClick={() => setShowExtraForm(true)}
-                                disabled={!order.uuid}
+                                disabled={!order.uuid || stationNames.length > 0}
                                 className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-950/50 disabled:opacity-50"
                             >
                                 <Plus size={14} /> Agregar extra

@@ -87,6 +87,7 @@ function OrderCard({
                         </p>
                     </div>
                     <StageCompleteToggle
+                        locked={stationNames.length > 0}
                         orderUuid={order.uuid}
                         orderRef={order.id}
                         stage="maquila"
@@ -185,6 +186,7 @@ function OrderCard({
                                             );
                                         return (
                                             <InsumoRow
+                        locked={stationNames.length > 0}
                                                 key={ins.name}
                                                 ins={ins}
                                                 orderUuid={order.uuid}

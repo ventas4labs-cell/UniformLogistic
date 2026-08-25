@@ -16,13 +16,15 @@ export function DecimalInput({
     onChange,
     className,
     placeholder,
-    ariaLabel
+    ariaLabel,
+    disabled = false
 }: {
     value: number;
     onChange: (next: number) => void;
     className?: string;
     placeholder?: string;
     ariaLabel?: string;
+    disabled?: boolean;
 }) {
     const [text, setText] = useState(() =>
         Number.isFinite(value) && value > 0 ? String(value) : ''
@@ -50,6 +52,7 @@ export function DecimalInput({
 
     return (
         <input
+            disabled={disabled}
             type="text"
             inputMode="decimal"
             value={text}

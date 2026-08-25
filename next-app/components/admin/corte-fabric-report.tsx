@@ -50,10 +50,13 @@ function seedDrafts(
 
 export function CorteFabricReportPanel({
     order,
-    initialReports = []
+    initialReports = [],
+    locked = false
 }: {
     order: Order;
     initialReports?: CorteFabricReport[];
+    /** Produced by an external station — the panel opens read-only. */
+    locked?: boolean;
 }) {
     const lines = useMemo(() => fabricLinesForOrder(order), [order]);
     const [open, setOpen] = useState(false);
@@ -189,6 +192,7 @@ export function CorteFabricReportPanel({
                                         Gastado
                                     </span>
                                     <DecimalInput
+                                        disabled={locked}
                                         value={d?.qty ?? 0}
                                         onChange={(qty) => setLine(line.fabricType, { qty })}
                                         placeholder="0"
@@ -196,6 +200,7 @@ export function CorteFabricReportPanel({
                                         className="w-20 text-center font-mono font-bold text-sm rounded-lg border border-gray-200 dark:border-zinc-700 px-2 py-1 outline-none focus:ring-2 focus:ring-orange-500 bg-white dark:bg-zinc-900 text-gray-900 dark:text-zinc-100"
                                     />
                                     <select
+                                        disabled={locked}
                                         value={d?.unit || DEFAULT_FABRIC_UNIT}
                                         onChange={(e) =>
                                             setLine(line.fabricType, { unit: e.target.value })
@@ -231,6 +236,7 @@ export function CorteFabricReportPanel({
                                 </div>
 
                                 <input
+                                    disabled={locked}
                                     type="text"
                                     value={d?.note ?? ''}
                                     onChange={(e) =>
@@ -253,7 +259,7 @@ export function CorteFabricReportPanel({
                     <button
                         type="button"
                         onClick={handleSave}
-                        disabled={!order.uuid || !dirty || pending}
+                        disabled={!order.uuid || !dirty || pending || locked}
                         className="w-full py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-1.5 bg-orange-600 hover:bg-orange-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {pending ? (
