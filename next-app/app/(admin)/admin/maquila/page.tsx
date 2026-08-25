@@ -3,10 +3,7 @@ import { fetchAllOrders, fetchOrdersByIds } from '@/lib/services/orders';
 import { fetchStageCompletions } from '@/lib/services/stage-completions';
 import { fetchStageItemProgress } from '@/lib/services/stage-item-progress';
 import { fetchCompletionsForOrders } from '@/lib/services/insumo-completions';
-import {
-    fetchOrdersOutsourcedToStage,
-    fetchAssignmentsForStage
-} from '@/lib/services/station-assignments';
+import { fetchAssignmentsForStage } from '@/lib/services/station-assignments';
 import { fetchStationUsers } from '@/lib/services/station-users';
 import { orderNeedsStage } from '@/lib/stage-utils';
 import { MaquilaModule } from '@/components/admin/maquila-module';
@@ -25,14 +22,12 @@ export default async function MaquilaPage() {
     const [
         completed,
         insumoCompletions,
-        outsourced,
         stationUsers,
         stageAssignments,
         progressByItem
     ] = await Promise.all([
         fetchStageCompletions(supabase, 'maquila'),
         fetchCompletionsForOrders(supabase, orderIds),
-        fetchOrdersOutsourcedToStage(supabase, orderIds, 'maquila'),
         fetchStationUsers(supabase),
         fetchAssignmentsForStage(supabase, 'maquila'),
         // Per-line pieces-done for every maquila order, so the admin panel
@@ -40,10 +35,16 @@ export default async function MaquilaPage() {
         fetchStageItemProgress(supabase, 'maquila')
     ]);
 
-    // In-house board: maquila orders NOT sent to an external workshop.
-    const inHouseOrders = maquilaOrders.filter(
-        (o) => !(o.uuid && outsourced.has(o.uuid))
-    );
+    // The "En taller" board shows EVERY maquila order, including the ones
+    // sent to an external workshop — those are badged with their station
+    // and can be isolated with the board's station picker. Hiding them
+    // made outsourced work invisible from the taller view.
+    const assignedStationsByOrder: Record<string, string[]> = {};
+    for (const a of stageAssignments) {
+        const s = stationUsers.find((u) => u.id === a.stationUserId);
+        const name = s?.displayName || s?.email || 'Estación';
+        (assignedStationsByOrder[a.orderId] ||= []).push(name);
+    }
 
     // External maquila stations (active) and their assigned orders with
     // pickup status. Fetch the full order detail for every assigned id.
@@ -75,9 +76,10 @@ export default async function MaquilaPage() {
     return (
         <MaquilaModule
             inHouse={{
-                initialOrders: inHouseOrders,
+                initialOrders: maquilaOrders,
                 initialCompletedOrderIds: Array.from(completed),
-                initialInsumoCompletions: insumoCompletions
+                initialInsumoCompletions: insumoCompletions,
+                assignedStationsByOrder
             }}
             stations={maquilaStations.map((s) => ({ id: s.id, name: s.displayName }))}
             workByStation={workByStation}

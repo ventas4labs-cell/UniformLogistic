@@ -21,6 +21,9 @@ interface Props {
         initialOrders: Order[];
         initialCompletedOrderIds: string[];
         initialInsumoCompletions: InsumoCompletion[];
+        /** orderId → external maquila station name(s), for the badges
+         *  and the station picker on the taller board. */
+        assignedStationsByOrder?: Record<string, string[]>;
     };
     stations: MaquilaStationInfo[];
     workByStation: Record<string, StationWorkItem[]>;
@@ -84,6 +87,7 @@ export function MaquilaModule({
                     initialOrders={inHouse.initialOrders}
                     initialCompletedOrderIds={inHouse.initialCompletedOrderIds}
                     initialInsumoCompletions={inHouse.initialInsumoCompletions}
+                    assignedStationsByOrder={inHouse.assignedStationsByOrder}
                 />
             ) : (
                 <ExternalStationPanel

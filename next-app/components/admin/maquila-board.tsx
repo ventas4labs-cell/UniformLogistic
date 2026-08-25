@@ -7,7 +7,9 @@ import {
     RefreshCw,
     Loader2,
     ChevronDown,
-    ChevronUp
+    ChevronUp,
+    HardHat,
+    X
 } from 'lucide-react';
 import { ProductThumb, useProductZoom } from '@/components/admin/product-thumb';
 import type { Order } from '@/lib/types';
@@ -16,6 +18,7 @@ import { aggregateInsumos } from '@/lib/stage-utils';
 import { StageCompleteToggle } from '@/components/admin/stage-complete-toggle';
 import type { StageTab } from '@/components/admin/stage-tab-bar';
 import { CollapsibleSearch } from '@/components/admin/collapsible-search';
+import { FilterSelect } from '@/components/admin/filter-controls';
 import { StageBoardFilters } from '@/components/admin/stage-board-filters';
 import {
     InsumoRow,
@@ -32,13 +35,16 @@ function OrderCard({
     isCompleted,
     onLocalChange,
     completedInsumos,
-    onToggleInsumo
+    onToggleInsumo,
+    stationNames = []
 }: {
     order: Order;
     isCompleted: boolean;
     onLocalChange: (uuid: string, next: boolean) => void;
     completedInsumos: Set<string>;
     onToggleInsumo: (orderId: string, insumoName: string, completed: boolean) => void;
+    /** External maquila station(s) this order is assigned to, if any. */
+    stationNames?: string[];
 }) {
     const [expanded, setExpanded] = useState(true);
     // Tapping a line's thumbnail opens the product full-size.
@@ -90,6 +96,11 @@ function OrderCard({
                     <span className="bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-300 text-xs font-bold px-2 py-1 rounded-full">
                         {order.items.length} líneas
                     </span>
+                    {stationNames.length > 0 && (
+                        <span className="inline-flex items-center gap-1 bg-blue-100 dark:bg-blue-950/50 text-blue-800 dark:text-blue-300 text-xs font-bold px-2 py-1 rounded-full">
+                            <HardHat size={12} /> {stationNames.join(', ')}
+                        </span>
+                    )}
                     {insumos.length > 0 && (
                         <span className="bg-purple-100 dark:bg-purple-950/50 text-purple-800 dark:text-purple-300 text-xs font-bold px-2 py-1 rounded-full">
                             {insumos.length} insumos
@@ -192,11 +203,18 @@ function OrderCard({
 export function MaquilaBoard({
     initialOrders,
     initialCompletedOrderIds,
-    initialInsumoCompletions
+    initialInsumoCompletions,
+    assignedStationsByOrder = {}
 }: {
     initialOrders: Order[];
     initialCompletedOrderIds: string[];
     initialInsumoCompletions: InsumoCompletion[];
+    /**
+     * orderId → external maquila station name(s). Outsourced orders stay
+     * on this board (badged + filterable) instead of disappearing, so
+     * the taller view is the whole picture.
+     */
+    assignedStationsByOrder?: Record<string, string[]>;
 }) {
     const [orders] = useState<Order[]>(initialOrders);
     const [completed, setCompleted] = useState<Set<string>>(
@@ -214,8 +232,26 @@ export function MaquilaBoard({
     const [tab, setTab] = useState<Tab>('pending');
     const [searchTerm, setSearchTerm] = useState('');
     const [companyFilter, setCompanyFilter] = useState<string>('all');
+    const [assignTab, setAssignTab] = useState<'all' | 'assigned'>('all');
+    const [stationFilter, setStationFilter] = useState<string>('all');
     const [pending] = useTransition();
     const router = useRouter();
+
+    const stationsFor = (o: Order): string[] =>
+        (o.uuid && assignedStationsByOrder[o.uuid]) || [];
+    const assignedCount = orders.filter((o) => stationsFor(o).length > 0).length;
+    const stationOptions = useMemo(
+        () =>
+            Array.from(
+                new Set(
+                    Object.values(assignedStationsByOrder).flat() as string[]
+                )
+            ).sort((a, b) => a.localeCompare(b, 'es')),
+        [assignedStationsByOrder]
+    );
+    // Picking one station is a visibility view: show that station's whole
+    // load, including what it already finished.
+    const singleStation = stationFilter !== 'all' && stationFilter !== 'none';
 
     const handleLocalChange = (uuid: string, next: boolean) => {
         setCompleted((prev) => {
@@ -226,11 +262,28 @@ export function MaquilaBoard({
         });
     };
 
+    const scoped = useMemo(
+        () => {
+            let list = orders;
+            if (stationFilter === 'none') {
+                list = list.filter((o) => stationsFor(o).length === 0);
+            } else if (singleStation) {
+                list = list.filter((o) => stationsFor(o).includes(stationFilter));
+            } else if (assignTab === 'assigned') {
+                list = list.filter((o) => stationsFor(o).length > 0);
+            }
+            return list;
+        },
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [orders, assignTab, stationFilter, singleStation, assignedStationsByOrder]
+    );
+
     const tabFiltered = useMemo(() => {
-        if (tab === 'all') return orders;
-        if (tab === 'done') return orders.filter((o) => o.uuid && completed.has(o.uuid));
-        return orders.filter((o) => !(o.uuid && completed.has(o.uuid)));
-    }, [orders, completed, tab]);
+        if (assignTab === 'assigned' || singleStation) return scoped;
+        if (tab === 'all') return scoped;
+        if (tab === 'done') return scoped.filter((o) => o.uuid && completed.has(o.uuid));
+        return scoped.filter((o) => !(o.uuid && completed.has(o.uuid)));
+    }, [scoped, completed, tab, assignTab, singleStation]);
 
     const filtered = tabFiltered.filter((o) => {
         if (companyFilter !== 'all' && o.companyName !== companyFilter) return false;
@@ -244,9 +297,9 @@ export function MaquilaBoard({
     });
 
     const counts = {
-        pending: orders.filter((o) => !(o.uuid && completed.has(o.uuid))).length,
-        done: orders.filter((o) => o.uuid && completed.has(o.uuid)).length,
-        all: orders.length
+        pending: scoped.filter((o) => !(o.uuid && completed.has(o.uuid))).length,
+        done: scoped.filter((o) => o.uuid && completed.has(o.uuid)).length,
+        all: scoped.length
     };
 
     return (
@@ -288,9 +341,85 @@ export function MaquilaBoard({
                 </div>
             </div>
 
+            {/* Assignment scope + station picker. Only rendered once some
+                maquila work is outsourced; the two stay in sync so the UI
+                never highlights contradictory filters. */}
+            {stationOptions.length > 0 && (
+                <div className="flex flex-wrap items-center gap-3 mb-4">
+                    <div className="inline-flex items-center gap-1 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
+                        {(
+                            [
+                                { key: 'all', label: 'Todos', count: orders.length },
+                                {
+                                    key: 'assigned',
+                                    label: 'Asignados a estación',
+                                    count: assignedCount
+                                }
+                            ] as const
+                        ).map((t) => (
+                            <button
+                                key={t.key}
+                                type="button"
+                                onClick={() => {
+                                    setAssignTab(t.key);
+                                    setStationFilter('all');
+                                }}
+                                className={`inline-flex items-center gap-1.5 px-4 min-h-11 rounded-lg text-sm font-bold transition-colors ${
+                                    assignTab === t.key
+                                        ? 'bg-white dark:bg-zinc-900 shadow-sm text-zinc-900 dark:text-zinc-100'
+                                        : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'
+                                }`}
+                            >
+                                {t.key === 'assigned' && <HardHat size={14} />}
+                                {t.label}
+                                <span
+                                    className={`min-w-[1.3rem] px-1 rounded-full text-[11px] leading-5 ${
+                                        assignTab === t.key
+                                            ? 'bg-orange-100 dark:bg-orange-950/50 text-orange-700 dark:text-orange-300'
+                                            : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300'
+                                    }`}
+                                >
+                                    {t.count}
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <FilterSelect
+                            label="Estación"
+                            value={stationFilter}
+                            onChange={(v) => {
+                                setStationFilter(v);
+                                if (v !== 'all') setAssignTab('all');
+                            }}
+                            options={[
+                                { value: 'none', label: 'Sin asignar (interno)' },
+                                ...stationOptions.map((n) => ({ value: n, label: n }))
+                            ]}
+                        />
+                        {stationFilter !== 'all' && (
+                            <button
+                                type="button"
+                                onClick={() => setStationFilter('all')}
+                                className="inline-flex items-center gap-1 text-xs font-bold text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/30 px-2 py-1.5 rounded-lg transition-colors"
+                            >
+                                <X size={13} /> Quitar
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {filtered.length === 0 ? (
                 <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm p-12 text-center text-gray-500 dark:text-zinc-400">
-                    {tab === 'pending'
+                    {singleStation
+                        ? `${stationFilter} no tiene pedidos de maquila asignados.`
+                        : stationFilter === 'none'
+                        ? 'Todos los pedidos de maquila están asignados a una estación externa.'
+                        : assignTab === 'assigned'
+                        ? 'Ningún pedido de maquila está asignado a una estación externa.'
+                        : tab === 'pending'
                         ? 'No hay pedidos pendientes de maquila.'
                         : tab === 'done'
                             ? 'Todavía no se ha completado ningún pedido en maquila.'
@@ -306,6 +435,7 @@ export function MaquilaBoard({
                             onLocalChange={handleLocalChange}
                             completedInsumos={completedInsumos}
                             onToggleInsumo={handleToggleInsumo}
+                            stationNames={stationsFor(order)}
                         />
                     ))}
                 </div>
