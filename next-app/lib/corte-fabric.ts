@@ -1,5 +1,6 @@
 import type { CartItem, Order } from '@/lib/types';
 import { extractSizeLabel, resolveBomQty } from '@/lib/services/products';
+import type { BomItem } from '@/lib/services/products';
 import { COLOR_WORDS, roundQty } from '@/lib/stage-utils';
 
 // ─── Corte fabric consumption ────────────────────────────────────────
@@ -185,6 +186,29 @@ function expectedForItem(
     }
     if (parts.length === 0) return null;
     return sumFabricParts(parts);
+}
+
+/**
+ * Can a corte estimate be derived from this product's BOM at all?
+ *
+ * Deliberately mirrors expectedForItem's matching (same isFabricBomLine,
+ * same "quantity must be positive" rule) so the admin task list and the
+ * corte board never disagree about which products are missing their
+ * tela. A base qty of 0 still counts when a per-size override supplies
+ * one, since the estimate resolves per size at report time.
+ */
+export function productHasFabricRow(
+    bom: BomItem[] | undefined | null,
+    fabricType: string | undefined | null
+): boolean {
+    if (!bom || bom.length === 0) return false;
+    return bom.some((b) => {
+        if (!isFabricBomLine(b.name, fabricType || '')) return false;
+        if (b.qty > 0) return true;
+        return Object.values(b.qtyBySize || {}).some(
+            (v) => Number.isFinite(v) && v > 0
+        );
+    });
 }
 
 /**

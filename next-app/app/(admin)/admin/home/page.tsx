@@ -24,6 +24,8 @@ import { fetchAllStationInvoices } from '@/lib/services/station-invoices';
 import { FAST_ACTIONS_COOKIE, resolveFastActions } from '@/lib/admin-fast-actions';
 import { orderApplicableStages, orderNeedsStage } from '@/lib/stage-utils';
 import { QuickActionsPanel } from '@/components/admin/quick-actions-panel';
+import { PendingTasks } from '@/components/admin/pending-tasks';
+import { buildAdminTasks, countTasks, countBySeverity } from '@/lib/admin-tasks';
 
 // Admin panel home — quick actions + at-a-glance statistics. Replaces
 // the old behavior where /admin redirected straight to /admin/orders
@@ -82,6 +84,14 @@ export default async function AdminHomePage() {
 
     const invoicesToPay = stationInvoices.filter((i) => i.status === 'pending').length;
 
+    // Data gaps that only bite mid-production (product without BOM,
+    // empresa without catálogo, line detached from its product).
+    // Derived from the orders/products/companies already loaded above,
+    // so the section adds no queries.
+    const taskGroups = buildAdminTasks({ products, companies, orders });
+    const taskTotal = countTasks(taskGroups);
+    const taskHigh = countBySeverity(taskGroups, 'high');
+
     return (
         <div className="space-y-8">
             {/* ── Header ───────────────────────────────────────────── */}
@@ -100,6 +110,13 @@ export default async function AdminHomePage() {
             <QuickActionsPanel
                 initialPinned={fastActions}
                 badges={{ invoicesToPay }}
+            />
+
+            {/* ── Data gaps needing admin attention ────────────────── */}
+            <PendingTasks
+                groups={taskGroups}
+                total={taskTotal}
+                highCount={taskHigh}
             />
 
             {/* ── Order KPIs ───────────────────────────────────────── */}
