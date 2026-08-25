@@ -23,6 +23,7 @@ import type { ItemProgress } from '@/lib/services/stage-item-progress';
 import type { Logo, LogoCategory } from '@/lib/services/logos';
 import { CollapsibleSearch } from '@/components/admin/collapsible-search';
 import { FilterSelect } from '@/components/admin/filter-controls';
+import { CompletedSection } from '@/components/admin/completed-section';
 import { OrderLogosButton } from '@/components/admin/order-logos-modal';
 import { OrderProductsSummary } from '@/components/admin/order-products-summary';
 import { StagePartialEditor } from '@/components/admin/stage-partial-editor';
@@ -338,6 +339,13 @@ export function SimpleStageBoard({
         );
     });
 
+    // Never mix finished work with what's still pending: when the current
+    // result set holds both, the completed ones move into a collapsed
+    // "Completados" section underneath.
+    const pendingList = filtered.filter((o) => !(o.uuid && completed.has(o.uuid)));
+    const doneList = filtered.filter((o) => o.uuid && completed.has(o.uuid));
+    const splitCompleted = pendingList.length > 0 && doneList.length > 0;
+
     const counts = {
         pending: scoped.filter((o) => !(o.uuid && completed.has(o.uuid))).length,
         done: scoped.filter((o) => o.uuid && completed.has(o.uuid)).length,
@@ -468,8 +476,9 @@ export function SimpleStageBoard({
                             : 'No hay pedidos.'}
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
-                    {filtered.map((order) => (
+                <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+                        {(splitCompleted ? pendingList : filtered).map((order) => (
                         <OrderCard
                             key={order.uuid || order.id}
                             order={order}
@@ -482,8 +491,29 @@ export function SimpleStageBoard({
                             initialProgress={initialProgress}
                             stationNames={stationsFor(order)}
                         />
-                    ))}
-                </div>
+                        ))}
+                    </div>
+                    {splitCompleted && (
+                        <CompletedSection count={doneList.length}>
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+                                {doneList.map((order) => (
+                        <OrderCard
+                            key={order.uuid || order.id}
+                            order={order}
+                            stage={stage}
+                            isCompleted={!!order.uuid && completed.has(order.uuid)}
+                            onLocalChange={handleLocalChange}
+                            logoCategory={logoCategory}
+                            logos={logos}
+                            allowPartial={allowPartial}
+                            initialProgress={initialProgress}
+                            stationNames={stationsFor(order)}
+                        />
+                                ))}
+                            </div>
+                        </CompletedSection>
+                    )}
+                </>
             )}
         </div>
     );

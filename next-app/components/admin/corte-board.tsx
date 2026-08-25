@@ -16,6 +16,7 @@ import type { StageTab } from '@/components/admin/stage-tab-bar';
 import { StageBoardFilters } from '@/components/admin/stage-board-filters';
 import { CollapsibleSearch } from '@/components/admin/collapsible-search';
 import { FilterSelect } from '@/components/admin/filter-controls';
+import { CompletedSection } from '@/components/admin/completed-section';
 import { addCorteExtraItemAction } from '@/app/(admin)/admin/_stage-actions';
 import { OrderProductsSummary } from '@/components/admin/order-products-summary';
 import { StagePartialEditor } from '@/components/admin/stage-partial-editor';
@@ -388,6 +389,13 @@ export function CorteBoard({
         );
     });
 
+    // Never mix finished work with what's still pending: when the current
+    // result set holds both, the completed ones move into a collapsed
+    // "Completados" section underneath.
+    const pendingList = filtered.filter((o) => !(o.uuid && completed.has(o.uuid)));
+    const doneList = filtered.filter((o) => o.uuid && completed.has(o.uuid));
+    const splitCompleted = pendingList.length > 0 && doneList.length > 0;
+
     const counts = {
         pending: scoped.filter((o) => !(o.uuid && completed.has(o.uuid))).length,
         done: scoped.filter((o) => o.uuid && completed.has(o.uuid)).length,
@@ -513,8 +521,9 @@ export function CorteBoard({
                                 : 'No hay pedidos.'}
                 </div>
             ) : (
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4 items-start">
-                    {filtered.map((order) => (
+                <>
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4 items-start">
+                        {(splitCompleted ? pendingList : filtered).map((order) => (
                         <OrderCard
                             key={order.uuid || order.id}
                             order={order}
@@ -526,8 +535,28 @@ export function CorteBoard({
                                 (order.uuid && fabricReportsByOrder[order.uuid]) || []
                             }
                         />
-                    ))}
-                </div>
+                        ))}
+                    </div>
+                    {splitCompleted && (
+                        <CompletedSection count={doneList.length}>
+                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4 items-start">
+                                {doneList.map((order) => (
+                        <OrderCard
+                            key={order.uuid || order.id}
+                            order={order}
+                            isCompleted={!!order.uuid && completed.has(order.uuid)}
+                            onLocalCompletionChange={handleLocalCompletionChange}
+                            initialProgress={initialProgress}
+                            stationNames={stationsFor(order)}
+                            fabricReports={
+                                (order.uuid && fabricReportsByOrder[order.uuid]) || []
+                            }
+                        />
+                                ))}
+                            </div>
+                        </CompletedSection>
+                    )}
+                </>
             )}
 
             {pending && (
