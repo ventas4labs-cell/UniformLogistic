@@ -14,6 +14,7 @@ import {
     ImageIcon,
     Check,
     FileDown,
+    HardHat
 } from 'lucide-react';
 import type { Order } from '@/lib/types';
 import type { InsumoCompletion } from '@/lib/services/insumo-completions';
@@ -25,6 +26,8 @@ import {
 } from '@/app/(admin)/admin/operador/actions';
 import { StageCompleteToggle } from '@/components/admin/stage-complete-toggle';
 import type { StageTab } from '@/components/admin/stage-tab-bar';
+import { FilterSelect } from '@/components/admin/filter-controls';
+import { CompletedSection } from '@/components/admin/completed-section';
 import { StageBoardFilters } from '@/components/admin/stage-board-filters';
 import { CollapsibleSearch } from '@/components/admin/collapsible-search';
 import { InsumoPrepEditor } from '@/components/admin/insumo-prep-editor';
@@ -596,7 +599,8 @@ export function OperatorBoard({
     initialCompletions,
     initialBodegaCompletedOrderIds = [],
     initialPreparations = [],
-    stationNamesByOrder = {}
+    stationNamesByOrder = {},
+    assignedStationsByOrder = {}
 }: {
     initialOrders: Order[];
     initialCompletions: InsumoCompletion[];
@@ -605,6 +609,12 @@ export function OperatorBoard({
     // orderId → assigned external station name(s). Rendered on the
     // card + included in the Bodega PDF export.
     stationNamesByOrder?: Record<string, string[]>;
+    /**
+     * orderId → external BODEGA station name(s). Drives the scope tab and
+     * station picker. Distinct from stationNamesByOrder, which spans all
+     * stages and feeds the card badge and the PDF header.
+     */
+    assignedStationsByOrder?: Record<string, string[]>;
 }) {
     const [orders] = useState<Order[]>(initialOrders);
     const [preparations, setPreparations] = useState<Map<string, number>>(
@@ -637,6 +647,8 @@ export function OperatorBoard({
         () => new Set(initialBodegaCompletedOrderIds)
     );
     const [tab, setTab] = useState<StageTab>('pending');
+    const [assignTab, setAssignTab] = useState<'all' | 'assigned'>('all');
+    const [stationFilter, setStationFilter] = useState<string>('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [companyFilter, setCompanyFilter] = useState<string>('all');
     const [pending, startTransition] = useTransition();
@@ -678,7 +690,23 @@ export function OperatorBoard({
         });
     };
 
-    const tabFiltered = orders.filter((o) => {
+    const stationsFor = (o: Order): string[] =>
+        (o.uuid && assignedStationsByOrder[o.uuid]) || [];
+    const assignedCount = orders.filter((o) => stationsFor(o).length > 0).length;
+    const stationOptions = Array.from(
+        new Set(Object.values(assignedStationsByOrder).flat() as string[])
+    ).sort((a, b) => a.localeCompare(b, 'es'));
+    const singleStation = stationFilter !== 'all' && stationFilter !== 'none';
+
+    const scoped = orders.filter((o) => {
+        if (stationFilter === 'none') return stationsFor(o).length === 0;
+        if (singleStation) return stationsFor(o).includes(stationFilter);
+        if (assignTab === 'assigned') return stationsFor(o).length > 0;
+        return true;
+    });
+
+    const tabFiltered = scoped.filter((o) => {
+        if (assignTab === 'assigned' || singleStation) return true;
         if (tab === 'all') return true;
         const done = !!o.uuid && bodegaCompleted.has(o.uuid);
         return tab === 'done' ? done : !done;
@@ -694,10 +722,16 @@ export function OperatorBoard({
         );
     });
 
+    const pendingList = filtered.filter(
+        (o) => !(o.uuid && bodegaCompleted.has(o.uuid))
+    );
+    const doneList = filtered.filter((o) => o.uuid && bodegaCompleted.has(o.uuid));
+    const splitCompleted = pendingList.length > 0 && doneList.length > 0;
+
     const tabCounts = {
-        pending: orders.filter((o) => !(o.uuid && bodegaCompleted.has(o.uuid))).length,
-        done: orders.filter((o) => o.uuid && bodegaCompleted.has(o.uuid)).length,
-        all: orders.length
+        pending: scoped.filter((o) => !(o.uuid && bodegaCompleted.has(o.uuid))).length,
+        done: scoped.filter((o) => o.uuid && bodegaCompleted.has(o.uuid)).length,
+        all: scoped.length
     };
 
     return (
@@ -738,15 +772,88 @@ export function OperatorBoard({
             </div>
 
             {/* Order cards grid */}
+            {stationOptions.length > 0 && (
+                <div className="flex flex-wrap items-center gap-3 mb-4">
+                    <div className="inline-flex items-center gap-1 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
+                        {(
+                            [
+                                { key: 'all', label: 'Todos', count: orders.length },
+                                {
+                                    key: 'assigned',
+                                    label: 'Asignados a estación',
+                                    count: assignedCount
+                                }
+                            ] as const
+                        ).map((t) => (
+                            <button
+                                key={t.key}
+                                type="button"
+                                onClick={() => {
+                                    setAssignTab(t.key);
+                                    setStationFilter('all');
+                                }}
+                                className={`inline-flex items-center gap-1.5 px-4 min-h-11 rounded-lg text-sm font-bold transition-colors ${
+                                    assignTab === t.key
+                                        ? 'bg-white dark:bg-zinc-900 shadow-sm text-zinc-900 dark:text-zinc-100'
+                                        : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'
+                                }`}
+                            >
+                                {t.key === 'assigned' && <HardHat size={14} />}
+                                {t.label}
+                                <span
+                                    className={`min-w-[1.3rem] px-1 rounded-full text-[11px] leading-5 ${
+                                        assignTab === t.key
+                                            ? 'bg-orange-100 dark:bg-orange-950/50 text-orange-700 dark:text-orange-300'
+                                            : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300'
+                                    }`}
+                                >
+                                    {t.count}
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <FilterSelect
+                            label="Estación"
+                            value={stationFilter}
+                            onChange={(v) => {
+                                setStationFilter(v);
+                                if (v !== 'all') setAssignTab('all');
+                            }}
+                            options={[
+                                { value: 'none', label: 'Sin asignar (interno)' },
+                                ...stationOptions.map((n) => ({ value: n, label: n }))
+                            ]}
+                        />
+                        {stationFilter !== 'all' && (
+                            <button
+                                type="button"
+                                onClick={() => setStationFilter('all')}
+                                className="inline-flex items-center gap-1 text-xs font-bold text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/30 px-2 py-1.5 rounded-lg transition-colors"
+                            >
+                                <X size={13} /> Quitar
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {filtered.length === 0 ? (
                 <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm p-12 text-center text-gray-500 dark:text-zinc-400">
-                    No se encontraron pedidos.
+                    {singleStation
+                        ? `${stationFilter} no tiene pedidos de bodega asignados.`
+                        : stationFilter === 'none'
+                        ? 'Todos los pedidos de bodega están asignados a una estación externa.'
+                        : assignTab === 'assigned'
+                        ? 'Ningún pedido de bodega está asignado a una estación externa.'
+                        : 'No se encontraron pedidos.'}
                 </div>
             ) : (
                 // items-start so an expanded card doesn't stretch its row
                 // siblings — each card sizes to its own content.
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
-                    {filtered.map((order) => (
+                <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+                        {(splitCompleted ? pendingList : filtered).map((order) => (
                         <OrderCard
                             key={order.uuid || order.id}
                             order={order}
@@ -761,8 +868,31 @@ export function OperatorBoard({
                                 (order.uuid && stationNamesByOrder[order.uuid]) || []
                             }
                         />
-                    ))}
-                </div>
+                        ))}
+                    </div>
+                    {splitCompleted && (
+                        <CompletedSection count={doneList.length}>
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+                                {doneList.map((order) => (
+                        <OrderCard
+                            key={order.uuid || order.id}
+                            order={order}
+                            isCompleted={!!order.uuid && bodegaCompleted.has(order.uuid)}
+                            onLocalCompletionChange={handleLocalCompletionChange}
+                            completedInsumos={completedInsumos}
+                            onToggleInsumo={handleToggleInsumo}
+                            preparations={preparations}
+                            onLocalPrepChange={handleLocalPrepChange}
+                            onCommitPrep={handleCommitPrep}
+                            stationNames={
+                                (order.uuid && stationNamesByOrder[order.uuid]) || []
+                            }
+                        />
+                                ))}
+                            </div>
+                        </CompletedSection>
+                    )}
+                </>
             )}
 
             {pending && (

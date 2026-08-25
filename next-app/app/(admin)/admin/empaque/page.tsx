@@ -3,7 +3,7 @@ import { fetchAllOrders } from '@/lib/services/orders';
 import { fetchStageCompletions } from '@/lib/services/stage-completions';
 import { fetchDispatchTotalsForOrders } from '@/lib/services/dispatches';
 import { fetchStockEntryTotalsForOrders } from '@/lib/services/stock-entries';
-import { fetchOrdersOutsourcedToStage } from '@/lib/services/station-assignments';
+import { fetchAssignmentsForOrders } from '@/lib/services/station-assignments';
 import { orderNeedsStage } from '@/lib/stage-utils';
 import { EmpaqueBoard } from '@/components/admin/empaque-board';
 
@@ -16,17 +16,22 @@ export default async function EmpaquePage() {
     const orderIds = empaqueOrders
         .map((o) => o.uuid)
         .filter((id): id is string => !!id);
-    const [completed, totals, addedToStock, outsourced] = await Promise.all([
+    const [completed, totals, addedToStock, assignments] = await Promise.all([
         fetchStageCompletions(supabase, 'empaque'),
         fetchDispatchTotalsForOrders(supabase, orderIds),
         fetchStockEntryTotalsForOrders(supabase, orderIds),
-        fetchOrdersOutsourcedToStage(supabase, orderIds, 'empaque')
+        fetchAssignmentsForOrders(supabase, orderIds)
     ]);
-    // Orders sent to an external empaque station are handled there, so
-    // hide them from this in-house board to avoid double production.
-    const orders = empaqueOrders.filter(
-        (o) => !(o.uuid && outsourced.has(o.uuid))
-    );
+    // Full visibility (same model as the other stage boards): outsourced
+    // orders stay on the board, badged with their station and isolatable
+    // with the station picker, instead of vanishing from this view.
+    const orders = empaqueOrders;
+    const assignedStationsByOrder: Record<string, string[]> = {};
+    for (const a of assignments) {
+        if (a.stationUserStage !== 'empaque') continue;
+        const name = a.stationUserName || a.stationUserEmail || 'Estación';
+        (assignedStationsByOrder[a.orderId] ||= []).push(name);
+    }
     // Serialize the Map<orderId, Map<itemId, qty>> down to plain JSON
     // so it can cross the Server→Client boundary. The board rebuilds
     // the Maps on mount.
@@ -44,6 +49,7 @@ export default async function EmpaquePage() {
             initialCompletedOrderIds={Array.from(completed)}
             initialDispatched={initialDispatched}
             initialAddedToStock={initialAddedToStock}
+            assignedStationsByOrder={assignedStationsByOrder}
         />
     );
 }
