@@ -116,6 +116,7 @@ export interface ProductRow {
     fabric_type: string | null;
     is_active: boolean | null;
     is_basic: boolean | null;
+    skips_fabric: boolean | null;
     bom_json: BomItem[] | null;
     codigo_cabys: string | null;
     stages_json: StageKey[] | null;
@@ -133,6 +134,12 @@ export interface AdminProduct extends Product {
     isActive: boolean;
     /** Shared "basic" item shown to every empresa; carries a 3D model. */
     isBasic: boolean;
+    /**
+     * Not cut from yardage — a purchased blank, an accessory, a bought-in
+     * patch. Corte derives no consumo esperado for it and the admin task
+     * list stops flagging it as missing a tela.
+     */
+    skipsFabric: boolean;
     bom: BomItem[];
     codigoCabys: string;
     /** UUIDs of companies the product is currently assigned to. */
@@ -173,6 +180,7 @@ export const mapProductRow = (
     fabricType: row.fabric_type || '',
     isActive: row.is_active !== false,
     isBasic: row.is_basic === true,
+    skipsFabric: row.skips_fabric === true,
     bom: (row.bom_json as BomItem[]) || [],
     codigoCabys: row.codigo_cabys || '',
     companyIds,
@@ -188,7 +196,7 @@ export const fetchCatalogForCompany = async (
         .select(`
             product:products (
                 id, product_code, name, description, image_url,
-                product_type, type_label, gender, genders, images_json, sizes_json, colors, fabric_type, is_active, is_basic, bom_json, codigo_cabys, stages_json
+                product_type, type_label, gender, genders, images_json, sizes_json, colors, fabric_type, is_active, is_basic, skips_fabric, bom_json, codigo_cabys, stages_json
             )
         `)
         .eq('company_id', companyId)
@@ -276,6 +284,8 @@ export interface ProductInput {
     isActive?: boolean;
     /** Shared "basic" 3D item shown to every empresa. */
     isBasic?: boolean;
+    /** Not cut from yardage — suppresses the "sin consumo de tela" task. */
+    skipsFabric?: boolean;
     bom?: BomItem[];
     codigoCabys?: string;
     /**
@@ -290,7 +300,7 @@ export interface ProductInput {
 }
 
 const PRODUCT_SELECT =
-    'id, product_code, name, description, image_url, product_type, type_label, gender, genders, images_json, sizes_json, colors, fabric_type, is_active, is_basic, bom_json, codigo_cabys, stages_json';
+    'id, product_code, name, description, image_url, product_type, type_label, gender, genders, images_json, sizes_json, colors, fabric_type, is_active, is_basic, skips_fabric, bom_json, codigo_cabys, stages_json';
 
 // Normalize the audience fields from a ProductInput into the DB columns.
 // The single `gender` column stays populated (= first audience) so
@@ -391,6 +401,7 @@ export const createProduct = async (
             fabric_type: input.fabricType || null,
             is_active: input.isActive ?? true,
             is_basic: input.isBasic ?? false,
+            skips_fabric: input.skipsFabric ?? false,
             bom_json: input.bom || [],
             codigo_cabys: input.codigoCabys || null,
             stages_json: input.stages ?? []
@@ -425,6 +436,7 @@ export const updateProduct = async (
             fabric_type: input.fabricType || null,
             is_active: input.isActive ?? true,
             is_basic: input.isBasic ?? false,
+            skips_fabric: input.skipsFabric ?? false,
             bom_json: input.bom || [],
             codigo_cabys: input.codigoCabys || null,
             stages_json: input.stages ?? []

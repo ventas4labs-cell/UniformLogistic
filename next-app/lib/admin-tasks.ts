@@ -102,7 +102,10 @@ export function buildAdminTasks({
             });
             continue;
         }
-        if (!productHasFabricRow(bom, p.fabricType)) {
+        // Products the admin marked as "no lleva tela" (purchased blanks,
+        // accessories) are expected to have no fabric row — asking for one
+        // forever would train the admin to ignore the list.
+        if (!p.skipsFabric && !productHasFabricRow(bom, p.fabricType)) {
             noFabric.push({
                 id: `nofabric-${p.uuid}`,
                 kind: 'product-no-fabric',

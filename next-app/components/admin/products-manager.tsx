@@ -55,6 +55,7 @@ const emptyForm: ProductInput = {
     fabricType: '',
     isActive: true,
     isBasic: false,
+    skipsFabric: false,
     bom: [],
     codigoCabys: '',
     companyIds: [],
@@ -406,6 +407,7 @@ export function ProductsManager({
             fabricType: p.fabricType,
             isActive: p.isActive,
             isBasic: p.isBasic,
+            skipsFabric: p.skipsFabric,
             bom: p.bom || [],
             codigoCabys: p.codigoCabys || '',
             companyIds: p.companyIds || [],
@@ -1704,6 +1706,22 @@ export function ProductsManager({
                                     />
                                     Producto básico (3D, visible para todos)
                                 </label>
+                                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-zinc-300">
+                                    <input
+                                        type="checkbox"
+                                        checked={form.skipsFabric ?? false}
+                                        onChange={(e) =>
+                                            setForm({ ...form, skipsFabric: e.target.checked })
+                                        }
+                                        className="w-4 h-4 text-orange-600 dark:text-orange-400 rounded"
+                                    />
+                                    No lleva tela (comprado / accesorio)
+                                </label>
+                                <p className="text-xs text-gray-500 dark:text-zinc-400 -mt-1">
+                                    Marcalo cuando el producto no se corta de tela — se compra
+                                    hecho o es un accesorio. Corte no calcula consumo esperado y
+                                    deja de aparecer en las tareas pendientes de Inicio.
+                                </p>
                             </div>
                             {error && (
                                 <div className="bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 p-3 rounded-lg text-sm border border-red-100 dark:border-red-900/50">
