@@ -15,6 +15,7 @@ import {
     Sparkles,
     PackageCheck,
     PenTool,
+    Users,
     type LucideIcon
 } from 'lucide-react';
 
@@ -50,6 +51,7 @@ export const ADMIN_ACTIONS: AdminAction[] = [
     { id: 'materials', label: 'Materiales', href: '/admin/materials', Icon: Package },
     { id: 'cuentas', label: 'Cuentas', href: '/admin/cuentas', Icon: Wallet },
     { id: 'stations', label: 'Estaciones', href: '/admin/station-users', Icon: HardHat },
+    { id: 'rrhh', label: 'Recursos Humanos', href: '/admin/rrhh', Icon: Users },
     { id: 'facturacion', label: 'Facturación', href: '/admin/facturacion', Icon: Receipt },
     { id: 'bodega', label: 'Bodega', href: '/admin/operador', Icon: Package },
     { id: 'corte', label: 'Corte', href: '/admin/corte', Icon: Scissors },

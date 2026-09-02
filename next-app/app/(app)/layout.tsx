@@ -4,6 +4,7 @@ import { CartProvider } from '@/components/cart-provider';
 import { CartDrawer } from '@/components/cart-drawer';
 import { TopNav } from '@/components/top-nav';
 import { fetchStationUser } from '@/lib/services/station-users';
+import { fetchEmployee } from '@/lib/services/employees';
 
 // Hard-coded admin gate — same value used in app/(app)/home/page.tsx and the
 // admin-route protection. Lives here too so the customer-shell TopNav can
@@ -24,6 +25,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     if (!isAdmin) {
         const station = await fetchStationUser(supabase, user.id);
         if (station) redirect('/station');
+        // Employees (HR module) get their own restricted /empleado shell.
+        const employee = await fetchEmployee(supabase, user.id);
+        if (employee) redirect('/empleado');
     }
 
     return (

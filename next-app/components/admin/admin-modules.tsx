@@ -17,6 +17,7 @@ import {
     PenTool,
     Box,
     Truck,
+    Users,
     type LucideIcon
 } from 'lucide-react';
 
@@ -62,6 +63,7 @@ export const ADMIN_MODULES: AdminModule[] = [
     { id: 'facturacion', label: 'Facturación', href: '/admin/facturacion', Icon: Receipt, group: 'principal', sub: 'clientes' },
     { id: 'station-invoices', label: 'Facturas a pagar', href: '/admin/station-invoices', Icon: FileText, group: 'principal', sub: 'clientes' },
     { id: 'station-users', label: 'Estaciones', href: '/admin/station-users', Icon: HardHat, group: 'principal', sub: 'config' },
+    { id: 'rrhh', label: 'Recursos Humanos', href: '/admin/rrhh', Icon: Users, group: 'principal', sub: 'config' },
     { id: '3d-models', label: 'Modelos 3D', href: '/admin/3d-models', Icon: Box, group: 'principal', sub: 'config' },
     { id: 'operador', label: 'Bodega', href: '/admin/operador', Icon: Package, group: 'operaciones' },
     { id: 'corte', label: 'Corte', href: '/admin/corte', Icon: Scissors, group: 'operaciones' },

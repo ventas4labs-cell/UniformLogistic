@@ -308,6 +308,39 @@ export function companyActivationEmail(d: CompanyActivationEmailData): RenderedE
     };
 }
 
+// ── 3d-bis. Employee invite (set your own password) ──────────────────
+export interface EmployeeInviteEmailData {
+    employeeName: string;
+    inviteUrl: string;
+    /** Human expiry, e.g. "72 horas". */
+    expiresIn: string;
+}
+
+export function employeeInviteEmail(d: EmployeeInviteEmailData): RenderedEmail {
+    const body = `
+    <p style="margin:0 0 14px 0;">Hola${d.employeeName ? ` <strong>${esc(d.employeeName)}</strong>` : ''},</p>
+    <p style="margin:0 0 6px 0;">Te damos la bienvenida al equipo de Uniform Logistic. Creá tu contraseña para activar tu cuenta de empleado y poder marcar tu entrada, salida, breaks y almuerzo.</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0;">
+      <tr><td style="border-radius:9999px;background:${ORANGE};">
+        <a href="${esc(d.inviteUrl)}" style="display:inline-block;padding:14px 30px;font-weight:800;color:#F7F4EE;text-decoration:none;border-radius:9999px;">Crear mi contraseña</a>
+      </td></tr>
+    </table>
+    <p style="margin:0 0 6px 0;color:${MUTED};font-size:13px;">Este enlace vence en ${esc(d.expiresIn)}. Si no esperabas esta invitación, ignorá este correo.</p>
+    <p style="margin:14px 0 0 0;color:${MUTED};font-size:12px;word-break:break-all;">O copiá y pegá este enlace: ${esc(d.inviteUrl)}</p>`;
+    return {
+        subject: 'Creá tu contraseña — Uniform Logistic',
+        html: layout({
+            title: 'Activá tu cuenta de empleado',
+            preheader: 'Creá tu contraseña para empezar a marcar',
+            body
+        }),
+        text:
+            `Hola${d.employeeName ? ` ${d.employeeName}` : ''},\n\n` +
+            `Creá tu contraseña para activar tu cuenta de empleado en Uniform Logistic:\n${d.inviteUrl}\n\n` +
+            `El enlace vence en ${d.expiresIn}. Si no esperabas esta invitación, ignoralo.\n${SUPPORT_EMAIL}`
+    };
+}
+
 // ── 3e. Company password reset ───────────────────────────────────────
 export interface PasswordResetEmailData {
     companyName: string;

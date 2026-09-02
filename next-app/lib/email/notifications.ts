@@ -12,6 +12,7 @@ import {
     deliveryScheduledEmail,
     deliveryDeliveredEmail,
     companyActivationEmail,
+    employeeInviteEmail,
     passwordResetEmail,
     invoiceOverdueEmail,
     fastOrderReceivedEmail,
@@ -263,6 +264,20 @@ export async function sendCompanyActivationEmail(
     expiresIn: string
 ): Promise<{ ok: boolean; error?: string }> {
     const t = companyActivationEmail({ companyName, activationUrl, expiresIn });
+    const res = await sendEmail({ to, subject: t.subject, html: t.html, text: t.text });
+    return { ok: res.ok, error: res.error };
+}
+
+/** Send an employee their invite / set-password link. Recipient passed
+ *  directly (the real email on the employees row). Returns the send
+ *  result so the caller can flag a failed send and offer a resend. */
+export async function sendEmployeeInviteEmail(
+    to: string,
+    employeeName: string,
+    inviteUrl: string,
+    expiresIn: string
+): Promise<{ ok: boolean; error?: string }> {
+    const t = employeeInviteEmail({ employeeName, inviteUrl, expiresIn });
     const res = await sendEmail({ to, subject: t.subject, html: t.html, text: t.text });
     return { ok: res.ok, error: res.error };
 }
