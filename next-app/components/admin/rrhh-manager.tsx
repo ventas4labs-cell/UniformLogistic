@@ -2,8 +2,11 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
+    CalendarClock,
     Check,
+    Clock,
     Copy,
     ExternalLink,
     Loader2,
@@ -21,12 +24,19 @@ import {
 import type { Employee } from '@/lib/services/employees';
 import type { Kiosk } from '@/lib/services/hr-kiosks';
 import {
+    DEFAULT_SCHEDULE,
+    WEEKDAY_LABELS,
+    type Schedule,
+    type ScheduleInput
+} from '@/lib/services/hr-schedules';
+import {
     createEmployeeAction,
     createKioskAction,
     deleteEmployeeAction,
     deleteKioskAction,
     regenerateKioskTokenAction,
     resendEmployeeInviteAction,
+    saveEmployeeScheduleAction,
     setEmployeeActiveAction,
     setKioskActiveAction,
     updateEmployeeAction,
@@ -55,19 +65,23 @@ const kioskUrl = (token: string) =>
 
 export function RrhhManager({
     initialEmployees,
-    initialKiosks
+    initialKiosks,
+    initialSchedules
 }: {
     initialEmployees: Employee[];
     initialKiosks: Kiosk[];
+    initialSchedules: Record<string, Schedule>;
 }) {
     const router = useRouter();
     // Rendered straight from props; every mutation calls router.refresh().
     const employees = initialEmployees;
     const kiosks = initialKiosks;
+    const schedules = initialSchedules;
 
     const [tab, setTab] = useState<Tab>('empleados');
     const [creating, setCreating] = useState(false);
     const [editing, setEditing] = useState<Employee | null>(null);
+    const [scheduling, setScheduling] = useState<Employee | null>(null);
     const [creatingKiosk, setCreatingKiosk] = useState(false);
     const [createdKioskUrl, setCreatedKioskUrl] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -140,29 +154,37 @@ export function RrhhManager({
                         Empleados y kioscos de marcaje por QR.
                     </p>
                 </div>
-                {tab === 'empleados' ? (
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setError(null);
-                            setCreating(true);
-                        }}
-                        className="bg-orange-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-orange-700 shadow-md flex items-center gap-2"
+                <div className="flex items-center gap-2">
+                    <Link
+                        href="/admin/rrhh/asistencia"
+                        className="bg-white dark:bg-zinc-900 border border-orange-300 dark:border-orange-800 text-orange-700 dark:text-orange-300 px-4 py-2 rounded-lg font-bold hover:bg-orange-50 dark:hover:bg-orange-950/40 shadow-sm flex items-center gap-2"
                     >
-                        <Plus size={16} /> Nuevo empleado
-                    </button>
-                ) : (
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setError(null);
-                            setCreatingKiosk(true);
-                        }}
-                        className="bg-orange-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-orange-700 shadow-md flex items-center gap-2"
-                    >
-                        <Plus size={16} /> Nuevo kiosco
-                    </button>
-                )}
+                        <CalendarClock size={16} /> Asistencia
+                    </Link>
+                    {tab === 'empleados' ? (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setError(null);
+                                setCreating(true);
+                            }}
+                            className="bg-orange-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-orange-700 shadow-md flex items-center gap-2"
+                        >
+                            <Plus size={16} /> Nuevo empleado
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setError(null);
+                                setCreatingKiosk(true);
+                            }}
+                            className="bg-orange-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-orange-700 shadow-md flex items-center gap-2"
+                        >
+                            <Plus size={16} /> Nuevo kiosco
+                        </button>
+                    )}
+                </div>
             </div>
 
             <div className="flex items-center gap-1 mb-6 border-b border-gray-200 dark:border-zinc-800">
@@ -237,6 +259,9 @@ export function RrhhManager({
                                                         }`}
                                                     >
                                                         {sentId === e.id ? <Check size={14} /> : <Mail size={14} />}
+                                                    </button>
+                                                    <button type="button" onClick={() => { setError(null); setScheduling(e); }} disabled={pending} title="Horario" className="p-1.5 text-gray-400 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/40 rounded-lg">
+                                                        <Clock size={14} />
                                                     </button>
                                                     <button type="button" onClick={() => { setError(null); setEditing(e); }} disabled={pending} title="Editar" className="p-1.5 text-gray-400 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/40 rounded-lg">
                                                         <Pencil size={14} />
@@ -364,6 +389,21 @@ export function RrhhManager({
                         });
                         if (res?.error) return res.error;
                         setEditing(null);
+                        router.refresh();
+                        return null;
+                    }}
+                />
+            )}
+
+            {scheduling && (
+                <ScheduleModal
+                    employee={scheduling}
+                    schedule={schedules[scheduling.id] || null}
+                    onClose={() => setScheduling(null)}
+                    onSubmit={async (input) => {
+                        const res = await saveEmployeeScheduleAction(scheduling.id, input);
+                        if (res?.error) return res.error;
+                        setScheduling(null);
                         router.refresh();
                         return null;
                     }}
@@ -545,6 +585,129 @@ function KioskModal({
                         </div>
                     </form>
                 )}
+            </div>
+        </div>
+    );
+}
+
+// Monday-first weekday order for the toggles (0=Sun … 6=Sat).
+const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
+function ScheduleModal({
+    employee,
+    schedule,
+    onClose,
+    onSubmit
+}: {
+    employee: Employee;
+    schedule: Schedule | null;
+    onClose: () => void;
+    onSubmit: (input: ScheduleInput) => Promise<string | null>;
+}) {
+    const dialogRef = useDialog();
+    const base = schedule || DEFAULT_SCHEDULE;
+    const [workdays, setWorkdays] = useState<number[]>(base.workdays);
+    const [startTime, setStartTime] = useState(base.startTime);
+    const [endTime, setEndTime] = useState(base.endTime);
+    const [lunchMin, setLunchMin] = useState(String(base.lunchMin));
+    const [breakMin, setBreakMin] = useState(String(base.breakMin));
+    const [graceMin, setGraceMin] = useState(String(base.graceMin));
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const toggleDay = (d: number) =>
+        setWorkdays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
+
+    const submit = async (ev: React.FormEvent) => {
+        ev.preventDefault();
+        setSaving(true);
+        setError(null);
+        const msg = await onSubmit({
+            workdays: [...workdays].sort((a, b) => a - b),
+            startTime,
+            endTime,
+            lunchMin: Number(lunchMin) || 0,
+            breakMin: Number(breakMin) || 0,
+            graceMin: Number(graceMin) || 0
+        });
+        setSaving(false);
+        if (msg) setError(msg);
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Horario" tabIndex={-1} className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-2xl shadow-2xl p-6 outline-none">
+                <div className="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Horario</h3>
+                        <p className="text-xs text-gray-500 dark:text-zinc-400">{employee.fullName}</p>
+                    </div>
+                    <button type="button" onClick={onClose} className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200">
+                        <X size={18} />
+                    </button>
+                </div>
+
+                <form onSubmit={submit} className="space-y-4">
+                    <div>
+                        <span className="block text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-zinc-400 mb-2">Días laborales</span>
+                        <div className="flex flex-wrap gap-1.5">
+                            {WEEKDAY_ORDER.map((d) => {
+                                const on = workdays.includes(d);
+                                return (
+                                    <button
+                                        key={d}
+                                        type="button"
+                                        onClick={() => toggleDay(d)}
+                                        aria-pressed={on}
+                                        className={`px-3 py-1.5 rounded-lg text-sm font-bold border ${
+                                            on
+                                                ? 'bg-orange-600 text-white border-orange-600'
+                                                : 'bg-transparent text-gray-600 dark:text-zinc-300 border-gray-200 dark:border-zinc-700 hover:border-orange-400'
+                                        }`}
+                                    >
+                                        {WEEKDAY_LABELS[d]}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <Field label="Entrada">
+                            <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-transparent" required />
+                        </Field>
+                        <Field label="Salida">
+                            <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-transparent" required />
+                        </Field>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                        <Field label="Almuerzo (min)">
+                            <input type="number" min={0} value={lunchMin} onChange={(e) => setLunchMin(e.target.value)} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-transparent" />
+                        </Field>
+                        <Field label="Break (min)">
+                            <input type="number" min={0} value={breakMin} onChange={(e) => setBreakMin(e.target.value)} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-transparent" />
+                        </Field>
+                        <Field label="Tolerancia (min)">
+                            <input type="number" min={0} value={graceMin} onChange={(e) => setGraceMin(e.target.value)} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-transparent" />
+                        </Field>
+                    </div>
+
+                    <p className="text-[11px] text-gray-500 dark:text-zinc-500">
+                        La tolerancia son los minutos de gracia antes de marcar
+                        “llegada tarde”. Almuerzo y break son el máximo permitido.
+                    </p>
+
+                    {error && <div className="bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 p-3 rounded-lg text-sm border border-red-200 dark:border-red-900/50">{error}</div>}
+
+                    <div className="flex justify-end gap-2 pt-1">
+                        <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-semibold text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg">Cancelar</button>
+                        <button type="submit" disabled={saving} className="px-4 py-2 bg-orange-600 text-white rounded-lg font-bold hover:bg-orange-700 disabled:opacity-50 flex items-center gap-2">
+                            {saving && <Loader2 size={14} className="animate-spin" />}
+                            Guardar horario
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     );

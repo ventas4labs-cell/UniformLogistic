@@ -20,6 +20,7 @@ import {
     setKioskAccessToken,
     setKioskActive
 } from '@/lib/services/hr-kiosks';
+import { upsertSchedule, type ScheduleInput } from '@/lib/services/hr-schedules';
 import { sendEmployeeInviteEmail } from '@/lib/email/notifications';
 
 // The invite link is single-use and expires; long enough that an
@@ -289,6 +290,35 @@ export async function deleteKioskAction(id: string): Promise<{ error?: string }>
         return { error: msg };
     }
     revalidatePath('/admin/rrhh');
+    return {};
+}
+
+// ─── Schedules ──────────────────────────────────────────────────────
+
+export async function saveEmployeeScheduleAction(
+    employeeId: string,
+    input: ScheduleInput
+): Promise<{ error?: string }> {
+    const { error: adminErr } = await requireAdmin();
+    if (adminErr) return { error: adminErr };
+    if (!input.workdays.length) return { error: 'Elegí al menos un día laboral.' };
+    if (!input.startTime || !input.endTime) return { error: 'Definí hora de entrada y salida.' };
+    const service = createServiceClient();
+    try {
+        await upsertSchedule(service, employeeId, {
+            workdays: input.workdays,
+            startTime: input.startTime,
+            endTime: input.endTime,
+            lunchMin: Math.max(0, input.lunchMin || 0),
+            breakMin: Math.max(0, input.breakMin || 0),
+            graceMin: Math.max(0, input.graceMin || 0)
+        });
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : 'No se pudo guardar el horario.';
+        return { error: msg };
+    }
+    revalidatePath('/admin/rrhh');
+    revalidatePath('/admin/rrhh/asistencia');
     return {};
 }
 

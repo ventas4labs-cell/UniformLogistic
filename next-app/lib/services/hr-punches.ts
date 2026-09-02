@@ -100,6 +100,73 @@ export function crDayRangeUtc(nowMs: number): { start: string; end: string } {
     };
 }
 
+/** Current Costa Rica calendar date as "YYYY-MM-DD". */
+export function crTodayStr(nowMs: number): string {
+    return new Date(nowMs - CR_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+/** Today (CR) — reads the clock here so server components don't. */
+export function crToday(): string {
+    return crTodayStr(Date.now());
+}
+
+/** Shift a "YYYY-MM-DD" date by n days (pure). */
+export function addDaysStr(dateStr: string, n: number): string {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+}
+
+/** UTC window [start,end) covering a given CR calendar date. */
+export function crDayRangeForDate(dateStr: string): { start: string; end: string } {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const startMs = Date.UTC(y, m - 1, d) + CR_OFFSET_MS;
+    return {
+        start: new Date(startMs).toISOString(),
+        end: new Date(startMs + 24 * 60 * 60 * 1000).toISOString()
+    };
+}
+
+/** Weekday of a CR date string (0=Sun … 6=Sat). */
+export function crWeekday(dateStr: string): number {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+
+export interface PunchWithEmployee extends Punch {
+    employeeId: string;
+}
+
+/** All punches on a given CR date, across employees (admin dashboard). */
+export async function fetchPunchesForDate(
+    supabase: SupabaseClient,
+    dateStr: string
+): Promise<PunchWithEmployee[]> {
+    const { start, end } = crDayRangeForDate(dateStr);
+    const { data, error } = await supabase
+        .from('hr_punches')
+        .select('id, employee_id, punch_type, punched_at')
+        .gte('punched_at', start)
+        .lt('punched_at', end)
+        .order('punched_at', { ascending: true });
+    if (error) {
+        if ((error as { code?: string }).code === '42P01') return [];
+        throw error;
+    }
+    return (
+        (data || []) as {
+            id: string;
+            employee_id: string;
+            punch_type: PunchType;
+            punched_at: string;
+        }[]
+    ).map((r) => ({
+        id: r.id,
+        employeeId: r.employee_id,
+        punchType: r.punch_type,
+        punchedAt: r.punched_at
+    }));
+}
+
 interface RawPunch {
     id: string;
     punch_type: PunchType;
