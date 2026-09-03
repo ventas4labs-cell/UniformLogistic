@@ -30,6 +30,22 @@ export interface SendResult {
 const FALLBACK_FROM = 'Uniform Logistic <no-reply@uniformlogisticcr.com>';
 const FALLBACK_REPLY_TO = 'ulogisticcr@gmail.com';
 
+/**
+ * Resend API key. The canonical name is RESEND_API_KEY, but the
+ * production project has historically stored it as `Resend_API` — env
+ * names are case-sensitive in Node, so reading only the canonical name
+ * silently disabled EVERY email in production. Accept the known
+ * aliases so a rename isn't required (and keeps working after one).
+ */
+export function resolveResendApiKey(): string | undefined {
+    return (
+        process.env.RESEND_API_KEY ||
+        process.env.Resend_API ||
+        process.env.RESEND_API ||
+        undefined
+    );
+}
+
 function resolveFrom(): string {
     const raw = process.env.RESEND_FROM_ADDRESS?.trim();
     if (!raw) return FALLBACK_FROM;
@@ -38,10 +54,13 @@ function resolveFrom(): string {
 }
 
 export async function sendEmail(opts: SendEmailOptions): Promise<SendResult> {
-    const apiKey = process.env.RESEND_API_KEY;
+    const apiKey = resolveResendApiKey();
     if (!apiKey) {
-        console.warn('[email] RESEND_API_KEY missing — skipping send to', opts.to);
-        return { ok: false, skipped: true };
+        console.warn(
+            '[email] No Resend API key found (RESEND_API_KEY / Resend_API) — skipping send to',
+            opts.to
+        );
+        return { ok: false, skipped: true, error: 'RESEND_API_KEY no está configurada.' };
     }
     const replyTo = opts.replyTo || process.env.RESEND_REPLY_TO || FALLBACK_REPLY_TO;
 

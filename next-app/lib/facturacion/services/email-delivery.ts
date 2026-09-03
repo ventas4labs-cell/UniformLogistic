@@ -13,6 +13,7 @@ import {
     type InvoicePdfDocumento,
     type InvoicePdfLine
 } from '@/lib/facturacion/pdf/invoice-pdf';
+import { resolveResendApiKey } from '@/lib/email/send';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const feFrom = (s: ReturnType<typeof createAdminClient>, t: string): any =>
@@ -176,19 +177,19 @@ function tipoLabel(t: string): string {
  * doesn't fail emissions because email isn't configured yet.
  */
 async function sendEmail(email: DeliveryEmail): Promise<DeliveryResult> {
-    if (process.env.RESEND_API_KEY) {
+    if (resolveResendApiKey()) {
         return sendViaResend(email);
     }
     // Future: add SMTP/SendGrid branches here.
     console.warn(
-        '[FE delivery] No email provider configured (RESEND_API_KEY missing). Skipping send for',
+        '[FE delivery] No email provider configured (RESEND_API_KEY / Resend_API missing). Skipping send for',
         email.to
     );
     return { ok: false, provider: 'none', skipped: true };
 }
 
 async function sendViaResend(email: DeliveryEmail): Promise<DeliveryResult> {
-    const apiKey = process.env.RESEND_API_KEY!;
+    const apiKey = resolveResendApiKey()!;
     const from = process.env.RESEND_FROM_ADDRESS || 'no-reply@uniformlogistic.com';
     try {
         const res = await fetch('https://api.resend.com/emails', {

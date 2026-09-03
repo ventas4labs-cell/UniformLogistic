@@ -121,9 +121,12 @@ export async function createEmployeeAction(
 
     revalidatePath('/admin/rrhh');
     if (!sent.ok) {
+        // Surface the provider's reason — a swallowed message here made a
+        // misconfigured API key look like a generic failure.
+        const detail = sent.error ? ` (${sent.error})` : '';
         return {
             warning:
-                'El empleado se creó, pero no se pudo enviar el correo de invitación. Usá "Reenviar invitación".'
+                `El empleado se creó, pero no se pudo enviar el correo de invitación${detail}. Usá "Reenviar invitación".`
         };
     }
     return {};
@@ -162,7 +165,10 @@ export async function resendEmployeeInviteAction(
     );
     revalidatePath('/admin/rrhh');
     if (!sent.ok) {
-        return { error: 'No se pudo enviar el correo. Revisá el email e intentá de nuevo.' };
+        const detail = sent.error ? ` (${sent.error})` : '';
+        return {
+            error: `No se pudo enviar el correo${detail}. Revisá el email e intentá de nuevo.`
+        };
     }
     return {};
 }
