@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 // ─── Kiosks + rotating punch tokens ─────────────────────────────────
 // A kiosk is a shared screen at the workplace, reached via a secret
 // /rrhh/kiosko/<access_token> link. It shows a QR of the current punch
-// token, which rotates every ~10 min.
+// token, which rotates every 2 min (see ROTATE_MS in the kiosk action).
 
 export interface Kiosk {
     id: string;
@@ -113,25 +113,36 @@ export async function deleteKioskRow(
 export interface CurrentToken {
     token: string;
     expiresAt: string;
+    /** When this code was minted — the kiosk rotates it rotateMs later. */
+    createdAt: string;
 }
 
-/** The latest still-valid token for a kiosk, or null if none/expired. */
+/**
+ * The code the kiosk should currently be DISPLAYING: the newest one
+ * minted within the rotation window. Deliberately keyed on created_at,
+ * not expires_at — a token stays punchable for a grace period after it
+ * stops being displayed, so someone who scanned a second before the
+ * rotation can still finish their punch. Returns null when the window
+ * has passed and a fresh code is due.
+ */
 export async function fetchCurrentToken(
     serviceSupabase: SupabaseClient,
-    kioskId: string
+    kioskId: string,
+    rotateMs: number
 ): Promise<CurrentToken | null> {
+    const mintedAfter = new Date(Date.now() - rotateMs).toISOString();
     const { data, error } = await serviceSupabase
         .from('hr_qr_tokens')
-        .select('token, expires_at')
+        .select('token, expires_at, created_at')
         .eq('kiosk_id', kioskId)
-        .gt('expires_at', new Date().toISOString())
-        .order('expires_at', { ascending: false })
+        .gt('created_at', mintedAfter)
+        .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
     if (error) throw error;
     if (!data) return null;
-    const r = data as { token: string; expires_at: string };
-    return { token: r.token, expiresAt: r.expires_at };
+    const r = data as { token: string; expires_at: string; created_at: string };
+    return { token: r.token, expiresAt: r.expires_at, createdAt: r.created_at };
 }
 
 export async function insertToken(
@@ -146,7 +157,7 @@ export async function insertToken(
         expires_at: expiresAt
     });
     if (error) throw error;
-    return { token, expiresAt };
+    return { token, expiresAt, createdAt: new Date().toISOString() };
 }
 
 /** Validate a punch token: returns its id + expiry (+ whether it's

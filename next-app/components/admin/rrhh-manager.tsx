@@ -573,7 +573,7 @@ function KioskModal({
                         </Field>
                         <p className="text-[11px] text-gray-500 dark:text-zinc-500 italic">
                             Se genera un enlace secreto para abrir en la pantalla del
-                            taller. El QR rota solo cada 10 minutos.
+                            taller. El QR rota solo cada 2 minutos y cada marcaje pide un escaneo nuevo.
                         </p>
                         {error && <div className="bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 p-3 rounded-lg text-sm border border-red-200 dark:border-red-900/50">{error}</div>}
                         <div className="flex justify-end gap-2 pt-2">

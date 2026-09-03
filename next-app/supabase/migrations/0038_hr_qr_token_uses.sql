@@ -1,5 +1,5 @@
 -- ─── Require a fresh QR scan for EVERY punch ────────────────────────
--- The kiosk shows one token to everybody for its 10-minute window, so a
+-- The kiosk shows one token to everybody for its rotation window, so a
 -- globally single-use token would let the first employee to scan lock
 -- everyone else out. Uniqueness is therefore per (token, employee): each
 -- person may spend a given code exactly once. The composite PK makes the

@@ -5,7 +5,7 @@ import QRCode from 'qrcode';
 import { getCurrentKioskTokenAction } from '@/app/rrhh/kiosko/actions';
 
 // Full-screen kiosk view for a shared workplace screen. Shows a QR of
-// the current punch token and rotates it every ~10 min. Employees scan
+// the current punch token and rotates it every 2 min. Employees scan
 // it with their own phone (already logged in) to open /empleado/marcar.
 export function KioskDisplay({
     kioskToken,
@@ -15,7 +15,7 @@ export function KioskDisplay({
     label: string;
 }) {
     const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
-    const [expiresMs, setExpiresMs] = useState<number | null>(null);
+    const [rotatesMs, setRotatesMs] = useState<number | null>(null);
     const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
     const loadingRef = useRef(false);
@@ -25,7 +25,7 @@ export function KioskDisplay({
         loadingRef.current = true;
         try {
             const res = await getCurrentKioskTokenAction(kioskToken);
-            if (res.error || !res.token || !res.expiresAt) {
+            if (res.error || !res.token || !res.rotatesAt) {
                 setError(res.error || 'No se pudo generar el código.');
                 return;
             }
@@ -37,7 +37,7 @@ export function KioskDisplay({
             });
             setError(null);
             setQrDataUrl(dataUrl);
-            setExpiresMs(new Date(res.expiresAt).getTime());
+            setRotatesMs(new Date(res.rotatesAt).getTime());
         } catch {
             setError('No se pudo generar el código. Reintentando…');
         } finally {
@@ -53,13 +53,13 @@ export function KioskDisplay({
     // Tick every second: update the countdown and reload once expired.
     useEffect(() => {
         const id = setInterval(() => {
-            if (expiresMs == null) return;
-            const left = Math.round((expiresMs - Date.now()) / 1000);
+            if (rotatesMs == null) return;
+            const left = Math.round((rotatesMs - Date.now()) / 1000);
             setSecondsLeft(Math.max(0, left));
             if (left <= 0) load();
         }, 1000);
         return () => clearInterval(id);
-    }, [expiresMs, load]);
+    }, [rotatesMs, load]);
 
     const mmss =
         secondsLeft == null
