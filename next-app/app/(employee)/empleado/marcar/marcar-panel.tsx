@@ -14,7 +14,7 @@ import {
 } from '@/lib/services/hr-punches';
 import { recordPunchAction } from './actions';
 
-export type TokenStatus = 'ok' | 'missing' | 'invalid' | 'expired';
+export type TokenStatus = 'ok' | 'missing' | 'invalid' | 'expired' | 'used';
 
 const fmtTime = (iso: string) =>
     new Date(iso).toLocaleTimeString('es-CR', {
@@ -57,6 +57,9 @@ export function MarcarPanel({
     const router = useRouter();
     const [pending, startTransition] = useTransition();
     const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+    // A code is good for one punch, so once this one lands the buttons go
+    // away and the employee is told to scan again for the next marcaje.
+    const [spent, setSpent] = useState(false);
 
     const onPunch = (type: PunchType) =>
         startTransition(async () => {
@@ -68,10 +71,11 @@ export function MarcarPanel({
             }
             const time = res.punchedAt ? ` · ${fmtTime(res.punchedAt)}` : '';
             setResult({ ok: true, text: `${res.message}${time}` });
+            setSpent(true);
             router.refresh();
         });
 
-    const tokenOk = tokenStatus === 'ok';
+    const tokenOk = tokenStatus === 'ok' && !spent;
     const firstName = employeeName.split(' ')[0] || '';
 
     return (
@@ -132,9 +136,13 @@ export function MarcarPanel({
                 <div className="rounded-2xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 p-4 text-center">
                     <AlertTriangle size={22} className="mx-auto text-amber-600 dark:text-amber-400" />
                     <p className="mt-2 text-sm font-semibold text-amber-800 dark:text-amber-300">
-                        {tokenStatus === 'expired'
-                            ? 'El código venció. Escaneá de nuevo el QR del taller.'
-                            : 'Escaneá el código QR del taller para poder marcar.'}
+                        {spent
+                            ? 'Marcaje guardado. Para el siguiente, escaneá otra vez el código de la pantalla.'
+                            : tokenStatus === 'expired'
+                              ? 'El código venció. Escaneá de nuevo el QR del taller.'
+                              : tokenStatus === 'used'
+                                ? 'Ya usaste este código. Escaneá el código nuevo de la pantalla para volver a marcar.'
+                                : 'Escaneá el código QR del taller para poder marcar.'}
                     </p>
                     <Link
                         href="/empleado"

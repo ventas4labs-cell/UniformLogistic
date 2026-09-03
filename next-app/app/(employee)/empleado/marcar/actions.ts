@@ -2,7 +2,11 @@
 
 import { createClient, createServiceClient } from '@/utils/supabase/server';
 import { fetchEmployee } from '@/lib/services/employees';
-import { fetchPunchToken } from '@/lib/services/hr-kiosks';
+import {
+    claimPunchToken,
+    fetchPunchToken,
+    releasePunchToken
+} from '@/lib/services/hr-kiosks';
 import {
     deriveState,
     fetchTodayPunches,
@@ -47,6 +51,17 @@ export async function recordPunchAction(
         };
     }
 
+    // Every punch needs its own scan: spend the code for this employee
+    // BEFORE writing the punch. The composite PK makes this atomic, so a
+    // double-tap or a second tab can't slip a second punch through on
+    // one scan.
+    const claimed = await claimPunchToken(service, pt.id, user.id);
+    if (!claimed) {
+        return {
+            error: 'Ya usaste este código. Escaneá el código nuevo de la pantalla para volver a marcar.'
+        };
+    }
+
     let punchedAt: string;
     try {
         const punch = await insertPunch(service, {
@@ -56,6 +71,8 @@ export async function recordPunchAction(
         });
         punchedAt = punch.punchedAt;
     } catch {
+        // Give the scan back so a transient failure doesn't burn it.
+        await releasePunchToken(service, pt.id, user.id);
         return { error: 'No se pudo registrar el marcaje. Probá de nuevo.' };
     }
 

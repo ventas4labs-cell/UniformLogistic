@@ -30,6 +30,15 @@ export interface DaySummary {
     workedMin: number | null;
     breakMin: number;
     lunchMin: number;
+    /** How many break / lunch periods were actually punched. Lets the UI
+     *  tell "took a 30-second break" (counts 1, rounds to 0 min) apart
+     *  from "never punched a break" — otherwise both render as "—" and a
+     *  real marcaje looks like it was never recorded. */
+    breakCount: number;
+    lunchCount: number;
+    /** A break/lunch that was started but not ended yet. */
+    breakOpen: boolean;
+    lunchOpen: boolean;
     open: boolean;
     flags: DayFlag[];
 }
@@ -67,6 +76,8 @@ export function computeDaySummary(
     let lastOut: string | null = null;
     let breakMin = 0;
     let lunchMin = 0;
+    let breakCount = 0;
+    let lunchCount = 0;
     let openBreak: string | null = null;
     let openLunch: string | null = null;
     let lastType: PunchType | null = null;
@@ -81,6 +92,7 @@ export function computeDaySummary(
                 break;
             case 'break_start':
                 openBreak = p.punchedAt;
+                breakCount++;
                 break;
             case 'break_end':
                 if (openBreak) {
@@ -90,6 +102,7 @@ export function computeDaySummary(
                 break;
             case 'lunch_start':
                 openLunch = p.punchedAt;
+                lunchCount++;
                 break;
             case 'lunch_end':
                 if (openLunch) {
@@ -123,7 +136,19 @@ export function computeDaySummary(
     if (ctx.isPast && hasPunches && open) flags.push('missing_out');
     if (ctx.isPast && scheduledDay && !hasPunches) flags.push('absent');
 
-    return { firstIn, lastOut, workedMin, breakMin, lunchMin, open, flags };
+    return {
+        firstIn,
+        lastOut,
+        workedMin,
+        breakMin,
+        lunchMin,
+        breakCount,
+        lunchCount,
+        breakOpen: openBreak !== null,
+        lunchOpen: openLunch !== null,
+        open,
+        flags
+    };
 }
 
 export function fmtHm(min: number | null): string {

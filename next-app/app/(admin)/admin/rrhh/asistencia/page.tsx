@@ -31,6 +31,16 @@ const fmtTime = (iso: string | null) =>
           })
         : '—';
 
+// Break / lunch cell. A punched period that rounds down to zero minutes
+// must still read as "happened" — showing "—" made a real marcaje look
+// like it was never recorded.
+function fmtPeriod(min: number, count: number, isOpen: boolean): string {
+    if (isOpen) return 'en curso';
+    if (count === 0) return '—';
+    if (min < 1) return '<1 min';
+    return fmtHm(min);
+}
+
 const dateLabel = (dateStr: string) =>
     new Date(`${dateStr}T12:00:00Z`).toLocaleDateString('es-CR', {
         timeZone: 'America/Costa_Rica',
@@ -161,8 +171,8 @@ export default async function AsistenciaPage({
                                         )}
                                     </td>
                                     <td className="px-4 py-3 font-semibold text-gray-900 dark:text-zinc-100">{fmtHm(summary.workedMin)}</td>
-                                    <td className="px-4 py-3 text-gray-600 dark:text-zinc-400">{summary.breakMin ? fmtHm(summary.breakMin) : '—'}</td>
-                                    <td className="px-4 py-3 text-gray-600 dark:text-zinc-400">{summary.lunchMin ? fmtHm(summary.lunchMin) : '—'}</td>
+                                    <td className="px-4 py-3 text-gray-600 dark:text-zinc-400">{fmtPeriod(summary.breakMin, summary.breakCount, summary.breakOpen)}</td>
+                                    <td className="px-4 py-3 text-gray-600 dark:text-zinc-400">{fmtPeriod(summary.lunchMin, summary.lunchCount, summary.lunchOpen)}</td>
                                     <td className="px-4 py-3">
                                         {summary.flags.length === 0 ? (
                                             <span className="text-gray-400 dark:text-zinc-600">—</span>

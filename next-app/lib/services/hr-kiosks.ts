@@ -170,3 +170,55 @@ export async function fetchPunchToken(
         expired: new Date(r.expires_at).getTime() < Date.now()
     };
 }
+
+// ─── One punch per scan ─────────────────────────────────────────────
+// A displayed token is shared by everyone at the screen, so it can be
+// spent once PER EMPLOYEE. The composite PK on hr_qr_token_uses makes
+// the claim atomic — a duplicate insert means "already used".
+
+/** Try to spend this token for this employee. False = already used. */
+export async function claimPunchToken(
+    serviceSupabase: SupabaseClient,
+    tokenId: string,
+    employeeId: string
+): Promise<boolean> {
+    const { error } = await serviceSupabase
+        .from('hr_qr_token_uses')
+        .insert({ token_id: tokenId, employee_id: employeeId });
+    if (!error) return true;
+    // 23505 = unique_violation → this employee already used this code.
+    if ((error as { code?: string }).code === '23505') return false;
+    throw error;
+}
+
+/** Release a claim (used when the punch insert itself fails). */
+export async function releasePunchToken(
+    serviceSupabase: SupabaseClient,
+    tokenId: string,
+    employeeId: string
+): Promise<void> {
+    await serviceSupabase
+        .from('hr_qr_token_uses')
+        .delete()
+        .eq('token_id', tokenId)
+        .eq('employee_id', employeeId);
+}
+
+/** Has this employee already spent this token? Drives the page state. */
+export async function hasUsedPunchToken(
+    serviceSupabase: SupabaseClient,
+    tokenId: string,
+    employeeId: string
+): Promise<boolean> {
+    const { data, error } = await serviceSupabase
+        .from('hr_qr_token_uses')
+        .select('token_id')
+        .eq('token_id', tokenId)
+        .eq('employee_id', employeeId)
+        .maybeSingle();
+    if (error) {
+        if ((error as { code?: string }).code === '42P01') return false;
+        throw error;
+    }
+    return !!data;
+}

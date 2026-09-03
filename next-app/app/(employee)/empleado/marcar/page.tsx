@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient, createServiceClient } from '@/utils/supabase/server';
 import { fetchEmployee } from '@/lib/services/employees';
-import { fetchPunchToken } from '@/lib/services/hr-kiosks';
+import { fetchPunchToken, hasUsedPunchToken } from '@/lib/services/hr-kiosks';
 import {
     deriveState,
     fetchTodayPunches,
@@ -35,13 +35,19 @@ export default async function MarcarPage({
 
     const service = createServiceClient();
     const pt = token ? await fetchPunchToken(service, token) : null;
+    // A code is good for exactly one punch per employee, so a code this
+    // person already spent is treated as "scan again".
+    const alreadyUsed =
+        pt && !pt.expired ? await hasUsedPunchToken(service, pt.id, user.id) : false;
     const tokenStatus: TokenStatus = !token
         ? 'missing'
         : !pt
           ? 'invalid'
           : pt.expired
             ? 'expired'
-            : 'ok';
+            : alreadyUsed
+              ? 'used'
+              : 'ok';
 
     const state = deriveState(lastPunchType(punches));
 
