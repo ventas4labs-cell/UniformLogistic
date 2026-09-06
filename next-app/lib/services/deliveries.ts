@@ -96,13 +96,13 @@ interface RawPlanRow {
         | {
               order_number: number;
               company: { name: string; contact_name: string } | { name: string; contact_name: string }[] | null;
-              items: { product_name: string; size: string | null; quantity: number }[] | null;
+              items: { id: string; product_name: string; size: string | null; quantity: number }[] | null;
           }
         | null
         | {
               order_number: number;
               company: { name: string; contact_name: string } | { name: string; contact_name: string }[] | null;
-              items: { product_name: string; size: string | null; quantity: number }[] | null;
+              items: { id: string; product_name: string; size: string | null; quantity: number }[] | null;
           }[];
 }
 
@@ -117,22 +117,45 @@ export async function fetchDeliveryPlan(
     const { data, error } = await supabase
         .from('order_deliveries')
         .select(
-            'order_id, scheduled_date, order:orders ( order_number, company:companies ( name, contact_name ), items:order_items ( product_name, size, quantity ) )'
+            'order_id, scheduled_date, order:orders ( order_number, company:companies ( name, contact_name ), items:order_items ( id, product_name, size, quantity ) )'
         )
         .not('scheduled_date', 'is', null)
         .is('delivered_at', null)
         .order('scheduled_date', { ascending: true });
     if (error) throw error;
+
+    // The courier carries only the pieces routed to entrega. An order can be
+    // split with the rest going to the customer's stock, so the ordered
+    // quantity would over-state what actually goes on the truck.
+    const rows = (data as unknown as RawPlanRow[]) || [];
+    const planOrderIds = rows.map((r) => r.order_id);
+    const dispatchedByItem = new Map<string, number>();
+    if (planOrderIds.length > 0) {
+        const { data: dispRows, error: dispErr } = await supabase
+            .from('order_dispatch_items')
+            .select('order_item_id, quantity, dispatch:order_dispatches!inner(order_id)')
+            .in('dispatch.order_id', planOrderIds);
+        if (dispErr) throw dispErr;
+        for (const d of (dispRows || []) as { order_item_id: string; quantity: number }[]) {
+            dispatchedByItem.set(
+                d.order_item_id,
+                (dispatchedByItem.get(d.order_item_id) || 0) + d.quantity
+            );
+        }
+    }
+
     const out: DriverPlanOrder[] = [];
-    for (const r of (data as unknown as RawPlanRow[]) || []) {
+    for (const r of rows) {
         const order = pickOne(r.order);
         if (!order) continue;
         const company = pickOne(order.company);
-        const items = (order.items || []).map((it) => ({
-            name: it.product_name,
-            size: it.size || '',
-            quantity: it.quantity
-        }));
+        const items = (order.items || [])
+            .map((it) => ({
+                name: it.product_name,
+                size: it.size || '',
+                quantity: Math.min(dispatchedByItem.get(it.id) || 0, it.quantity)
+            }))
+            .filter((it) => it.quantity > 0);
         out.push({
             orderId: r.order_id,
             orderRef: `ORDEN-${String(order.order_number).padStart(5, '0')}`,

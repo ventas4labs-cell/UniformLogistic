@@ -4,6 +4,20 @@ import { randomBytes } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/utils/supabase/server';
 import { sendDeliveryScheduledEmail } from '@/lib/email/notifications';
+import { isAdminEmail } from '@/lib/admin-acting-company';
+
+// Defence in depth: the (admin) layout redirect does NOT protect server
+// actions — an action runs and commits before that render pass, and it is
+// addressed by action id, so it can be POSTed from any page the caller can
+// load. Every mutation re-checks that the caller is the admin.
+async function assertAdmin(): Promise<void> {
+    const _sb = await createClient();
+    const {
+        data: { user }
+    } = await _sb.auth.getUser();
+    if (!user || !isAdminEmail(user.email)) throw new Error('No autorizado.');
+}
+
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
@@ -29,6 +43,7 @@ export async function scheduleDeliveryAction(
     orderUuid: string,
     dateIso: string
 ): Promise<{ error?: string }> {
+    await assertAdmin();
     const { supabase, user } = await requireUser();
     if (!user) return { error: 'No autenticado.' };
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateIso)) return { error: 'Fecha inválida.' };
@@ -54,6 +69,7 @@ export async function scheduleDeliveryAction(
 export async function notifyDeliveryTodayAction(
     orderUuid: string
 ): Promise<{ error?: string }> {
+    await assertAdmin();
     const { supabase, user } = await requireUser();
     if (!user) return { error: 'No autenticado.' };
     const now = new Date().toISOString();
@@ -79,6 +95,7 @@ export async function notifyDeliveryTodayAction(
 export async function clearScheduleAction(
     orderUuid: string
 ): Promise<{ error?: string }> {
+    await assertAdmin();
     const { supabase, user } = await requireUser();
     if (!user) return { error: 'No autenticado.' };
     const { error } = await supabase
@@ -103,6 +120,7 @@ export async function regenerateDriverLinkAction(): Promise<{
     error?: string;
     token?: string;
 }> {
+    await assertAdmin();
     const { supabase, user } = await requireUser();
     if (!user) return { error: 'No autenticado.' };
     const token = randomBytes(24).toString('base64url');
@@ -120,6 +138,7 @@ export async function markDeliveredAction(
     orderUuid: string,
     delivered: boolean
 ): Promise<{ error?: string }> {
+    await assertAdmin();
     const { supabase, user } = await requireUser();
     if (!user) return { error: 'No autenticado.' };
     const { error } = await supabase.from('order_deliveries').upsert(

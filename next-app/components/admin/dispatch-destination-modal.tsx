@@ -113,12 +113,12 @@ export function DispatchDestinationModal({
             setError('Ingresá al menos una cantidad.');
             return;
         }
-        const orderedTotals = lines.map((l) => ({ orderItemId: l.id, ordered: l.ordered }));
         startTransition(async () => {
+            // Ordered quantities are read server-side; the board's copy can
+            // be stale, so it must not be the cap.
             const res = await dispatchOrderAction(
                 order.uuid!,
                 send,
-                orderedTotals,
                 notes.trim() || undefined
             );
             if (res.error) {

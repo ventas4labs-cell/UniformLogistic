@@ -9,6 +9,20 @@ import {
     uploadProductImage,
     ProductInput
 } from '@/lib/services/products';
+import { isAdminEmail } from '@/lib/admin-acting-company';
+
+// Defence in depth: the (admin) layout redirect does NOT protect server
+// actions — an action runs and commits before that render pass, and it is
+// addressed by action id, so it can be POSTed from any page the caller can
+// load. Every mutation re-checks that the caller is the admin.
+async function assertAdmin(): Promise<void> {
+    const _sb = await createClient();
+    const {
+        data: { user }
+    } = await _sb.auth.getUser();
+    if (!user || !isAdminEmail(user.email)) throw new Error('No autorizado.');
+}
+
 
 export type SaveProductResult = { ok: true } | { ok: false; error: string };
 
@@ -26,6 +40,7 @@ function toFriendlyError(err: unknown, code: string): string {
 export async function createProductAction(
     input: ProductInput
 ): Promise<SaveProductResult> {
+    await assertAdmin();
     try {
         const supabase = await createClient();
         await createProduct(supabase, input);
@@ -40,6 +55,7 @@ export async function updateProductAction(
     uuid: string,
     input: ProductInput
 ): Promise<SaveProductResult> {
+    await assertAdmin();
     try {
         const supabase = await createClient();
         await updateProduct(supabase, uuid, input);
@@ -51,12 +67,14 @@ export async function updateProductAction(
 }
 
 export async function deleteProductAction(uuid: string) {
+    await assertAdmin();
     const supabase = await createClient();
     await deleteProduct(supabase, uuid);
     revalidatePath('/admin/products');
 }
 
 export async function uploadProductImageAction(formData: FormData): Promise<string> {
+    await assertAdmin();
     const file = formData.get('file');
     if (!(file instanceof File)) {
         throw new Error('No se recibió el archivo');

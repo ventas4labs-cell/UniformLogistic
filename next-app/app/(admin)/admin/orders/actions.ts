@@ -18,14 +18,30 @@ import {
     ensureWebCompany
 } from '@/lib/services/fast-orders';
 import type { CartItem, CustomerForm } from '@/lib/types';
+import { isAdminEmail } from '@/lib/admin-acting-company';
+
+// Defence in depth: the (admin) layout redirect does NOT protect server
+// actions — an action runs and commits before that render pass, and it is
+// addressed by action id, so it can be POSTed from any page the caller can
+// load. Every mutation re-checks that the caller is the admin.
+async function assertAdmin(): Promise<void> {
+    const _sb = await createClient();
+    const {
+        data: { user }
+    } = await _sb.auth.getUser();
+    if (!user || !isAdminEmail(user.email)) throw new Error('No autorizado.');
+}
+
 
 export async function updateOrderStatusAction(orderUuid: string, status: OrderStatus) {
+    await assertAdmin();
     const supabase = await createClient();
     await updateOrderStatus(supabase, orderUuid, status);
     revalidatePath('/admin/orders');
 }
 
 export async function deleteOrderAction(orderUuid: string) {
+    await assertAdmin();
     const supabase = await createClient();
     await deleteOrder(supabase, orderUuid);
     revalidatePath('/admin/orders');
@@ -37,6 +53,7 @@ export async function updateOrderAction(
     header: UpdateOrderHeaderInput,
     items: OrderItemInput[]
 ) {
+    await assertAdmin();
     const supabase = await createClient();
     await updateOrderFull(supabase, orderUuid, header, items);
     revalidatePath('/admin/orders');
@@ -47,12 +64,14 @@ export async function updateOrderAction(
 // each affected order card. Resolving/reopening lives here now that
 // the standalone /admin/notificaciones page is gone.
 export async function resolveOrderReportAction(reportId: string) {
+    await assertAdmin();
     const supabase = await createClient();
     await resolveReport(supabase, reportId);
     revalidatePath('/admin/orders');
 }
 
 export async function unresolveOrderReportAction(reportId: string) {
+    await assertAdmin();
     const supabase = await createClient();
     await unresolveReport(supabase, reportId);
     revalidatePath('/admin/orders');
@@ -67,6 +86,7 @@ export async function unresolveOrderReportAction(reportId: string) {
 export async function acceptFastOrderRequestAction(
     requestId: string
 ): Promise<{ ok: boolean; orderRef?: string; error?: string }> {
+    await assertAdmin();
     const supabase = await createClient();
     const {
         data: { user }
@@ -139,6 +159,7 @@ export async function acceptFastOrderRequestAction(
 export async function rejectFastOrderRequestAction(
     requestId: string
 ): Promise<{ ok: boolean; error?: string }> {
+    await assertAdmin();
     try {
         const supabase = await createClient();
         await updateFastOrderRequestStatus(supabase, requestId, 'rejected');

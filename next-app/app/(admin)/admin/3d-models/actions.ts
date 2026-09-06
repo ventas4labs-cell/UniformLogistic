@@ -13,30 +13,48 @@ import {
 import { setCompanyCustomOrderEnabled } from '@/lib/services/companies';
 import { createOrder } from '@/lib/services/orders';
 import type { CartItem, CustomerForm } from '@/lib/types';
+import { isAdminEmail } from '@/lib/admin-acting-company';
+
+// Defence in depth: the (admin) layout redirect does NOT protect server
+// actions — an action runs and commits before that render pass, and it is
+// addressed by action id, so it can be POSTed from any page the caller can
+// load. Every mutation re-checks that the caller is the admin.
+async function assertAdmin(): Promise<void> {
+    const _sb = await createClient();
+    const {
+        data: { user }
+    } = await _sb.auth.getUser();
+    if (!user || !isAdminEmail(user.email)) throw new Error('No autorizado.');
+}
+
 
 // Route gate at (admin)/admin/layout.tsx already restricts these to the
 // admin email, same as the other admin modules (catalogo-default etc.).
 const REVAL_PATHS = ['/admin/3d-models', '/custom-order', '/catalog'];
 
 export async function updateModelAction(id: string, input: ThreeDModelInput) {
+    await assertAdmin();
     const supabase = await createClient();
     await updateThreeDModel(supabase, id, input);
     for (const p of REVAL_PATHS) revalidatePath(p);
 }
 
 export async function deleteModelAction(id: string) {
+    await assertAdmin();
     const supabase = await createClient();
     await deleteThreeDModel(supabase, id);
     for (const p of REVAL_PATHS) revalidatePath(p);
 }
 
 export async function updateDesignStatusAction(id: string, status: DesignStatus) {
+    await assertAdmin();
     const supabase = await createClient();
     await updateDesignRequestStatus(supabase, id, status);
     revalidatePath('/admin/3d-models');
 }
 
 export async function setCompanyCustomOrderEnabledAction(companyId: string, enabled: boolean) {
+    await assertAdmin();
     const supabase = await createClient();
     await setCompanyCustomOrderEnabled(supabase, companyId, enabled);
     for (const p of REVAL_PATHS) revalidatePath(p);
@@ -47,6 +65,7 @@ export async function setCompanyCustomOrderEnabledAction(companyId: string, enab
 export async function acceptDesignRequestAction(
     requestId: string
 ): Promise<{ ok: boolean; orderRef?: string; error?: string }> {
+    await assertAdmin();
     const supabase = await createClient();
     const {
         data: { user }

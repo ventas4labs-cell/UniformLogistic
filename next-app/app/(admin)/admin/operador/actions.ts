@@ -9,8 +9,23 @@ import {
     unmarkInsumoComplete,
 } from '@/lib/services/insumo-completions';
 import { setInsumoPreparation } from '@/lib/services/insumo-preparations';
+import { isAdminEmail } from '@/lib/admin-acting-company';
+
+// Defence in depth: the (admin) layout redirect does NOT protect server
+// actions — an action runs and commits before that render pass, and it is
+// addressed by action id, so it can be POSTed from any page the caller can
+// load. Every mutation re-checks that the caller is the admin.
+async function assertAdmin(): Promise<void> {
+    const _sb = await createClient();
+    const {
+        data: { user }
+    } = await _sb.auth.getUser();
+    if (!user || !isAdminEmail(user.email)) throw new Error('No autorizado.');
+}
+
 
 export async function updateOrderStatusAction(orderUuid: string, status: OrderStatus) {
+    await assertAdmin();
     const supabase = await createClient();
     await updateOrderStatus(supabase, orderUuid, status);
     revalidatePath('/admin/operador');
@@ -24,6 +39,7 @@ export async function reportMissingInsumoAction(
     notes?: string,
     stage?: string
 ) {
+    await assertAdmin();
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('No autenticado');
@@ -48,6 +64,7 @@ export async function toggleInsumoCompleteAction(
     insumoName: string,
     completed: boolean
 ) {
+    await assertAdmin();
     const supabase = await createClient();
     if (completed) {
         const { data: { user } } = await supabase.auth.getUser();
@@ -65,6 +82,7 @@ export async function setInsumoPreparationAction(
     insumoName: string,
     qty: number
 ) {
+    await assertAdmin();
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('No autenticado');
