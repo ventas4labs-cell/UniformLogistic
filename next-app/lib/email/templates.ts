@@ -308,6 +308,60 @@ export function companyActivationEmail(d: CompanyActivationEmailData): RenderedE
     };
 }
 
+// ── 3c-bis. Stock retiro approved — to the customer ──────────────────
+export interface WithdrawalApprovedEmailData {
+    ref: string;
+    companyName: string;
+    contactName: string;
+    /** Who the client said would collect the pieces. */
+    recipientName: string;
+    totalPieces: number;
+    lines: { name: string; size: string; quantity: number }[];
+    /** The client asked for it to be delivered rather than collected. */
+    wantsDelivery: boolean;
+}
+
+export function withdrawalApprovedEmail(d: WithdrawalApprovedEmailData): RenderedEmail {
+    const greet = d.contactName || d.companyName;
+    const rows = d.lines
+        .map(
+            (l) => `
+      <tr>
+        <td style="padding:7px 0;border-bottom:1px solid #EAE6E1;font-size:14px;">${esc(l.name)}
+          <span style="color:${MUTED};">${esc(l.size)}</span></td>
+        <td style="padding:7px 0;border-bottom:1px solid #EAE6E1;font-size:14px;text-align:right;font-weight:700;">${l.quantity}</td>
+      </tr>`
+        )
+        .join('');
+    const closing = d.wantsDelivery
+        ? 'Coordinamos la entrega y te avisamos la fecha.'
+        : `Ya podés pasar a retirarlas por bodega${d.recipientName ? ` a nombre de ${esc(d.recipientName)}` : ''}.`;
+
+    const body = `
+    <p style="margin:0 0 14px 0;">${greet ? `Hola ${esc(greet)},` : 'Hola,'}</p>
+    <p style="margin:0 0 6px 0;">Aprobamos tu retiro <strong style="color:${ORANGE};">${esc(d.ref)}</strong> — se descontaron <strong>${d.totalPieces}</strong> piezas de tu inventario.</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:18px 0;border-collapse:collapse;">
+      <tr>
+        <th align="left" style="padding:0 0 6px 0;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:${MUTED};">Producto</th>
+        <th align="right" style="padding:0 0 6px 0;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:${MUTED};">Cant.</th>
+      </tr>${rows}
+    </table>
+    <p style="margin:14px 0 0 0;color:${MUTED};font-size:14px;">${closing} Si algo no cuadra, respondé este correo.</p>`;
+
+    return {
+        subject: `Retiro ${d.ref} aprobado — Uniform Logistic`,
+        html: layout({
+            title: 'Retiro aprobado',
+            preheader: `${d.ref} — ${d.totalPieces} piezas`,
+            body
+        }),
+        text:
+            `${greet ? `Hola ${greet},\n\n` : ''}Aprobamos tu retiro ${d.ref}: ${d.totalPieces} piezas descontadas de tu inventario.\n\n` +
+            d.lines.map((l) => `- ${l.name} ${l.size} x${l.quantity}`).join('\n') +
+            `\n\n${d.wantsDelivery ? 'Coordinamos la entrega y te avisamos la fecha.' : 'Ya podés pasar a retirarlas por bodega.'}\n${SUPPORT_EMAIL}`
+    };
+}
+
 // ── 3d-bis. Employee invite (set your own password) ──────────────────
 export interface EmployeeInviteEmailData {
     employeeName: string;

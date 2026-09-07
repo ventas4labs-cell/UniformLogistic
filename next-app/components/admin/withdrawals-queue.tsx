@@ -38,6 +38,7 @@ export function WithdrawalsQueue({ withdrawals }: { withdrawals: Withdrawal[] })
     const router = useRouter();
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
+    const [notice, setNotice] = useState<string | null>(null);
     const [showHistory, setShowHistory] = useState(false);
 
     const queue = withdrawals.filter((w) => w.status === 'pending');
@@ -49,6 +50,7 @@ export function WithdrawalsQueue({ withdrawals }: { withdrawals: Withdrawal[] })
             if (note === null) return; // cancelled the prompt
             startTransition(async () => {
                 setError(null);
+                setNotice(null);
                 const res = await reviewWithdrawalAction(w.id, false, note);
                 if (res.error) setError(res.error);
                 else router.refresh();
@@ -63,9 +65,13 @@ export function WithdrawalsQueue({ withdrawals }: { withdrawals: Withdrawal[] })
             return;
         startTransition(async () => {
             setError(null);
+            setNotice(null);
             const res = await reviewWithdrawalAction(w.id, true);
             if (res.error) setError(res.error);
-            else router.refresh();
+            else {
+                if (res.warning) setNotice(res.warning);
+                router.refresh();
+            }
         });
     };
 
@@ -88,6 +94,16 @@ export function WithdrawalsQueue({ withdrawals }: { withdrawals: Withdrawal[] })
             {error && (
                 <div className="mb-3 flex items-center gap-2 p-3 rounded-lg text-sm border bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-900/50">
                     <AlertTriangle size={16} /> {error}
+                </div>
+            )}
+            {notice && (
+                <div className="mb-3 flex items-start justify-between gap-3 p-3 rounded-lg text-sm border bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-900/50">
+                    <span className="flex items-center gap-2">
+                        <AlertTriangle size={16} /> {notice}
+                    </span>
+                    <button type="button" onClick={() => setNotice(null)} aria-label="Cerrar">
+                        <X size={14} />
+                    </button>
                 </div>
             )}
 

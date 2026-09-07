@@ -13,6 +13,7 @@ import {
     deliveryDeliveredEmail,
     companyActivationEmail,
     employeeInviteEmail,
+    withdrawalApprovedEmail,
     passwordResetEmail,
     invoiceOverdueEmail,
     fastOrderReceivedEmail,
@@ -266,6 +267,73 @@ export async function sendCompanyActivationEmail(
     const t = companyActivationEmail({ companyName, activationUrl, expiresIn });
     const res = await sendEmail({ to, subject: t.subject, html: t.html, text: t.text });
     return { ok: res.ok, error: res.error };
+}
+
+/**
+ * Tell the client their stock retiro was approved and the pieces are off
+ * their inventory. Best-effort: a failed send must never roll back the
+ * approval, which has already moved real stock.
+ */
+export async function sendWithdrawalApprovedEmail(
+    supabase: SupabaseClient,
+    withdrawalId: string
+): Promise<{ sent: boolean; reason?: string }> {
+    try {
+        const { data, error } = await supabase
+            .from('stock_withdrawals')
+            .select(
+                'withdrawal_number, recipient_name, wants_delivery, company:companies ( name, email, contact_name ), items:stock_withdrawal_items ( quantity, size, product:products ( name ) )'
+            )
+            .eq('id', withdrawalId)
+            .maybeSingle();
+        if (error || !data) return { sent: false, reason: 'no se encontró el retiro' };
+
+        const row = data as unknown as {
+            withdrawal_number: number;
+            recipient_name: string | null;
+            wants_delivery: boolean;
+            company:
+                | { name: string; email: string; contact_name: string }
+                | { name: string; email: string; contact_name: string }[]
+                | null;
+            items:
+                | {
+                      quantity: number;
+                      size: string | null;
+                      product: { name: string } | { name: string }[] | null;
+                  }[]
+                | null;
+        };
+        const company = pickOne(row.company);
+        const to = (company?.email || '').trim();
+        if (!to) {
+            return {
+                sent: false,
+                reason: `${company?.name || 'La empresa'} no tiene correo registrado`
+            };
+        }
+
+        const lines = (row.items || []).map((it) => ({
+            name: pickOne(it.product)?.name || '—',
+            size: it.size || '',
+            quantity: it.quantity
+        }));
+
+        const t = withdrawalApprovedEmail({
+            ref: `RETIRO-${String(row.withdrawal_number).padStart(5, '0')}`,
+            companyName: company?.name || '',
+            contactName: company?.contact_name || '',
+            recipientName: row.recipient_name || '',
+            totalPieces: lines.reduce((s, l) => s + l.quantity, 0),
+            lines,
+            wantsDelivery: row.wants_delivery
+        });
+        const res = await sendEmail({ to, subject: t.subject, html: t.html, text: t.text });
+        return res.ok ? { sent: true } : { sent: false, reason: res.error || 'el proveedor rechazó el envío' };
+    } catch (e) {
+        console.error('[email] withdrawal approved notice failed', e);
+        return { sent: false, reason: e instanceof Error ? e.message : 'error desconocido' };
+    }
 }
 
 /** Send an employee their invite / set-password link. Recipient passed
