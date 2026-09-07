@@ -14,6 +14,9 @@ import {
     companyActivationEmail,
     employeeInviteEmail,
     withdrawalApprovedEmail,
+    withdrawalRejectedEmail,
+    withdrawalDeliveryScheduledEmail,
+    withdrawalDeliveredEmail,
     passwordResetEmail,
     invoiceOverdueEmail,
     fastOrderReceivedEmail,
@@ -269,71 +272,192 @@ export async function sendCompanyActivationEmail(
     return { ok: res.ok, error: res.error };
 }
 
-/**
- * Tell the client their stock retiro was approved and the pieces are off
- * their inventory. Best-effort: a failed send must never roll back the
- * approval, which has already moved real stock.
- */
+// ─── Retiro notices ──────────────────────────────────────────────────
+// All four share one loader. Each is best-effort — the stock has already
+// moved by the time we mail — but each REPORTS why it skipped, so "the
+// client was never told" can't hide behind a silent return.
+
+interface WithdrawalEmailContext {
+    to: string;
+    ref: string;
+    companyName: string;
+    contactName: string;
+    recipientName: string;
+    reviewNote: string;
+    wantsDelivery: boolean;
+    totalPieces: number;
+    lines: { name: string; size: string; quantity: number }[];
+}
+
+export interface MailResult {
+    sent: boolean;
+    reason?: string;
+}
+
+async function loadWithdrawalContext(
+    supabase: SupabaseClient,
+    withdrawalId: string
+): Promise<WithdrawalEmailContext | MailResult> {
+    const { data, error } = await supabase
+        .from('stock_withdrawals')
+        .select(
+            'withdrawal_number, recipient_name, wants_delivery, review_note, company:companies ( name, email, contact_name ), items:stock_withdrawal_items ( quantity, size, product:products ( name ) )'
+        )
+        .eq('id', withdrawalId)
+        .maybeSingle();
+    if (error || !data) return { sent: false, reason: 'no se encontró el retiro' };
+
+    const row = data as unknown as {
+        withdrawal_number: number;
+        recipient_name: string | null;
+        wants_delivery: boolean;
+        review_note: string | null;
+        company:
+            | { name: string; email: string; contact_name: string }
+            | { name: string; email: string; contact_name: string }[]
+            | null;
+        items:
+            | {
+                  quantity: number;
+                  size: string | null;
+                  product: { name: string } | { name: string }[] | null;
+              }[]
+            | null;
+    };
+    const company = pickOne(row.company);
+    const to = (company?.email || '').trim();
+    if (!to) {
+        return {
+            sent: false,
+            reason: `${company?.name || 'La empresa'} no tiene correo registrado`
+        };
+    }
+    const lines = (row.items || []).map((it) => ({
+        name: pickOne(it.product)?.name || '—',
+        size: it.size || '',
+        quantity: it.quantity
+    }));
+    return {
+        to,
+        ref: `RETIRO-${String(row.withdrawal_number).padStart(5, '0')}`,
+        companyName: company?.name || '',
+        contactName: company?.contact_name || '',
+        recipientName: row.recipient_name || '',
+        reviewNote: row.review_note || '',
+        wantsDelivery: row.wants_delivery,
+        totalPieces: lines.reduce((s, l) => s + l.quantity, 0),
+        lines
+    };
+}
+
+const isCtx = (v: WithdrawalEmailContext | MailResult): v is WithdrawalEmailContext =>
+    (v as WithdrawalEmailContext).to !== undefined;
+
+async function deliver(
+    ctx: WithdrawalEmailContext,
+    t: { subject: string; html: string; text: string },
+    label: string
+): Promise<MailResult> {
+    try {
+        const res = await sendEmail({
+            to: ctx.to,
+            subject: t.subject,
+            html: t.html,
+            text: t.text
+        });
+        return res.ok
+            ? { sent: true }
+            : { sent: false, reason: res.error || 'el proveedor rechazó el envío' };
+    } catch (e) {
+        console.error(`[email] ${label} failed`, e);
+        return { sent: false, reason: e instanceof Error ? e.message : 'error desconocido' };
+    }
+}
+
+/** Approved: the pieces came off their inventory. */
 export async function sendWithdrawalApprovedEmail(
     supabase: SupabaseClient,
     withdrawalId: string
-): Promise<{ sent: boolean; reason?: string }> {
-    try {
-        const { data, error } = await supabase
-            .from('stock_withdrawals')
-            .select(
-                'withdrawal_number, recipient_name, wants_delivery, company:companies ( name, email, contact_name ), items:stock_withdrawal_items ( quantity, size, product:products ( name ) )'
-            )
-            .eq('id', withdrawalId)
-            .maybeSingle();
-        if (error || !data) return { sent: false, reason: 'no se encontró el retiro' };
+): Promise<MailResult> {
+    const ctx = await loadWithdrawalContext(supabase, withdrawalId);
+    if (!isCtx(ctx)) return ctx;
+    return deliver(
+        ctx,
+        withdrawalApprovedEmail({
+            ref: ctx.ref,
+            companyName: ctx.companyName,
+            contactName: ctx.contactName,
+            recipientName: ctx.recipientName,
+            totalPieces: ctx.totalPieces,
+            lines: ctx.lines,
+            wantsDelivery: ctx.wantsDelivery
+        }),
+        'withdrawal approved'
+    );
+}
 
-        const row = data as unknown as {
-            withdrawal_number: number;
-            recipient_name: string | null;
-            wants_delivery: boolean;
-            company:
-                | { name: string; email: string; contact_name: string }
-                | { name: string; email: string; contact_name: string }[]
-                | null;
-            items:
-                | {
-                      quantity: number;
-                      size: string | null;
-                      product: { name: string } | { name: string }[] | null;
-                  }[]
-                | null;
-        };
-        const company = pickOne(row.company);
-        const to = (company?.email || '').trim();
-        if (!to) {
-            return {
-                sent: false,
-                reason: `${company?.name || 'La empresa'} no tiene correo registrado`
-            };
-        }
+/** Rejected: nothing left their inventory, and here's why. */
+export async function sendWithdrawalRejectedEmail(
+    supabase: SupabaseClient,
+    withdrawalId: string
+): Promise<MailResult> {
+    const ctx = await loadWithdrawalContext(supabase, withdrawalId);
+    if (!isCtx(ctx)) return ctx;
+    return deliver(
+        ctx,
+        withdrawalRejectedEmail({
+            ref: ctx.ref,
+            companyName: ctx.companyName,
+            contactName: ctx.contactName,
+            totalPieces: ctx.totalPieces,
+            reason: ctx.reviewNote
+        }),
+        'withdrawal rejected'
+    );
+}
 
-        const lines = (row.items || []).map((it) => ({
-            name: pickOne(it.product)?.name || '—',
-            size: it.size || '',
-            quantity: it.quantity
-        }));
+/** Scheduled for delivery (or going out today). `dateIso` is YYYY-MM-DD. */
+export async function sendWithdrawalDeliveryScheduledEmail(
+    supabase: SupabaseClient,
+    withdrawalId: string,
+    dateIso: string
+): Promise<MailResult> {
+    const ctx = await loadWithdrawalContext(supabase, withdrawalId);
+    if (!isCtx(ctx)) return ctx;
+    const today = new Date().toISOString().slice(0, 10);
+    const isToday = dateIso === today;
+    // Format YYYY-MM-DD as an es-CR date without timezone drift.
+    const [y, m, dd] = dateIso.split('-').map((n) => parseInt(n, 10));
+    return deliver(
+        ctx,
+        withdrawalDeliveryScheduledEmail({
+            ref: ctx.ref,
+            companyName: ctx.companyName,
+            contactName: ctx.contactName,
+            dateLabel: isToday ? 'hoy' : `el ${dd}/${m}/${y}`,
+            isToday
+        }),
+        'withdrawal delivery scheduled'
+    );
+}
 
-        const t = withdrawalApprovedEmail({
-            ref: `RETIRO-${String(row.withdrawal_number).padStart(5, '0')}`,
-            companyName: company?.name || '',
-            contactName: company?.contact_name || '',
-            recipientName: row.recipient_name || '',
-            totalPieces: lines.reduce((s, l) => s + l.quantity, 0),
-            lines,
-            wantsDelivery: row.wants_delivery
-        });
-        const res = await sendEmail({ to, subject: t.subject, html: t.html, text: t.text });
-        return res.ok ? { sent: true } : { sent: false, reason: res.error || 'el proveedor rechazó el envío' };
-    } catch (e) {
-        console.error('[email] withdrawal approved notice failed', e);
-        return { sent: false, reason: e instanceof Error ? e.message : 'error desconocido' };
-    }
+/** Delivered. */
+export async function sendWithdrawalDeliveredEmail(
+    supabase: SupabaseClient,
+    withdrawalId: string
+): Promise<MailResult> {
+    const ctx = await loadWithdrawalContext(supabase, withdrawalId);
+    if (!isCtx(ctx)) return ctx;
+    return deliver(
+        ctx,
+        withdrawalDeliveredEmail({
+            ref: ctx.ref,
+            companyName: ctx.companyName,
+            contactName: ctx.contactName,
+            totalPieces: ctx.totalPieces
+        }),
+        'withdrawal delivered'
+    );
 }
 
 /** Send an employee their invite / set-password link. Recipient passed

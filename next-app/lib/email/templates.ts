@@ -362,6 +362,96 @@ export function withdrawalApprovedEmail(d: WithdrawalApprovedEmailData): Rendere
     };
 }
 
+// ── 3c-ter. Stock retiro rejected / delivery notices ─────────────────
+export interface WithdrawalRejectedEmailData {
+    ref: string;
+    companyName: string;
+    contactName: string;
+    totalPieces: number;
+    /** Admin's reason, if they gave one. */
+    reason: string;
+}
+
+export function withdrawalRejectedEmail(d: WithdrawalRejectedEmailData): RenderedEmail {
+    const greet = d.contactName || d.companyName;
+    const body = `
+    <p style="margin:0 0 14px 0;">${greet ? `Hola ${esc(greet)},` : 'Hola,'}</p>
+    <p style="margin:0 0 6px 0;">No pudimos procesar tu retiro <strong style="color:${ORANGE};">${esc(d.ref)}</strong>. Las <strong>${d.totalPieces}</strong> piezas siguen en tu inventario y vuelven a estar disponibles.</p>
+    ${d.reason ? `<p style="margin:14px 0 0 0;padding:12px 14px;background:${IVORY};border-radius:10px;font-size:14px;"><strong>Motivo:</strong> ${esc(d.reason)}</p>` : ''}
+    <p style="margin:14px 0 0 0;color:${MUTED};font-size:14px;">Podés volver a solicitarlo desde tu inventario, o respondé este correo si querés que lo veamos juntos.</p>`;
+    return {
+        subject: `Retiro ${d.ref} no procesado — Uniform Logistic`,
+        html: layout({
+            title: 'Retiro no procesado',
+            preheader: `${d.ref} — las piezas siguen en tu inventario`,
+            body
+        }),
+        text:
+            `${greet ? `Hola ${greet},\n\n` : ''}No pudimos procesar tu retiro ${d.ref}. Las ${d.totalPieces} piezas siguen en tu inventario.\n` +
+            `${d.reason ? `\nMotivo: ${d.reason}\n` : ''}\nPodés volver a solicitarlo desde tu inventario.\n${SUPPORT_EMAIL}`
+    };
+}
+
+export interface WithdrawalDeliveryEmailData {
+    ref: string;
+    companyName: string;
+    contactName: string;
+    dateLabel: string;
+    isToday: boolean;
+}
+
+export function withdrawalDeliveryScheduledEmail(
+    d: WithdrawalDeliveryEmailData
+): RenderedEmail {
+    const greet = d.contactName || d.companyName;
+    const when = d.isToday
+        ? 'sale a entrega <strong>hoy</strong>'
+        : `está programado para entregarse <strong>${esc(d.dateLabel)}</strong>`;
+    const body = `
+    <p style="margin:0 0 14px 0;">${greet ? `Hola ${esc(greet)},` : 'Hola,'}</p>
+    <p style="margin:0 0 6px 0;">Tu retiro <strong style="color:${ORANGE};">${esc(d.ref)}</strong> ${when}.</p>
+    <p style="margin:14px 0 0 0;color:${MUTED};font-size:14px;">Nuestro mensajero se encarga de la entrega. Si necesitás coordinar algo, respondé este correo.</p>`;
+    return {
+        subject: d.isToday
+            ? `Tu retiro ${d.ref} sale a entrega hoy — Uniform Logistic`
+            : `Tu retiro ${d.ref} tiene fecha de entrega — Uniform Logistic`,
+        html: layout({
+            title: 'Entrega programada',
+            preheader: d.isToday ? `${d.ref} sale hoy` : `${d.ref} — entrega ${d.dateLabel}`,
+            body
+        }),
+        text:
+            `${greet ? `Hola ${greet},\n\n` : ''}Tu retiro ${d.ref} ${
+                d.isToday ? 'sale a entrega hoy' : `se entregará ${d.dateLabel}`
+            }.\n\nUniform Logistic\n${SUPPORT_EMAIL}`
+    };
+}
+
+export interface WithdrawalDeliveredEmailData {
+    ref: string;
+    companyName: string;
+    contactName: string;
+    totalPieces: number;
+}
+
+export function withdrawalDeliveredEmail(d: WithdrawalDeliveredEmailData): RenderedEmail {
+    const greet = d.contactName || d.companyName;
+    const body = `
+    <p style="margin:0 0 14px 0;">${greet ? `Hola ${esc(greet)},` : 'Hola,'}</p>
+    <p style="margin:0 0 6px 0;">Tu retiro <strong style="color:${ORANGE};">${esc(d.ref)}</strong> — ${d.totalPieces} piezas — fue <strong>entregado</strong>. ¡Gracias por confiar en Uniform Logistic!</p>
+    <p style="margin:14px 0 0 0;color:${MUTED};font-size:14px;">Si algo no está en orden con tu entrega, respondé este correo y lo resolvemos.</p>`;
+    return {
+        subject: `Tu retiro ${d.ref} fue entregado — Uniform Logistic`,
+        html: layout({
+            title: 'Retiro entregado',
+            preheader: `${d.ref} fue entregado`,
+            body
+        }),
+        text:
+            `${greet ? `Hola ${greet},\n\n` : ''}Tu retiro ${d.ref} (${d.totalPieces} piezas) fue entregado. ¡Gracias por confiar en Uniform Logistic!\n${SUPPORT_EMAIL}`
+    };
+}
+
 // ── 3d-bis. Employee invite (set your own password) ──────────────────
 export interface EmployeeInviteEmailData {
     employeeName: string;

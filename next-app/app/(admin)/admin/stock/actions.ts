@@ -3,7 +3,10 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/utils/supabase/server';
 import { isAdminEmail } from '@/lib/admin-acting-company';
-import { sendWithdrawalApprovedEmail } from '@/lib/email/notifications';
+import {
+    sendWithdrawalApprovedEmail,
+    sendWithdrawalRejectedEmail
+} from '@/lib/email/notifications';
 
 // Defence in depth: the (admin) layout redirect does NOT protect server
 // actions — an action runs and commits before that render pass, and it is
@@ -41,11 +44,11 @@ export async function reviewWithdrawalAction(
     // It IS reported though: silently not notifying the client is how you
     // end up with someone waiting on an email that never existed.
     let warning: string | undefined;
-    if (approve) {
-        const mail = await sendWithdrawalApprovedEmail(supabase, id);
-        if (!mail.sent) {
-            warning = `Retiro aprobado, pero no se avisó al cliente por correo (${mail.reason}).`;
-        }
+    const mail = approve
+        ? await sendWithdrawalApprovedEmail(supabase, id)
+        : await sendWithdrawalRejectedEmail(supabase, id);
+    if (!mail.sent) {
+        warning = `Retiro ${approve ? 'aprobado' : 'rechazado'}, pero no se avisó al cliente por correo (${mail.reason}).`;
     }
 
     revalidatePath('/admin/stock');

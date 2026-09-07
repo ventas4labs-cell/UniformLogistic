@@ -3,7 +3,10 @@
 import { randomBytes } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/utils/supabase/server';
-import { sendDeliveryScheduledEmail } from '@/lib/email/notifications';
+import { sendDeliveryScheduledEmail ,
+    sendWithdrawalDeliveryScheduledEmail,
+    sendWithdrawalDeliveredEmail
+} from '@/lib/email/notifications';
 import { isAdminEmail } from '@/lib/admin-acting-company';
 
 // Defence in depth: the (admin) layout redirect does NOT protect server
@@ -69,8 +72,8 @@ export async function scheduleDeliveryAction(
     const { supabase, user } = await requireUser();
     if (!user) return { error: 'No autenticado.' };
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateIso)) return { error: 'Fecha inválida.' };
-    if (kind === 'retiro')
-        return updateRetiro(
+    if (kind === 'retiro') {
+        const res = await updateRetiro(
             {
                 scheduled_date: dateIso,
                 scheduled_by: user.id,
@@ -78,6 +81,11 @@ export async function scheduleDeliveryAction(
             },
             orderUuid
         );
+        if (!res.error) {
+            await sendWithdrawalDeliveryScheduledEmail(supabase, orderUuid, dateIso);
+        }
+        return res;
+    }
     const { error } = await supabase.from('order_deliveries').upsert(
         {
             order_id: orderUuid,
@@ -106,9 +114,7 @@ export async function notifyDeliveryTodayAction(
     if (!user) return { error: 'No autenticado.' };
     const now = new Date().toISOString();
     if (kind === 'retiro') {
-        // No customer email yet for retiros — sendDeliveryScheduledEmail
-        // resolves an order, not a withdrawal.
-        return updateRetiro(
+        const res = await updateRetiro(
             {
                 scheduled_date: todayIso(),
                 scheduled_by: user.id,
@@ -117,6 +123,10 @@ export async function notifyDeliveryTodayAction(
             },
             orderUuid
         );
+        if (!res.error) {
+            await sendWithdrawalDeliveryScheduledEmail(supabase, orderUuid, todayIso());
+        }
+        return res;
     }
     const { error } = await supabase.from('order_deliveries').upsert(
         {
@@ -193,14 +203,20 @@ export async function markDeliveredAction(
     await assertAdmin();
     const { supabase, user } = await requireUser();
     if (!user) return { error: 'No autenticado.' };
-    if (kind === 'retiro')
-        return updateRetiro(
+    if (kind === 'retiro') {
+        const res = await updateRetiro(
             {
                 delivered_at: delivered ? new Date().toISOString() : null,
                 delivered_by: delivered ? user.id : null
             },
             orderUuid
         );
+        // Only on the way in — un-marking shouldn't mail anyone.
+        if (!res.error && delivered) {
+            await sendWithdrawalDeliveredEmail(supabase, orderUuid);
+        }
+        return res;
+    }
     const { error } = await supabase.from('order_deliveries').upsert(
         {
             order_id: orderUuid,
