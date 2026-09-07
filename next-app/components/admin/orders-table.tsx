@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { Download, Search, SearchX, RefreshCw, Loader2, Eye, Receipt, Pencil, Trash2, Calendar, User, Building2, Bell, X, AlertTriangle, CheckCircle2, Undo2, Plus, History, ShoppingCart, Clock, Boxes, Truck, Ruler, Inbox, Check } from 'lucide-react';
+import { Download, Search, SearchX, RefreshCw, Loader2, Eye, Receipt, Pencil, Trash2, Calendar, User, Building2, Bell, X, AlertTriangle, CheckCircle2, Undo2, Plus, History, ShoppingCart, Clock, Boxes, Truck, Ruler, Inbox, Check, ChevronDown, LayoutGrid } from 'lucide-react';
 import type { Order } from '@/lib/types';
 import type { AdminProduct } from '@/lib/services/products';
 import type { MissingInsumoReport } from '@/lib/services/missing-insumos';
@@ -468,61 +468,46 @@ export function OrdersTable({
                             ) : null;
                         })()}
                     </button>
-                    <button
-                        type="button"
-                        onClick={() => setShowFabricReport(true)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-bold text-orange-700 dark:text-orange-300 bg-orange-100 dark:bg-orange-950/40 hover:bg-orange-200 dark:hover:bg-orange-900/50 rounded-lg transition-colors"
-                        title="Consumo de tela reportado por Corte"
-                        aria-label="Consumo de tela"
-                    >
-                        <Ruler size={14} />
-                        Tela
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setShowRequests(true)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-bold text-orange-700 dark:text-orange-300 bg-orange-100 dark:bg-orange-950/40 hover:bg-orange-200 dark:hover:bg-orange-900/50 rounded-lg transition-colors"
-                        title="Pedidos rápidos recibidos desde el sitio web"
-                        aria-label="Solicitudes de pedido rápido"
-                    >
-                        <Inbox size={14} />
-                        Solicitudes
-                        {fastRequests.length > 0 && (
-                            <span className="ml-0.5 min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-orange-600 text-white text-[10px] font-bold flex items-center justify-center leading-none">
-                                {fastRequests.length > 99 ? '99+' : fastRequests.length}
-                            </span>
-                        )}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setShowDeletedHistory(true)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-bold text-gray-700 dark:text-zinc-300 bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 rounded-lg transition-colors"
-                        title="Historial de pedidos eliminados"
-                        aria-label="Historial de pedidos eliminados"
-                    >
-                        <History size={14} />
-                        Historial
-                        {deletedOrders.length > 0 && (
-                            <span className="ml-0.5 min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-gray-700 dark:bg-zinc-600 text-white text-[10px] font-bold flex items-center justify-center leading-none">
-                                {deletedOrders.length > 99 ? '99+' : deletedOrders.length}
-                            </span>
-                        )}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setShowCompleted(true)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-bold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-950/40 hover:bg-green-200 dark:hover:bg-green-900/50 rounded-lg transition-colors"
-                        title="Pedidos completados (despachados o en stock)"
-                        aria-label="Pedidos completados"
-                    >
-                        <CheckCircle2 size={14} />
-                        Completados
-                        {completedList.length > 0 && (
-                            <span className="ml-0.5 min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-green-700 dark:bg-green-600 text-white text-[10px] font-bold flex items-center justify-center leading-none">
-                                {completedList.length > 99 ? '99+' : completedList.length}
-                            </span>
-                        )}
-                    </button>
+                    <SectionsMenu
+                        alertCount={fastRequests.length}
+                        items={[
+                            {
+                                key: 'tela',
+                                label: 'Tela',
+                                hint: 'Consumo reportado por Corte',
+                                Icon: Ruler,
+                                tone: 'orange',
+                                onSelect: () => setShowFabricReport(true)
+                            },
+                            {
+                                key: 'solicitudes',
+                                label: 'Solicitudes',
+                                hint: 'Pedidos rápidos del sitio web',
+                                Icon: Inbox,
+                                tone: 'orange',
+                                count: fastRequests.length,
+                                onSelect: () => setShowRequests(true)
+                            },
+                            {
+                                key: 'historial',
+                                label: 'Historial',
+                                hint: 'Pedidos eliminados',
+                                Icon: History,
+                                tone: 'gray',
+                                count: deletedOrders.length,
+                                onSelect: () => setShowDeletedHistory(true)
+                            },
+                            {
+                                key: 'completados',
+                                label: 'Completados',
+                                hint: 'Despachados o en stock',
+                                Icon: CheckCircle2,
+                                tone: 'green',
+                                count: completedList.length,
+                                onSelect: () => setShowCompleted(true)
+                            }
+                        ]}
+                    />
                     <button
                         onClick={() => router.refresh()}
                         className="p-2 text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg"
@@ -1165,6 +1150,128 @@ export function OrdersTable({
                     onClose={() => setShowRequests(false)}
                     onDone={() => router.refresh()}
                 />
+            )}
+        </div>
+    );
+}
+
+// ── Secciones menu ───────────────────────────────────────────────────
+// Tela / Solicitudes / Historial / Completados used to sit in the toolbar
+// as four labelled buttons, which crowded the header. They collapse into
+// one dropdown; the trigger keeps a badge so incoming Solicitudes are
+// still noticed while collapsed.
+interface SectionItem {
+    key: string;
+    label: string;
+    hint: string;
+    Icon: typeof Ruler;
+    count?: number;
+    tone: 'orange' | 'gray' | 'green';
+    onSelect: () => void;
+}
+
+const TONE: Record<SectionItem['tone'], { icon: string; badge: string }> = {
+    orange: {
+        icon: 'text-orange-600 dark:text-orange-400',
+        badge: 'bg-orange-600 text-white'
+    },
+    gray: {
+        icon: 'text-gray-500 dark:text-zinc-400',
+        badge: 'bg-gray-700 dark:bg-zinc-600 text-white'
+    },
+    green: {
+        icon: 'text-green-600 dark:text-green-400',
+        badge: 'bg-green-700 dark:bg-green-600 text-white'
+    }
+};
+
+function SectionsMenu({ items, alertCount }: { items: SectionItem[]; alertCount: number }) {
+    const [open, setOpen] = useState(false);
+    const wrapperRef = useRef<HTMLDivElement>(null);
+
+    // Click-outside / Escape closes the menu (same pattern as the board filters).
+    useEffect(() => {
+        if (!open) return;
+        const onClick = (e: MouseEvent) => {
+            if (!wrapperRef.current) return;
+            if (!wrapperRef.current.contains(e.target as Node)) setOpen(false);
+        };
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setOpen(false);
+        };
+        document.addEventListener('mousedown', onClick);
+        document.addEventListener('keydown', onKey);
+        return () => {
+            document.removeEventListener('mousedown', onClick);
+            document.removeEventListener('keydown', onKey);
+        };
+    }, [open]);
+
+    return (
+        <div className="relative" ref={wrapperRef}>
+            <button
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={open}
+                className={`relative inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-bold rounded-lg transition-colors ${
+                    open
+                        ? 'bg-gray-200 dark:bg-zinc-700 text-gray-900 dark:text-zinc-100'
+                        : 'bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 hover:bg-gray-200 dark:hover:bg-zinc-700'
+                }`}
+                title="Tela, solicitudes, historial y completados"
+            >
+                <LayoutGrid size={14} />
+                Secciones
+                <ChevronDown
+                    size={14}
+                    className={`transition-transform ${open ? 'rotate-180' : ''}`}
+                />
+                {alertCount > 0 && !open && (
+                    <span className="absolute -top-1 -right-1 min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-orange-600 text-white text-[10px] font-bold flex items-center justify-center leading-none ring-2 ring-white dark:ring-zinc-950">
+                        {alertCount > 99 ? '99+' : alertCount}
+                    </span>
+                )}
+            </button>
+
+            {open && (
+                <div
+                    role="menu"
+                    className="absolute right-0 top-full mt-2 z-30 w-64 bg-white dark:bg-zinc-900 rounded-xl shadow-2xl border border-gray-200 dark:border-zinc-800 p-1.5"
+                >
+                    {items.map((it) => {
+                        const tone = TONE[it.tone];
+                        return (
+                            <button
+                                key={it.key}
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                    setOpen(false);
+                                    it.onSelect();
+                                }}
+                                className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-left hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                            >
+                                <it.Icon size={16} className={`shrink-0 ${tone.icon}`} />
+                                <span className="min-w-0 flex-1">
+                                    <span className="block text-sm font-bold text-gray-900 dark:text-zinc-100">
+                                        {it.label}
+                                    </span>
+                                    <span className="block text-[11px] text-gray-500 dark:text-zinc-400 truncate">
+                                        {it.hint}
+                                    </span>
+                                </span>
+                                {!!it.count && it.count > 0 && (
+                                    <span
+                                        className={`shrink-0 min-w-[1.25rem] h-5 px-1.5 rounded-full text-[10px] font-bold flex items-center justify-center leading-none ${tone.badge}`}
+                                    >
+                                        {it.count > 99 ? '99+' : it.count}
+                                    </span>
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
             )}
         </div>
     );
