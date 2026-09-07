@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { Download, Search, SearchX, RefreshCw, Loader2, Eye, Receipt, Pencil, Trash2, Calendar, User, Building2, Bell, X, AlertTriangle, CheckCircle2, Undo2, Plus, History, ShoppingCart, Clock, Boxes, Truck, Ruler, Inbox, Check, ChevronDown, LayoutGrid } from 'lucide-react';
+import { Download, Search, SearchX, RefreshCw, Loader2, Eye, Receipt, Pencil, Calendar, User, Building2, Bell, X, AlertTriangle, CheckCircle2, Undo2, Plus, History, ShoppingCart, Clock, Boxes, Truck, Ruler, Inbox, Check, ChevronDown, LayoutGrid } from 'lucide-react';
 import type { Order } from '@/lib/types';
 import type { AdminProduct } from '@/lib/services/products';
 import type { MissingInsumoReport } from '@/lib/services/missing-insumos';
