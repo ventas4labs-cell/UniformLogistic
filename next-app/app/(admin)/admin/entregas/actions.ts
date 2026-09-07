@@ -39,14 +39,45 @@ function revalidate() {
  * Set (or change) an order's planned delivery date — the delivery plan.
  * Planning only: does NOT email the customer. Pass a YYYY-MM-DD string.
  */
+
+// Orders and stock retiros share the courier board but live in different
+// tables — order_deliveries.order_id FKs to orders, so a retiro cannot
+// reuse it. Every mutation takes the kind and writes to the right place.
+export type DeliveryKind = 'order' | 'retiro';
+
+async function updateRetiro(
+    fields: Record<string, unknown>,
+    id: string
+): Promise<{ error?: string }> {
+    const { supabase, user } = await requireUser();
+    if (!user) return { error: 'No autenticado.' };
+    const { error } = await supabase
+        .from('stock_withdrawals')
+        .update(fields)
+        .eq('id', id);
+    if (error) return { error: error.message };
+    revalidate();
+    return {};
+}
+
 export async function scheduleDeliveryAction(
     orderUuid: string,
-    dateIso: string
+    dateIso: string,
+    kind: DeliveryKind = 'order'
 ): Promise<{ error?: string }> {
     await assertAdmin();
     const { supabase, user } = await requireUser();
     if (!user) return { error: 'No autenticado.' };
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateIso)) return { error: 'Fecha inválida.' };
+    if (kind === 'retiro')
+        return updateRetiro(
+            {
+                scheduled_date: dateIso,
+                scheduled_by: user.id,
+                scheduled_at: new Date().toISOString()
+            },
+            orderUuid
+        );
     const { error } = await supabase.from('order_deliveries').upsert(
         {
             order_id: orderUuid,
@@ -67,12 +98,26 @@ export async function scheduleDeliveryAction(
  * and notifies the customer their order is out for delivery.
  */
 export async function notifyDeliveryTodayAction(
-    orderUuid: string
+    orderUuid: string,
+    kind: DeliveryKind = 'order'
 ): Promise<{ error?: string }> {
     await assertAdmin();
     const { supabase, user } = await requireUser();
     if (!user) return { error: 'No autenticado.' };
     const now = new Date().toISOString();
+    if (kind === 'retiro') {
+        // No customer email yet for retiros — sendDeliveryScheduledEmail
+        // resolves an order, not a withdrawal.
+        return updateRetiro(
+            {
+                scheduled_date: todayIso(),
+                scheduled_by: user.id,
+                scheduled_at: now,
+                notified_at: now
+            },
+            orderUuid
+        );
+    }
     const { error } = await supabase.from('order_deliveries').upsert(
         {
             order_id: orderUuid,
@@ -93,11 +138,17 @@ export async function notifyDeliveryTodayAction(
 
 /** Remove an order from the plan (clear its scheduled date). */
 export async function clearScheduleAction(
-    orderUuid: string
+    orderUuid: string,
+    kind: DeliveryKind = 'order'
 ): Promise<{ error?: string }> {
     await assertAdmin();
     const { supabase, user } = await requireUser();
     if (!user) return { error: 'No autenticado.' };
+    if (kind === 'retiro')
+        return updateRetiro(
+            { scheduled_date: null, scheduled_at: null, notified_at: null },
+            orderUuid
+        );
     const { error } = await supabase
         .from('order_deliveries')
         .update({
@@ -136,11 +187,20 @@ export async function regenerateDriverLinkAction(): Promise<{
 /** Mark (or unmark) an order as delivered. */
 export async function markDeliveredAction(
     orderUuid: string,
-    delivered: boolean
+    delivered: boolean,
+    kind: DeliveryKind = 'order'
 ): Promise<{ error?: string }> {
     await assertAdmin();
     const { supabase, user } = await requireUser();
     if (!user) return { error: 'No autenticado.' };
+    if (kind === 'retiro')
+        return updateRetiro(
+            {
+                delivered_at: delivered ? new Date().toISOString() : null,
+                delivered_by: delivered ? user.id : null
+            },
+            orderUuid
+        );
     const { error } = await supabase.from('order_deliveries').upsert(
         {
             order_id: orderUuid,

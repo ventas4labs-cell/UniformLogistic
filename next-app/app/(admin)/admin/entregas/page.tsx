@@ -3,6 +3,7 @@ import { fetchAllOrders } from '@/lib/services/orders';
 import { fetchDispatchTotalsForOrders } from '@/lib/services/dispatches';
 import { fetchStockEntryTotalsForOrders } from '@/lib/services/stock-entries';
 import { fetchDeliveriesForOrders, fetchDriverLinkToken } from '@/lib/services/deliveries';
+import { fetchDeliverableWithdrawals } from '@/lib/services/stock-withdrawals';
 import { DeliveryBoard, type DeliverySummary } from '@/components/admin/delivery-board';
 import type { Order } from '@/lib/types';
 
@@ -44,12 +45,14 @@ export default async function EntregasPage() {
     const supabase = await createClient();
     const orders = await fetchAllOrders(supabase);
     const orderIds = orders.map((o) => o.uuid).filter((id): id is string => !!id);
-    const [dispatchTotals, stockTotals, deliveries, driverToken] = await Promise.all([
-        fetchDispatchTotalsForOrders(supabase, orderIds),
-        fetchStockEntryTotalsForOrders(supabase, orderIds),
-        fetchDeliveriesForOrders(supabase, orderIds),
-        fetchDriverLinkToken(supabase)
-    ]);
+    const [dispatchTotals, stockTotals, deliveries, driverToken, retiros] =
+        await Promise.all([
+            fetchDispatchTotalsForOrders(supabase, orderIds),
+            fetchStockEntryTotalsForOrders(supabase, orderIds),
+            fetchDeliveriesForOrders(supabase, orderIds),
+            fetchDriverLinkToken(supabase),
+            fetchDeliverableWithdrawals(supabase)
+        ]);
 
     const summaries: DeliverySummary[] = orders
         .filter(
@@ -62,6 +65,7 @@ export default async function EntregasPage() {
             const d = deliveries.get(o.uuid as string) || null;
             const dispatched = dispatchTotals.get(o.uuid as string);
             return {
+                kind: 'order' as const,
                 uuid: o.uuid as string,
                 ref: o.id,
                 companyName: o.companyName,
@@ -82,7 +86,27 @@ export default async function EntregasPage() {
             };
         });
 
+    // Approved retiros the client asked to have delivered ride the same
+    // board, so the courier sees one list. They keep their scheduling state
+    // on stock_withdrawals, since order_deliveries.order_id FKs to orders.
+    const retiroSummaries: DeliverySummary[] = retiros.map((r) => ({
+        kind: 'retiro' as const,
+        uuid: r.id,
+        ref: r.ref,
+        companyName: r.companyName,
+        contactName: r.recipientName,
+        requestedDeliveryDate: '',
+        totalPieces: r.totalPieces,
+        items: [...new Set(r.lines.map((l) => l.productName).filter(Boolean))],
+        scheduledDate: r.scheduledDate,
+        notifiedAt: r.notifiedAt,
+        deliveredAt: r.deliveredAt
+    }));
+
     return (
-        <DeliveryBoard initialSummaries={summaries} initialDriverToken={driverToken} />
+        <DeliveryBoard
+            initialSummaries={[...summaries, ...retiroSummaries]}
+            initialDriverToken={driverToken}
+        />
     );
 }

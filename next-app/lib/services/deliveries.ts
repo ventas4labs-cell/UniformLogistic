@@ -166,5 +166,45 @@ export async function fetchDeliveryPlan(
             items
         });
     }
+    // Scheduled stock retiros ride the same plan — they live in their own
+    // table (order_deliveries FKs to orders) but the courier sees one list.
+    const { data: retiroRows, error: retiroErr } = await supabase
+        .from('stock_withdrawals')
+        .select(
+            'id, withdrawal_number, scheduled_date, recipient_name, company:companies(name, contact_name), items:stock_withdrawal_items(quantity, size, product:products(name))'
+        )
+        .eq('status', 'approved')
+        .eq('wants_delivery', true)
+        .not('scheduled_date', 'is', null)
+        .is('delivered_at', null)
+        .order('scheduled_date', { ascending: true });
+    if (retiroErr && (retiroErr as { code?: string }).code !== '42P01') throw retiroErr;
+
+    for (const r of (retiroRows || []) as unknown as {
+        id: string;
+        withdrawal_number: number;
+        scheduled_date: string;
+        recipient_name: string | null;
+        company: { name: string; contact_name: string } | { name: string; contact_name: string }[] | null;
+        items: { quantity: number; size: string | null; product: { name: string } | { name: string }[] | null }[] | null;
+    }[]) {
+        const company = pickOne(r.company);
+        const items = (r.items || []).map((it) => ({
+            name: pickOne(it.product)?.name || '—',
+            size: it.size || '',
+            quantity: it.quantity
+        }));
+        out.push({
+            orderId: r.id,
+            orderRef: `RETIRO-${String(r.withdrawal_number).padStart(5, '0')}`,
+            companyName: company?.name || '',
+            contactName: r.recipient_name || company?.contact_name || '',
+            scheduledDate: r.scheduled_date,
+            totalPieces: items.reduce((s, i) => s + i.quantity, 0),
+            items
+        });
+    }
+
+    out.sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate));
     return out;
 }

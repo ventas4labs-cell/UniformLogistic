@@ -27,6 +27,9 @@ import {
 } from '@/app/(admin)/admin/entregas/actions';
 
 export interface DeliverySummary {
+    /** Orders and stock retiros share this board but live in different
+     *  tables, so every mutation has to say which it is. */
+    kind: 'order' | 'retiro';
     uuid: string;
     ref: string;
     companyName: string;
@@ -412,11 +415,11 @@ function DeliveryCard({
                                 const v = e.target.value;
                                 if (!v) {
                                     run(s.uuid, { scheduledDate: null, notifiedAt: null }, () =>
-                                        clearScheduleAction(s.uuid)
+                                        clearScheduleAction(s.uuid, s.kind)
                                     );
                                 } else {
                                     run(s.uuid, { scheduledDate: v }, () =>
-                                        scheduleDeliveryAction(s.uuid, v)
+                                        scheduleDeliveryAction(s.uuid, v, s.kind)
                                     );
                                 }
                             }}
@@ -428,7 +431,7 @@ function DeliveryCard({
                                 disabled={busy}
                                 onClick={() =>
                                     run(s.uuid, { scheduledDate: null, notifiedAt: null }, () =>
-                                        clearScheduleAction(s.uuid)
+                                        clearScheduleAction(s.uuid, s.kind)
                                     )
                                 }
                                 title="Quitar del plan"
@@ -446,7 +449,7 @@ function DeliveryCard({
                                 run(
                                     s.uuid,
                                     { scheduledDate: todayIso(), notifiedAt: new Date().toISOString() },
-                                    () => notifyDeliveryTodayAction(s.uuid)
+                                    () => notifyDeliveryTodayAction(s.uuid, s.kind)
                                 )
                             }
                             className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
@@ -460,7 +463,7 @@ function DeliveryCard({
                             disabled={busy}
                             onClick={() =>
                                 run(s.uuid, { deliveredAt: new Date().toISOString() }, () =>
-                                    markDeliveredAction(s.uuid, true)
+                                    markDeliveredAction(s.uuid, true, s.kind)
                                 )
                             }
                             className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-bold bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
@@ -479,7 +482,7 @@ function DeliveryCard({
                         disabled={busy}
                         onClick={() =>
                             run(s.uuid, { deliveredAt: null }, () =>
-                                markDeliveredAction(s.uuid, false)
+                                markDeliveredAction(s.uuid, false, s.kind)
                             )
                         }
                         className="inline-flex items-center gap-1 text-xs font-bold text-gray-500 dark:text-zinc-400 hover:text-amber-600"

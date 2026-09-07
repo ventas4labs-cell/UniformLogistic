@@ -1,6 +1,8 @@
 import { Boxes, Package, Wallet } from 'lucide-react';
 import { createClient } from '@/utils/supabase/server';
 import { fetchStockForUser, summarizeStock, type StockRow } from '@/lib/services/stock';
+import { fetchWithdrawals } from '@/lib/services/stock-withdrawals';
+import { WithdrawalPanel } from '@/components/customer/withdrawal-panel';
 
 const fmtCRC = (n: number) =>
     new Intl.NumberFormat('es-CR', { style: 'currency', currency: 'CRC', maximumFractionDigits: 0 }).format(n);
@@ -12,7 +14,10 @@ export default async function StockPage() {
     } = await supabase.auth.getUser();
     if (!user) return null;
 
-    const rows = await fetchStockForUser(supabase, user.id);
+    const [rows, withdrawals] = await Promise.all([
+        fetchStockForUser(supabase, user.id),
+        fetchWithdrawals(supabase)
+    ]);
     const summary = summarizeStock(rows);
 
     // Group rows by product for the cards-then-table layout
@@ -36,6 +41,8 @@ export default async function StockPage() {
                     Uniformes guardados en bodega de Uniform Logistic a tu nombre.
                 </p>
             </header>
+
+            <WithdrawalPanel rows={rows} withdrawals={withdrawals} />
 
             <section className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                 <Kpi
