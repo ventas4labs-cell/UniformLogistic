@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
     CalendarClock,
+    CalendarDays,
     Check,
     Clock,
     Copy,
@@ -66,11 +67,13 @@ const kioskUrl = (token: string) =>
 export function RrhhManager({
     initialEmployees,
     initialKiosks,
-    initialSchedules
+    initialSchedules,
+    pendingTimeOff
 }: {
     initialEmployees: Employee[];
     initialKiosks: Kiosk[];
     initialSchedules: Record<string, Schedule>;
+    pendingTimeOff: number;
 }) {
     const router = useRouter();
     // Rendered straight from props; every mutation calls router.refresh().
@@ -151,7 +154,7 @@ export function RrhhManager({
                         Recursos Humanos
                     </h2>
                     <p className="text-gray-500 dark:text-zinc-400 text-sm">
-                        Empleados y kioscos de marcaje por QR.
+                        Empleados, kioscos de marcaje por QR y permisos.
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -160,6 +163,20 @@ export function RrhhManager({
                         className="bg-white dark:bg-zinc-900 border border-orange-300 dark:border-orange-800 text-orange-700 dark:text-orange-300 px-4 py-2 rounded-lg font-bold hover:bg-orange-50 dark:hover:bg-orange-950/40 shadow-sm flex items-center gap-2"
                     >
                         <CalendarClock size={16} /> Asistencia
+                    </Link>
+                    <Link
+                        href="/admin/rrhh/permisos"
+                        className="bg-white dark:bg-zinc-900 border border-orange-300 dark:border-orange-800 text-orange-700 dark:text-orange-300 px-4 py-2 rounded-lg font-bold hover:bg-orange-50 dark:hover:bg-orange-950/40 shadow-sm flex items-center gap-2"
+                    >
+                        <CalendarDays size={16} /> Permisos
+                        {pendingTimeOff > 0 && (
+                            <span
+                                className="min-w-5 h-5 px-1.5 rounded-full bg-orange-600 text-white text-[11px] font-bold flex items-center justify-center"
+                                aria-label={`${pendingTimeOff} pendientes`}
+                            >
+                                {pendingTimeOff}
+                            </span>
+                        )}
                     </Link>
                     {tab === 'empleados' ? (
                         <button

@@ -19,6 +19,9 @@ export interface Punch {
     id: string;
     punchType: PunchType;
     punchedAt: string;
+    /** 'qr' = untouched kiosk scan, 'admin' = added or changed by an
+     *  admin correction. Only loaded by the range fetch below. */
+    source?: string;
 }
 
 export const PUNCH_LABELS: Record<PunchType, string> = {
@@ -29,6 +32,8 @@ export const PUNCH_LABELS: Record<PunchType, string> = {
     lunch_start: 'Inicio de almuerzo',
     lunch_end: 'Fin de almuerzo'
 };
+
+export const PUNCH_TYPES = Object.keys(PUNCH_LABELS) as PunchType[];
 
 export const STATE_LABELS: Record<PunchState, string> = {
     out: 'Fuera',
@@ -85,6 +90,26 @@ export function lastPunchType(punches: Punch[]): PunchType | null {
     return punches.length ? punches[punches.length - 1].punchType : null;
 }
 
+export interface SequenceIssue {
+    punch: Punch;
+    /** State the day was in when this punch arrived. */
+    fromState: PunchState;
+}
+
+/** Punches that break the daily state machine (e.g. two entradas in a
+ *  row, a salida while on lunch). Kiosk punches can't produce these, but
+ *  admin corrections can — the correction screen warns, not blocks, so
+ *  a day with two mistakes can be fixed one step at a time. */
+export function sequenceIssues(punches: Punch[]): SequenceIssue[] {
+    const issues: SequenceIssue[] = [];
+    let state: PunchState = 'out';
+    for (const p of punches) {
+        if (!isValidTransition(state, p.punchType)) issues.push({ punch: p, fromState: state });
+        state = deriveState(p.punchType);
+    }
+    return issues;
+}
+
 // Costa Rica is a fixed UTC-6 (no DST), so a calendar day maps to a
 // clean UTC window: [date 06:00Z, next-date 06:00Z).
 const CR_OFFSET_MS = 6 * 60 * 60 * 1000;
@@ -124,6 +149,18 @@ export function crDayRangeForDate(dateStr: string): { start: string; end: string
         start: new Date(startMs).toISOString(),
         end: new Date(startMs + 24 * 60 * 60 * 1000).toISOString()
     };
+}
+
+/** UTC ISO timestamp for a CR wall-clock "HH:MM" on a CR date. */
+export function crDateTimeToIso(dateStr: string, hhmm: string): string {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const [h, min] = hhmm.split(':').map(Number);
+    return new Date(Date.UTC(y, m - 1, d, h, min) + CR_OFFSET_MS).toISOString();
+}
+
+/** CR wall-clock "HH:MM" of a timestamp (time-input value). */
+export function crHHMM(iso: string): string {
+    return new Date(new Date(iso).getTime() - CR_OFFSET_MS).toISOString().slice(11, 16);
 }
 
 /** Weekday of a CR date string (0=Sun … 6=Sat). */
@@ -195,6 +232,38 @@ export async function fetchTodayPunches(
         punchType: r.punch_type,
         punchedAt: r.punched_at
     }));
+}
+
+/** One employee's punches across CR dates [fromDate, toDateExclusive),
+ *  ordered ascending (employee hours view). */
+export async function fetchPunchesInRange(
+    supabase: SupabaseClient,
+    employeeId: string,
+    fromDate: string,
+    toDateExclusive: string
+): Promise<Punch[]> {
+    const { data, error } = await supabase
+        .from('hr_punches')
+        .select('id, punch_type, punched_at, source')
+        .eq('employee_id', employeeId)
+        .gte('punched_at', crDayRangeForDate(fromDate).start)
+        .lt('punched_at', crDayRangeForDate(toDateExclusive).start)
+        .order('punched_at', { ascending: true });
+    if (error) {
+        if ((error as { code?: string }).code === '42P01') return [];
+        throw error;
+    }
+    return ((data || []) as (RawPunch & { source: string })[]).map((r) => ({
+        id: r.id,
+        punchType: r.punch_type,
+        punchedAt: r.punched_at,
+        source: r.source
+    }));
+}
+
+/** CR calendar date ("YYYY-MM-DD") a timestamp falls on. */
+export function crDateOf(iso: string): string {
+    return crTodayStr(new Date(iso).getTime());
 }
 
 /** Insert a punch (service-role; employee_id comes from the verified

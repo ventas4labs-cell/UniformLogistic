@@ -79,6 +79,23 @@ export async function fetchSchedules(
     return ((data || []) as RawRow[]).map(mapRow);
 }
 
+/** One employee's schedule (null when none was set). */
+export async function fetchSchedule(
+    supabase: SupabaseClient,
+    employeeId: string
+): Promise<Schedule | null> {
+    const { data, error } = await supabase
+        .from('employee_schedules')
+        .select(SELECT)
+        .eq('employee_id', employeeId)
+        .maybeSingle();
+    if (error) {
+        if ((error as { code?: string }).code === '42P01') return null;
+        throw error;
+    }
+    return data ? mapRow(data as RawRow) : null;
+}
+
 /** Map of employeeId → Schedule for quick lookup in the dashboard/UI. */
 export async function fetchSchedulesMap(
     supabase: SupabaseClient

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowLeft, CalendarClock, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, CalendarClock, AlertTriangle, Pencil } from 'lucide-react';
 import { createClient } from '@/utils/supabase/server';
 import { fetchEmployees } from '@/lib/services/employees';
 import { fetchSchedulesMap } from '@/lib/services/hr-schedules';
@@ -16,6 +16,11 @@ import {
     FLAG_LABELS,
     type DayFlag
 } from '@/lib/services/hr-attendance';
+import {
+    fetchApprovedTimeOffInRange,
+    KIND_LABELS,
+    timeOffOn
+} from '@/lib/services/hr-time-off';
 import { AsistenciaNav } from './asistencia-nav';
 
 export const dynamic = 'force-dynamic';
@@ -64,10 +69,11 @@ export default async function AsistenciaPage({
     const weekday = crWeekday(date);
 
     const supabase = await createClient();
-    const [employees, schedulesMap, punches] = await Promise.all([
+    const [employees, schedulesMap, punches, leave] = await Promise.all([
         fetchEmployees(supabase),
         fetchSchedulesMap(supabase),
-        fetchPunchesForDate(supabase, date)
+        fetchPunchesForDate(supabase, date),
+        fetchApprovedTimeOffInRange(supabase, date, date)
     ]);
 
     const byEmployee = new Map<string, Punch[]>();
@@ -79,14 +85,21 @@ export default async function AsistenciaPage({
 
     const rows = employees
         .filter((e) => e.isActive)
-        .map((e) => ({
-            employee: e,
-            summary: computeDaySummary(
-                byEmployee.get(e.id) || [],
-                schedulesMap[e.id] || null,
-                { weekday, isPast }
-            )
-        }))
+        .map((e) => {
+            const onLeave = timeOffOn(
+                leave.filter((r) => r.employeeId === e.id),
+                date
+            );
+            return {
+                employee: e,
+                onLeave,
+                summary: computeDaySummary(
+                    byEmployee.get(e.id) || [],
+                    schedulesMap[e.id] || null,
+                    { weekday, isPast, onLeave: !!onLeave }
+                )
+            };
+        })
         .sort((a, b) => {
             const fa = a.summary.flags.length ? 0 : 1;
             const fb = b.summary.flags.length ? 0 : 1;
@@ -141,7 +154,7 @@ export default async function AsistenciaPage({
                         No hay empleados activos.
                     </div>
                 ) : (
-                    <table className="w-full text-sm min-w-[820px]">
+                    <table className="w-full text-sm min-w-[900px]">
                         <thead className="bg-gray-50 dark:bg-zinc-900/60">
                             <tr>
                                 <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-zinc-400 text-xs uppercase">Empleado</th>
@@ -151,10 +164,11 @@ export default async function AsistenciaPage({
                                 <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-zinc-400 text-xs uppercase">Break</th>
                                 <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-zinc-400 text-xs uppercase">Almuerzo</th>
                                 <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-zinc-400 text-xs uppercase">Novedades</th>
+                                <th className="px-4 py-3"><span className="sr-only">Corregir</span></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100 dark:divide-zinc-800">
-                            {rows.map(({ employee, summary }) => (
+                            {rows.map(({ employee, onLeave, summary }) => (
                                 <tr key={employee.id}>
                                     <td className="px-4 py-3">
                                         <div className="font-bold text-gray-900 dark:text-zinc-100">{employee.fullName}</div>
@@ -174,7 +188,11 @@ export default async function AsistenciaPage({
                                     <td className="px-4 py-3 text-gray-600 dark:text-zinc-400">{fmtPeriod(summary.breakMin, summary.breakCount, summary.breakOpen)}</td>
                                     <td className="px-4 py-3 text-gray-600 dark:text-zinc-400">{fmtPeriod(summary.lunchMin, summary.lunchCount, summary.lunchOpen)}</td>
                                     <td className="px-4 py-3">
-                                        {summary.flags.length === 0 ? (
+                                        {onLeave && summary.flags.length === 0 ? (
+                                            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-sky-100 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300">
+                                                {KIND_LABELS[onLeave.kind]}
+                                            </span>
+                                        ) : summary.flags.length === 0 ? (
                                             <span className="text-gray-400 dark:text-zinc-600">—</span>
                                         ) : (
                                             <div className="flex flex-wrap gap-1">
@@ -192,6 +210,14 @@ export default async function AsistenciaPage({
                                                 ))}
                                             </div>
                                         )}
+                                    </td>
+                                    <td className="px-4 py-3 text-right">
+                                        <Link
+                                            href={`/admin/rrhh/asistencia/${employee.id}?d=${date}`}
+                                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-orange-700 dark:text-orange-400 border border-orange-200 dark:border-orange-900/60 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-950/40 whitespace-nowrap"
+                                        >
+                                            <Pencil size={12} /> Corregir
+                                        </Link>
                                     </td>
                                 </tr>
                             ))}

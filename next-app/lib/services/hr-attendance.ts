@@ -65,6 +65,8 @@ export interface DayContext {
     weekday: number;
     /** True when the day is in the past (enables missing-out / absent). */
     isPast: boolean;
+    /** Approved time off covers the day — not an absence. */
+    onLeave?: boolean;
 }
 
 export function computeDaySummary(
@@ -134,7 +136,7 @@ export function computeDaySummary(
         if (lunchMin > schedule.lunchMin) flags.push('long_lunch');
     }
     if (ctx.isPast && hasPunches && open) flags.push('missing_out');
-    if (ctx.isPast && scheduledDay && !hasPunches) flags.push('absent');
+    if (ctx.isPast && scheduledDay && !hasPunches && !ctx.onLeave) flags.push('absent');
 
     return {
         firstIn,

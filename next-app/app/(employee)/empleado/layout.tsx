@@ -3,8 +3,13 @@ import { LogOut, Clock } from 'lucide-react';
 import { createClient } from '@/utils/supabase/server';
 import { fetchEmployee } from '@/lib/services/employees';
 import { signOutAction } from '@/app/login/actions';
+import { EmployeeNav } from './employee-nav';
 
 // ─── Restricted shell for employees (HR / time-tracking) ────────────
+// Employees can only punch (kiosk QR), review their hours and request
+// time off. They have read-only RLS on every HR table; each write is a
+// server action that takes the id from the session and the time from
+// the database.
 // Anyone reaching /empleado who isn't an active employees row is bounced.
 // Admin, customers and stations have their own shells — fetchEmployee
 // returns null for them (RLS self-read), so the redirect fires.
@@ -42,6 +47,7 @@ export default async function EmpleadoLayout({
                         </button>
                     </form>
                 </div>
+                <EmployeeNav />
             </header>
             <main className="mx-auto w-full max-w-2xl px-4 py-6">{children}</main>
         </div>

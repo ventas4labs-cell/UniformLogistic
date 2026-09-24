@@ -3,23 +3,26 @@
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-// Day navigation for the attendance dashboard. Pure ?d= navigation so
-// the page stays a server component.
+// Day navigation for the attendance dashboard (and the per-employee
+// correction page, via basePath). Pure ?d= navigation so the page stays
+// a server component.
 export function AsistenciaNav({
     date,
     prevDate,
     nextDate,
     today,
-    label
+    label,
+    basePath = '/admin/rrhh/asistencia'
 }: {
     date: string;
     prevDate: string;
     nextDate: string;
     today: string;
     label: string;
+    basePath?: string;
 }) {
     const router = useRouter();
-    const go = (d: string) => router.push(`/admin/rrhh/asistencia?d=${d}`);
+    const go = (d: string) => router.push(`${basePath}?d=${d}`);
 
     return (
         <div className="flex items-center gap-2 flex-wrap">

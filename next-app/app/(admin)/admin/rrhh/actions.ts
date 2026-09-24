@@ -21,6 +21,9 @@ import {
     setKioskActive
 } from '@/lib/services/hr-kiosks';
 import { upsertSchedule, type ScheduleInput } from '@/lib/services/hr-schedules';
+import { reviewTimeOffRequest } from '@/lib/services/hr-time-off';
+import { crDateTimeToIso, crToday, PUNCH_TYPES, type PunchType } from '@/lib/services/hr-punches';
+import { correctPunch, type PunchEditAction } from '@/lib/services/hr-punch-edits';
 import { sendEmployeeInviteEmail } from '@/lib/email/notifications';
 
 // The invite link is single-use and expires; long enough that an
@@ -324,6 +327,105 @@ export async function saveEmployeeScheduleAction(
         return { error: msg };
     }
     revalidatePath('/admin/rrhh');
+    revalidatePath('/admin/rrhh/asistencia');
+    return {};
+}
+
+// ─── Punch corrections ──────────────────────────────────────────────
+// The only way a recorded time changes. Each correction needs a reason
+// and is logged in hr_punch_edits by the same DB transaction.
+
+export interface CorrectPunchInput {
+    action: PunchEditAction;
+    employeeId: string;
+    /** CR day being corrected ("YYYY-MM-DD"); new times land on it. */
+    date: string;
+    punchId?: string;
+    punchType?: PunchType;
+    /** CR wall-clock "HH:MM". */
+    time?: string;
+    reason: string;
+}
+
+export async function correctPunchAction(
+    input: CorrectPunchInput
+): Promise<{ error?: string }> {
+    const { error: adminErr, adminId } = await requireAdmin();
+    if (adminErr || !adminId) return { error: adminErr || 'No autorizado.' };
+
+    const reason = (input.reason || '').trim().slice(0, 300);
+    if (!reason) return { error: 'Escribí el motivo de la corrección.' };
+    if (!['create', 'update', 'delete'].includes(input.action))
+        return { error: 'Acción inválida.' };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date) || input.date > crToday())
+        return { error: 'Fecha inválida.' };
+    if (input.action !== 'create' && !input.punchId)
+        return { error: 'Marcaje no encontrado.' };
+
+    let punchedAt: string | null = null;
+    let punchType: PunchType | null = null;
+    if (input.action !== 'delete') {
+        if (!input.punchType || !PUNCH_TYPES.includes(input.punchType))
+            return { error: 'Elegí el tipo de marcaje.' };
+        const m = /^(\d{2}):(\d{2})$/.exec(input.time || '');
+        if (!m || Number(m[1]) > 23 || Number(m[2]) > 59)
+            return { error: 'Hora inválida.' };
+        punchType = input.punchType;
+        punchedAt = crDateTimeToIso(input.date, input.time!);
+        if (Date.parse(punchedAt) > Date.now())
+            return { error: 'No se puede registrar un marcaje en el futuro.' };
+    }
+
+    const service = createServiceClient();
+    const employee = await fetchEmployee(service, input.employeeId);
+    if (!employee) return { error: 'Empleado no encontrado.' };
+
+    try {
+        await correctPunch(service, {
+            action: input.action,
+            employeeId: input.employeeId,
+            punchId: input.punchId || null,
+            punchType,
+            punchedAt,
+            reason,
+            editedBy: adminId
+        });
+    } catch (err) {
+        // PostgREST errors are plain objects, not Error instances.
+        const msg = (err as { message?: string } | null)?.message || '';
+        if (msg.includes('punch not found'))
+            return { error: 'Ese marcaje ya no existe. Recargá la página.' };
+        return { error: 'No se pudo guardar la corrección. Probá de nuevo.' };
+    }
+
+    revalidatePath('/admin/rrhh/asistencia');
+    return {};
+}
+
+// ─── Time-off requests ──────────────────────────────────────────────
+
+export async function reviewTimeOffAction(
+    id: string,
+    decision: 'approved' | 'rejected',
+    note: string
+): Promise<{ error?: string }> {
+    const { error: adminErr, adminId } = await requireAdmin();
+    if (adminErr || !adminId) return { error: adminErr || 'No autorizado.' };
+    if (decision !== 'approved' && decision !== 'rejected') return { error: 'Decisión inválida.' };
+    const service = createServiceClient();
+    try {
+        const ok = await reviewTimeOffRequest(service, id, {
+            status: decision,
+            adminNote: (note || '').trim().slice(0, 500),
+            reviewedBy: adminId
+        });
+        if (!ok) return { error: 'La solicitud ya no está pendiente (quizá el empleado la canceló).' };
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : 'No se pudo guardar la decisión.';
+        return { error: msg };
+    }
+    revalidatePath('/admin/rrhh');
+    revalidatePath('/admin/rrhh/permisos');
     revalidatePath('/admin/rrhh/asistencia');
     return {};
 }
