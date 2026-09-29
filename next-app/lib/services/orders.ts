@@ -400,6 +400,33 @@ export const fetchOrdersByIds = async (
     return orders;
 };
 
+/**
+ * Customer name per order, for the station board. Stations have no RLS
+ * access to companies (a companies row also carries login tokens — see
+ * migration 0048), so the NESTED_SELECT company embed comes back empty for
+ * them. Pass a service-role client and ONLY order ids the caller may see.
+ */
+export const fetchCompanyNamesForOrders = async (
+    serviceSupabase: SupabaseClient,
+    orderIds: string[]
+): Promise<Map<string, string>> => {
+    const names = new Map<string, string>();
+    if (orderIds.length === 0) return names;
+    const { data, error } = await serviceSupabase
+        .from('orders')
+        .select('id, company:companies ( name )')
+        .in('id', orderIds);
+    if (error) throw error;
+    for (const row of (data || []) as unknown as {
+        id: string;
+        company: { name: string } | { name: string }[] | null;
+    }[]) {
+        const name = pickOne(row.company)?.name;
+        if (name) names.set(row.id, name);
+    }
+    return names;
+};
+
 export const updateOrderStatus = async (
     supabase: SupabaseClient,
     orderUuid: string,

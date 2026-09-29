@@ -1,10 +1,10 @@
-import { createClient } from '@/utils/supabase/server';
+import { createClient, createServiceClient } from '@/utils/supabase/server';
 import { fetchStationUser } from '@/lib/services/station-users';
 import {
     fetchOrderIdsAssignedTo,
     fetchPickupStatusForStation
 } from '@/lib/services/station-assignments';
-import { fetchOrdersByIds } from '@/lib/services/orders';
+import { fetchCompanyNamesForOrders, fetchOrdersByIds } from '@/lib/services/orders';
 import { fetchStageCompletions, STAGE_LABELS } from '@/lib/services/stage-completions';
 import { fetchStageItemProgress } from '@/lib/services/stage-item-progress';
 import { fetchCorteFabricReports } from '@/lib/services/corte-fabric-reports';
@@ -25,7 +25,7 @@ export default async function StationPage() {
     if (!station) return null;
 
     const orderIds = await fetchOrderIdsAssignedTo(supabase, user.id);
-    const [orders, completedSet, progress, fabricReportsByOrder, pickupMap] =
+    const [orders, completedSet, progress, fabricReportsByOrder, pickupMap, companyNames] =
         await Promise.all([
             fetchOrdersByIds(supabase, orderIds),
             fetchStageCompletions(supabase, station.stage),
@@ -38,8 +38,15 @@ export default async function StationPage() {
             // Pickup lifecycle only applies to maquila stations.
             station.stage === 'maquila'
                 ? fetchPickupStatusForStation(supabase, user.id)
-                : Promise.resolve(new Map())
+                : Promise.resolve(new Map()),
+            // Stations can't read companies (the rows carry login tokens), so
+            // the customer name the board shows and searches is looked up
+            // server-side — only for the orders assigned to this station.
+            fetchCompanyNamesForOrders(createServiceClient(), orderIds)
         ]);
+    for (const o of orders) {
+        if (o.uuid) o.companyName = companyNames.get(o.uuid) || o.companyName;
+    }
 
     return (
         // Kiosk tablets sit open for hours; when the session lapses the
