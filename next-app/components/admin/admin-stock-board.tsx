@@ -7,11 +7,13 @@ import {
     ChevronRight,
     ImageIcon,
     PackageCheck,
+    SlidersHorizontal,
     Warehouse
 } from 'lucide-react';
 import type { CompanyStockGroup, StockRow } from '@/lib/services/stock';
 import { VoiceStockDictate } from '@/components/admin/voice-stock-dictate';
 import { CollapsibleSearch } from '@/components/admin/collapsible-search';
+import { StockCorrectionModal } from '@/components/admin/stock-correction-modal';
 
 // Canonical shirt size order (anything not in this list sorts to the end).
 const SHIRT_SIZE_ORDER = [
@@ -152,7 +154,7 @@ export function AdminStockBoard({
 
     // Org-wide totals
     const totals = useMemo(() => {
-        let companies = filteredGroups.length;
+        const companies = filteredGroups.length;
         let skuCount = 0;
         let totalOnHand = 0;
         let totalAvailable = 0;
@@ -312,7 +314,12 @@ export function AdminStockBoard({
                                     </div>
                                 </button>
 
-                                {isOpen && <ProductTable rows={g.rows} />}
+                                {isOpen && (
+                                    <ProductTable
+                                        company={g.company}
+                                        rows={g.rows}
+                                    />
+                                )}
                             </div>
                         );
                     })}
@@ -324,10 +331,30 @@ export function AdminStockBoard({
 
 // ── Subcomponents ───────────────────────────────────────────────────────
 
-function ProductTable({ rows }: { rows: StockRow[] }) {
+function ProductTable({
+    company,
+    rows
+}: {
+    company: { id: string; name: string };
+    rows: StockRow[];
+}) {
     const products = useMemo(() => groupByProduct(rows), [rows]);
+    const [correcting, setCorrecting] = useState<string | null>(null);
+    // Look the product up on every render so the modal sees fresh
+    // quantities after router.refresh() (partial-failure case).
+    const correctingProduct = products.find((p) => p.productId === correcting);
     return (
         <div className="border-t border-gray-100 dark:border-zinc-800">
+            {correctingProduct && (
+                <StockCorrectionModal
+                    companyId={company.id}
+                    companyName={company.name}
+                    productId={correctingProduct.productId}
+                    productName={correctingProduct.productName}
+                    rows={correctingProduct.rows}
+                    onClose={() => setCorrecting(null)}
+                />
+            )}
             <table className="w-full text-left text-sm">
                 <thead className="bg-gray-50 dark:bg-zinc-900/60 text-xs font-semibold text-gray-600 dark:text-zinc-400">
                     <tr>
@@ -338,6 +365,9 @@ function ProductTable({ rows }: { rows: StockRow[] }) {
                         <th className="p-3 text-right whitespace-nowrap">Libres</th>
                         <th className="p-3 text-right whitespace-nowrap">Precio</th>
                         <th className="p-3 text-right whitespace-nowrap">Valor</th>
+                        <th className="p-3 w-px">
+                            <span className="sr-only">Acciones</span>
+                        </th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-zinc-800">
@@ -410,6 +440,17 @@ function ProductTable({ rows }: { rows: StockRow[] }) {
                             </td>
                             <td className="p-3 align-top text-right text-gray-900 dark:text-zinc-100 font-bold tabular-nums">
                                 {p.unitPrice ? fmtCRC(p.totalValue) : '—'}
+                            </td>
+                            <td className="p-3 align-top text-right">
+                                <button
+                                    type="button"
+                                    onClick={() => setCorrecting(p.productId)}
+                                    title="Registrar salida o fijar el conteo real"
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-zinc-700 text-xs font-bold text-gray-700 dark:text-zinc-300 hover:bg-orange-50 hover:text-orange-700 hover:border-orange-200 dark:hover:bg-orange-950/40 dark:hover:text-orange-300 dark:hover:border-orange-900/50 whitespace-nowrap transition-colors"
+                                >
+                                    <SlidersHorizontal size={13} />
+                                    Corregir
+                                </button>
                             </td>
                         </tr>
                     ))}
