@@ -1,49 +1,35 @@
 import type { Order } from '@/lib/types';
 import { orderApplicableStages } from '@/lib/stage-utils';
-import {
-    STAGE_LABELS,
-    type StageKey,
-    type CompletionIndex
-} from '@/lib/services/stage-completions';
+import type { CompletionIndex } from '@/lib/services/stage-completions';
 import type { DispatchTotalsByOrder } from '@/lib/services/dispatches';
 
-// ─── Customer-facing order status, derived from real progress ────────
+// ─── Customer-facing order status ────────────────────────────────────
 //
-// The production workflow is PARALLEL: an order's stages are tracked in
-// order_stage_completions (one row per finished stage), and delivery in
-// order_dispatches — NOT in the legacy orders.status column, which now
-// stays "pending" for its whole life. Reading orders.status made every
-// customer order look "Pendiente / En producción" forever.
+// The customer sees ONE bit about a live order: is it still being made
+// ("Pendiente"), or is it finished and waiting to move ("Listo").
 //
-// This mirrors the admin's bucketFor (all applicable stages done = made)
-// and adds the delivery split the customer dashboard needs:
-//   production → still being made (not all stages done)
-//   ready      → made & packed, not yet delivered
-//   completed  → delivered (fully dispatched), fully moved into the
-//                customer's stock, or manually completed
-//   cancelled  → order cancelled
+// Everything the workshop tracks internally — which of the parallel
+// stages are done, how many pieces were dispatched, how much landed in
+// stock — is deliberately NOT exposed here. It changed hourly, meant
+// nothing to the customer, and made the dashboard read like a production
+// terminal instead of an order status page.
+//
+// Readiness is still DERIVED from that real progress (order_stage_
+// completions + order_dispatches), never from the legacy orders.status
+// column, which stays "pending" for an order's whole life:
+//   pending   → still being made
+//   ready     → made: packed for dispatch, or sitting in the customer's
+//                bodega waiting to be delivered
+//   completed → actually delivered
+//   cancelled → order cancelled
 
-export type CustomerBucket = 'production' | 'ready' | 'completed' | 'cancelled';
-
-export interface CustomerStageState {
-    key: StageKey;
-    label: string;
-    done: boolean;
-}
+export type CustomerBucket = 'pending' | 'ready' | 'completed' | 'cancelled';
 
 export interface CustomerOrderProgress {
     bucket: CustomerBucket;
+    /** "Pendiente" / "Listo" / "Entregado" / "Cancelado". */
     statusLabel: string;
-    stages: CustomerStageState[];
-    doneCount: number;
-    totalStages: number;
     totalPieces: number;
-    // Pieces packed & sent out for delivery (NOT necessarily received).
-    dispatchedPieces: number;
-    // Pieces moved into the customer's own stock ("Mi almacén").
-    stockedPieces: number;
-    // True only once the delivery module confirms an actual delivery.
-    delivered: boolean;
 }
 
 export function deriveOrderProgress(
@@ -51,7 +37,7 @@ export function deriveOrderProgress(
     completions: CompletionIndex,
     dispatchTotals: DispatchTotalsByOrder,
     // Same shape as dispatchTotals — how much of each line was pushed
-    // into the company's stock. Optional so older callers still compile.
+    // into the company's stock.
     stockTotals?: DispatchTotalsByOrder,
     // True once the delivery module has marked the order delivered. Only
     // a real delivery (not merely being dispatched) completes the order.
@@ -59,66 +45,42 @@ export function deriveOrderProgress(
 ): CustomerOrderProgress {
     const totalPieces = order.items.reduce((s, i) => s + i.quantity, 0);
 
+    // All applicable stages done = the order is made. Which ones, and in
+    // what order, stays internal.
     const applicable = orderApplicableStages(order);
     const perOrder = order.uuid ? completions.get(order.uuid) : undefined;
-    const stages: CustomerStageState[] = applicable.map((key) => ({
-        key,
-        label: STAGE_LABELS[key],
-        done: !!perOrder?.get(key)
-    }));
-    const doneCount = stages.filter((s) => s.done).length;
-    const totalStages = stages.length;
-    const allStagesDone = totalStages > 0 && doneCount === totalStages;
+    const allStagesDone =
+        applicable.length > 0 && applicable.every((key) => !!perOrder?.get(key));
 
-    // Dispatched pieces = sum of every dispatched line for this order.
-    // Being fully dispatched means the order is packed & ready to leave —
-    // NOT delivered. The delivery module marks the actual delivery.
+    // Fully dispatched means packed & out the door — NOT delivered. The
+    // delivery module marks the actual delivery.
     let dispatchedPieces = 0;
     const dt = order.uuid ? dispatchTotals.get(order.uuid) : undefined;
     if (dt) for (const q of dt.values()) dispatchedPieces += q;
     const fullyDispatched = totalPieces > 0 && dispatchedPieces >= totalPieces;
 
-    // Stocked pieces = sum of every line pushed into the company's stock.
     let stockedPieces = 0;
     const st = order.uuid ? stockTotals?.get(order.uuid) : undefined;
     if (st) for (const q of st.values()) stockedPieces += q;
     const fullyStocked = totalPieces > 0 && stockedPieces >= totalPieces;
 
-    let bucket: CustomerBucket;
-    let statusLabel: string;
     if (order.status === 'cancelled') {
-        bucket = 'cancelled';
-        statusLabel = 'Cancelado';
-    } else if (order.status === 'completed' || delivered || fullyStocked) {
-        // Completion for the customer: the order was actually delivered
-        // (by the delivery module) or every piece moved into their stock
-        // ("Mi almacén"). Being merely dispatched is NOT completion.
-        bucket = 'completed';
-        statusLabel = delivered
-            ? 'Entregado'
-            : fullyStocked
-                ? 'En stock'
-                : 'Completado';
-    } else if (fullyDispatched || allStagesDone) {
-        // Packed & dispatched (or all stages done) → waiting for the
-        // courier. Shows in the customer's "Listos para despacho" list.
-        bucket = 'ready';
-        statusLabel = 'Listo para despacho';
-    } else {
-        bucket = 'production';
-        statusLabel =
-            totalStages > 0 ? `En producción · ${doneCount}/${totalStages}` : 'En producción';
+        return { bucket: 'cancelled', statusLabel: 'Cancelado', totalPieces };
     }
-
-    return {
-        bucket,
-        statusLabel,
-        stages,
-        doneCount,
-        totalStages,
-        totalPieces,
-        dispatchedPieces,
-        stockedPieces,
-        delivered
-    };
+    if (order.status === 'completed' || delivered) {
+        // Closed only once the order was actually delivered. Being
+        // dispatched or stocked is NOT delivery.
+        return {
+            bucket: 'completed',
+            statusLabel: delivered ? 'Entregado' : 'Completado',
+            totalPieces
+        };
+    }
+    if (fullyStocked || fullyDispatched || allStagesDone) {
+        // Made. Pieces sitting in the customer's own bodega count here
+        // too — they are finished goods waiting on a delivery, so the
+        // customer can ask for them from /stock.
+        return { bucket: 'ready', statusLabel: 'Listo', totalPieces };
+    }
+    return { bucket: 'pending', statusLabel: 'Pendiente', totalPieces };
 }

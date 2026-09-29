@@ -1,22 +1,38 @@
 import { Boxes, Package, Wallet } from 'lucide-react';
 import { createClient } from '@/utils/supabase/server';
-import { fetchStockForUser, summarizeStock, type StockRow } from '@/lib/services/stock';
+import {
+    fetchStockForUser,
+    fetchStockedOrderForUser,
+    summarizeStock,
+    type StockRow
+} from '@/lib/services/stock';
 import { fetchWithdrawals } from '@/lib/services/stock-withdrawals';
 import { WithdrawalPanel } from '@/components/customer/withdrawal-panel';
+import { compareSizeLabels } from '@/lib/size-order';
 
 const fmtCRC = (n: number) =>
     new Intl.NumberFormat('es-CR', { style: 'currency', currency: 'CRC', maximumFractionDigits: 0 }).format(n);
 
-export default async function StockPage() {
+export default async function StockPage({
+    searchParams
+}: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
     const supabase = await createClient();
     const {
         data: { user }
     } = await supabase.auth.getUser();
     if (!user) return null;
 
-    const [rows, withdrawals] = await Promise.all([
+    // /stock?retirar=<order uuid> — the "Retirar" button on a ready order
+    // card lands here with the picker open and that order preloaded.
+    const { retirar } = await searchParams;
+    const [rows, withdrawals, retiroOrder] = await Promise.all([
         fetchStockForUser(supabase, user.id),
-        fetchWithdrawals(supabase)
+        fetchWithdrawals(supabase),
+        typeof retirar === 'string'
+            ? fetchStockedOrderForUser(supabase, user.id, retirar)
+            : Promise.resolve(null)
     ]);
     const summary = summarizeStock(rows);
 
@@ -42,7 +58,11 @@ export default async function StockPage() {
                 </p>
             </header>
 
-            <WithdrawalPanel rows={rows} withdrawals={withdrawals} />
+            <WithdrawalPanel
+                rows={rows}
+                withdrawals={withdrawals}
+                initialOrder={retiroOrder}
+            />
 
             <section className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                 <Kpi
@@ -79,9 +99,9 @@ export default async function StockPage() {
                     {Array.from(summary.byProduct.values())
                         .sort((a, b) => a.productName.localeCompare(b.productName))
                         .map((p) => {
-                            const sizes = (byProduct.get(p.productId) || []).slice().sort((a, b) =>
-                                a.size.localeCompare(b.size, undefined, { numeric: true })
-                            );
+                            const sizes = (byProduct.get(p.productId) || [])
+                                .slice()
+                                .sort((a, b) => compareSizeLabels(a.size, b.size));
                             return (
                                 <ProductBlock key={p.productId} product={p} rows={sizes} />
                             );

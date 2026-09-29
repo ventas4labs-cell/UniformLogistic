@@ -41,17 +41,25 @@ const pickOne = <T,>(v: T | T[] | null | undefined): T | null => {
     return Array.isArray(v) ? (v[0] ?? null) : v;
 };
 
-export const fetchStockForUser = async (
+const fetchCompanyIdForUser = async (
     supabase: SupabaseClient,
     userId: string
-): Promise<StockRow[]> => {
-    const { data: link, error: linkErr } = await supabase
+): Promise<string | null> => {
+    const { data: link, error } = await supabase
         .from('company_users')
         .select('company_id')
         .eq('user_id', userId)
         .maybeSingle();
-    if (linkErr) throw linkErr;
-    if (!link?.company_id) return [];
+    if (error) throw error;
+    return (link?.company_id as string | undefined) ?? null;
+};
+
+export const fetchStockForUser = async (
+    supabase: SupabaseClient,
+    userId: string
+): Promise<StockRow[]> => {
+    const companyId = await fetchCompanyIdForUser(supabase, userId);
+    if (!companyId) return [];
 
     const { data, error } = await supabase
         .from('company_stock')
@@ -61,7 +69,7 @@ export const fetchStockForUser = async (
             product:products ( id, product_code, name, product_type, fabric_type, image_url, unit_price )
         `
         )
-        .eq('company_id', link.company_id)
+        .eq('company_id', companyId)
         .order('product_id')
         .order('size');
     if (error) throw error;
@@ -224,4 +232,118 @@ export const summarizeStock = (rows: StockRow[]): StockSummary => {
         estimatedValue,
         byProduct
     };
+};
+
+// ─── An order as a retiro shortcut ───────────────────────────────────
+//
+// Stock is pooled per (product, size) — once Empaque pushes an order into
+// the bodega, the pieces stop belonging to that order. But customers think
+// in orders ("send me the ORDEN-00030 pants"), so the "Retirar" button on a
+// ready order card opens the retiro picker pre-filled with the product/size/
+// quantity mix that order put into the bodega, capped at what is available
+// right now.
+
+export interface StockedOrderLine {
+    productId: string;
+    size: string;
+    quantity: number;
+}
+
+export interface StockedOrder {
+    orderId: string;
+    /** One line per product+size. */
+    lines: StockedOrderLine[];
+}
+
+interface RawStockedEntry {
+    items:
+        | {
+              quantity: number;
+              item: { product_id: string | null; size: string } | { product_id: string | null; size: string }[] | null;
+          }[]
+        | null;
+}
+
+export const stockKey = (productId: string, size: string) => `${productId}|${size}`;
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * What one of the user's orders put into their bodega. Null when the id is
+ * malformed, the order belongs to another company, or nothing was stocked.
+ */
+export const fetchStockedOrderForUser = async (
+    supabase: SupabaseClient,
+    userId: string,
+    orderId: string
+): Promise<StockedOrder | null> => {
+    // The id comes straight from the URL — a malformed one would fail the
+    // uuid cast in Postgres and take the whole page down with it.
+    if (!UUID_RE.test(orderId)) return null;
+    const companyId = await fetchCompanyIdForUser(supabase, userId);
+    if (!companyId) return null;
+
+    // RLS (0047) already limits a customer to their own company's entries,
+    // but the admin can read all of them — the explicit company scope keeps
+    // this correct for every caller.
+    const { data, error } = await supabase
+        .from('order_stock_entries')
+        .select(
+            `
+            origin:orders!inner ( company_id ),
+            items:order_stock_entry_items ( quantity, item:order_items ( product_id, size ) )
+        `
+        )
+        .eq('order_id', orderId)
+        .eq('origin.company_id', companyId);
+    if (error) throw error;
+
+    // An order can be stocked across several partial entries, and extras
+    // can repeat a size — fold both down to one line per product+size.
+    const lines = new Map<string, StockedOrderLine>();
+    for (const e of (data || []) as unknown as RawStockedEntry[]) {
+        for (const it of e.items || []) {
+            const oi = pickOne(it.item);
+            if (!oi?.product_id) continue;
+            const k = stockKey(oi.product_id, oi.size);
+            const line = lines.get(k) || { productId: oi.product_id, size: oi.size, quantity: 0 };
+            line.quantity += Number(it.quantity || 0);
+            lines.set(k, line);
+        }
+    }
+    return lines.size > 0 ? { orderId, lines: Array.from(lines.values()) } : null;
+};
+
+/**
+ * How many of each order's stocked pieces could be withdrawn right now —
+ * what the order put into the bodega, capped per size at the pooled
+ * availability. Keyed by order uuid; orders with nothing left are omitted.
+ * Pure: works off the orders, stock-entry totals and stock rows a page has
+ * already loaded.
+ */
+export const withdrawablePiecesByOrder = (
+    orders: { uuid?: string; items: { uuid?: string; productId: string; selection: { size?: string } }[] }[],
+    stockTotals: Map<string, Map<string, number>>,
+    stockRows: StockRow[]
+): Map<string, number> => {
+    // Order items carry the product CODE, stock rows carry both.
+    const available = new Map<string, number>();
+    for (const r of stockRows) available.set(stockKey(r.productCode, r.size), r.quantityAvailable);
+
+    const out = new Map<string, number>();
+    for (const o of orders) {
+        const perItem = o.uuid ? stockTotals.get(o.uuid) : undefined;
+        if (!o.uuid || !perItem) continue;
+        const stocked = new Map<string, number>();
+        for (const it of o.items) {
+            const q = it.uuid ? perItem.get(it.uuid) || 0 : 0;
+            if (q <= 0) continue;
+            const k = stockKey(it.productId, it.selection.size || '');
+            stocked.set(k, (stocked.get(k) || 0) + q);
+        }
+        let pieces = 0;
+        for (const [k, q] of stocked) pieces += Math.min(q, available.get(k) || 0);
+        if (pieces > 0) out.set(o.uuid, pieces);
+    }
+    return out;
 };

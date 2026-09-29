@@ -6,6 +6,7 @@ import { fetchDispatchTotalsForOrders } from '@/lib/services/dispatches';
 import { fetchStockEntryTotalsForOrders } from '@/lib/services/stock-entries';
 import { fetchDeliveriesForOrders } from '@/lib/services/deliveries';
 import { deriveOrderProgress } from '@/lib/customer-order-status';
+import { fetchStockForUser, withdrawablePiecesByOrder } from '@/lib/services/stock';
 import { OrderCard } from '@/components/customer/order-card';
 
 export default async function OrdersPage() {
@@ -17,12 +18,14 @@ export default async function OrdersPage() {
 
     const orders = await fetchUserOrders(supabase, user.id);
     const orderIds = orders.map((o) => o.uuid).filter((id): id is string => !!id);
-    const [completions, dispatchTotals, stockTotals, deliveries] = await Promise.all([
+    const [completions, dispatchTotals, stockTotals, deliveries, stockRows] = await Promise.all([
         fetchStageCompletionsForOrders(supabase, orderIds),
         fetchDispatchTotalsForOrders(supabase, orderIds),
         fetchStockEntryTotalsForOrders(supabase, orderIds),
-        fetchDeliveriesForOrders(supabase, orderIds)
+        fetchDeliveriesForOrders(supabase, orderIds),
+        fetchStockForUser(supabase, user.id)
     ]);
+    const withdrawable = withdrawablePiecesByOrder(orders, stockTotals, stockRows);
 
     return (
         <div className="p-4 pb-24 max-w-3xl mx-auto">
@@ -50,6 +53,9 @@ export default async function OrdersPage() {
                                 key={order.uuid || order.id}
                                 order={order}
                                 progress={progress}
+                                withdrawablePieces={
+                                    order.uuid ? withdrawable.get(order.uuid) : 0
+                                }
                             />
                         );
                     })}

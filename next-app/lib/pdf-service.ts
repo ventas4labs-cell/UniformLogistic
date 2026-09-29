@@ -2,6 +2,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { Order, CartItem } from '@/lib/types';
 import { extractSizeLabel, resolveBomQty } from '@/lib/services/products';
+import { compareSizeLabels } from '@/lib/size-order';
 
 const createDoc = () => new jsPDF();
 
@@ -109,60 +110,6 @@ const formatPantSize = (item: CartItem): string => {
     if (item.selection.waist == null) return item.selection.size || '';
     const w = String(item.selection.waist);
     return item.selection.inseam != null ? `${w}/${item.selection.inseam}` : w;
-};
-
-// Canonical shirt-size ordering. Anything not listed sorts after these
-// (numeric pant waists, then unknowns). XXL/2XL etc. are treated as the
-// same rank so mixed naming still orders correctly.
-const SHIRT_SIZE_RANK: Record<string, number> = {
-    XS: 0,
-    S: 1,
-    M: 2,
-    L: 3,
-    XL: 4,
-    '2XL': 5,
-    XXL: 5,
-    '3XL': 6,
-    XXXL: 6,
-    '4XL': 7,
-    XXXXL: 7,
-    '5XL': 8,
-    XXXXXL: 8,
-    '6XL': 9
-};
-
-// Decompose a size label like "H · 2XL", "M · L", "32" or "32/30" into a
-// sort key. Gender prefix (H before M before none) is the primary axis;
-// within a gender, shirt sizes follow SHIRT_SIZE_RANK and pant waists
-// sort numerically after all letter sizes.
-const sizeSortKey = (label: string): [number, number, string] => {
-    let gender = '';
-    let size = label.trim();
-    // Accept full words ("Hombre · ", "Mujer · ") and legacy letters.
-    const m = size.match(/^(hombre|mujer|[HM])\s*[·\-]\s*(.+)$/i);
-    if (m) {
-        gender = m[1];
-        size = m[2].trim();
-    }
-    const g0 = gender.charAt(0).toLowerCase();
-    const genderRank = g0 === 'h' ? 0 : g0 === 'm' ? 1 : 2;
-
-    const upper = size.toUpperCase().replace(/\s+/g, '');
-    const rank = SHIRT_SIZE_RANK[upper];
-    if (rank !== undefined) return [genderRank, rank, label];
-
-    const num = parseFloat(size);
-    if (Number.isFinite(num)) return [genderRank, 1000 + num, label];
-
-    return [genderRank, 9999, label];
-};
-
-const compareSizeLabels = (a: string, b: string): number => {
-    const ka = sizeSortKey(a);
-    const kb = sizeSortKey(b);
-    if (ka[0] !== kb[0]) return ka[0] - kb[0];
-    if (ka[1] !== kb[1]) return ka[1] - kb[1];
-    return ka[2].localeCompare(kb[2]);
 };
 
 const buildSizeGrid = (

@@ -1,26 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import {
-    ArrowRight,
-    X,
-    CheckCircle2,
-    Circle,
-    Calendar,
-    Clock,
-    Truck,
-    Boxes,
-    Package,
-    ImageIcon
-} from 'lucide-react';
+import { ArrowRight, X, Calendar, Clock, Package, ImageIcon } from 'lucide-react';
 import type { Order, SizeSelection } from '@/lib/types';
 import type { CustomerOrderProgress, CustomerBucket } from '@/lib/customer-order-status';
 import { useDialog } from '@/lib/use-dialog';
 
 const BUCKET_BADGE: Record<CustomerBucket, string> = {
-    production: 'bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-300',
+    pending: 'bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-300',
     ready: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300',
-    completed: 'bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-300',
+    completed: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
     cancelled: 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300'
 };
 
@@ -70,8 +59,7 @@ function OrderDetailsModal({
 }) {
     const dialogRef = useDialog(onClose);
 
-    const { bucket, statusLabel, stages, totalPieces, dispatchedPieces, stockedPieces, delivered } =
-        progress;
+    const { bucket, statusLabel, totalPieces } = progress;
 
     return (
         <div
@@ -138,47 +126,7 @@ function OrderDetailsModal({
                                 OC {order.purchaseOrder}
                             </span>
                         )}
-                        {stockedPieces > 0 && (
-                            <span className="inline-flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 font-semibold">
-                                <Boxes size={13} />
-                                {stockedPieces}/{totalPieces} en tu bodega
-                            </span>
-                        )}
-                        {!delivered && dispatchedPieces > 0 && (
-                            <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold">
-                                <Truck size={13} />
-                                {dispatchedPieces}/{totalPieces} despachadas
-                            </span>
-                        )}
                     </div>
-
-                    {/* Production progress */}
-                    {bucket !== 'cancelled' && stages.length > 0 && (
-                        <section>
-                            <h4 className="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-2">
-                                Progreso de producción
-                            </h4>
-                            <ul className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                {stages.map((s) => (
-                                    <li
-                                        key={s.key}
-                                        className={`flex items-center gap-1.5 text-sm rounded-lg px-2.5 py-1.5 ${
-                                            s.done
-                                                ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300'
-                                                : 'bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400'
-                                        }`}
-                                    >
-                                        {s.done ? (
-                                            <CheckCircle2 size={14} className="shrink-0" />
-                                        ) : (
-                                            <Circle size={14} className="shrink-0" />
-                                        )}
-                                        {s.label}
-                                    </li>
-                                ))}
-                            </ul>
-                        </section>
-                    )}
 
                     {/* Items */}
                     <section>
@@ -191,7 +139,7 @@ function OrderDetailsModal({
                                     key={idx}
                                     className="flex items-center gap-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg px-3 py-2"
                                 >
-                                    <div className="w-10 h-10 rounded-lg overflow-hidden bg-white dark:bg-zinc-800 shrink-0 border border-zinc-200 dark:border-zinc-700">
+                                    <div className="w-14 h-14 rounded-lg overflow-hidden bg-white dark:bg-zinc-800 shrink-0 border border-zinc-200 dark:border-zinc-700">
                                         {it.imageUrl ? (
                                             // eslint-disable-next-line @next/next/no-img-element
                                             <img
@@ -202,7 +150,7 @@ function OrderDetailsModal({
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center">
                                                 <ImageIcon
-                                                    size={16}
+                                                    size={18}
                                                     className="text-zinc-300 dark:text-zinc-600"
                                                 />
                                             </div>
