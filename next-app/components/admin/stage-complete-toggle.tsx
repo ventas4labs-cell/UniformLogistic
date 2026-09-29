@@ -25,8 +25,8 @@ interface Props {
     // the completion before the action round-trips.
     onLocalChange: (orderUuid: string, next: boolean) => void;
     /**
-     * Order is being produced by an external station — the board shows it
-     * dimmed and read-only so nobody here marks work they didn't do.
+     * Order is being produced by an external station — the toggle is
+     * read-only so nobody here marks work they didn't do.
      */
     locked?: boolean;
 }

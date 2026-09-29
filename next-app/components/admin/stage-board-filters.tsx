@@ -12,6 +12,8 @@ interface Props {
     setTab: (t: StageTab) => void;
     companyFilter: string;
     setCompanyFilter: (c: string) => void;
+    /** Hide the Estado section — for boards that show it inline instead. */
+    showStatus?: boolean;
 }
 
 // Single icon button — slot it into a board's title-row action cluster
@@ -23,7 +25,8 @@ export function StageBoardFilters({
     tab,
     setTab,
     companyFilter,
-    setCompanyFilter
+    setCompanyFilter,
+    showStatus = true
 }: Props) {
     const [open, setOpen] = useState(false);
     const wrapperRef = useRef<HTMLDivElement>(null);
@@ -56,7 +59,7 @@ export function StageBoardFilters({
         [orders]
     );
 
-    const filtersActive = tab !== 'pending' || companyFilter !== 'all';
+    const filtersActive = (showStatus && tab !== 'pending') || companyFilter !== 'all';
 
     return (
         <div ref={wrapperRef} className="relative">
@@ -79,6 +82,7 @@ export function StageBoardFilters({
 
             {open && (
                 <div className="absolute right-0 top-full mt-2 z-30 w-80 bg-white dark:bg-zinc-900 rounded-xl shadow-2xl border border-gray-200 dark:border-zinc-800 p-4 space-y-4">
+                    {showStatus && (
                     <div>
                         <h4 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-zinc-500 mb-2">
                             Estado
@@ -109,6 +113,7 @@ export function StageBoardFilters({
                             })}
                         </div>
                     </div>
+                    )}
 
                     <div>
                         <h4 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-zinc-500 mb-2">
@@ -146,7 +151,7 @@ export function StageBoardFilters({
                             <button
                                 type="button"
                                 onClick={() => {
-                                    setTab('pending');
+                                    if (showStatus) setTab('pending');
                                     setCompanyFilter('all');
                                 }}
                                 className="text-xs font-bold text-orange-600 dark:text-orange-400 hover:underline"
