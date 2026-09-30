@@ -20,6 +20,7 @@ import {
     RefreshCcw,
     Trash2,
     Users,
+    Wallet,
     X
 } from 'lucide-react';
 import type { Employee } from '@/lib/services/employees';
@@ -30,6 +31,13 @@ import {
     type Schedule,
     type ScheduleInput
 } from '@/lib/services/hr-schedules';
+import {
+    fmtDate,
+    fmtRate,
+    rateEntryOn,
+    upcomingRate,
+    type PayRate
+} from '@/lib/services/hr-payroll';
 import {
     createEmployeeAction,
     createKioskAction,
@@ -47,6 +55,14 @@ import { useDialog } from '@/lib/use-dialog';
 
 type Status = 'active' | 'pending' | 'inactive';
 type Tab = 'empleados' | 'kioscos';
+
+interface EmployeeFormValues extends CreateEmployeeInput {
+    hourlyRate: number | null;
+    /** The salario por hora differs from the one in force today. */
+    rateChanged: boolean;
+    /** "Rige desde" — only asked when replacing an existing rate. */
+    rateFrom: string;
+}
 
 function statusOf(e: Employee): Status {
     if (!e.isActive) return 'inactive';
@@ -68,11 +84,17 @@ export function RrhhManager({
     initialEmployees,
     initialKiosks,
     initialSchedules,
+    payRates,
+    today,
     pendingTimeOff
 }: {
     initialEmployees: Employee[];
     initialKiosks: Kiosk[];
     initialSchedules: Record<string, Schedule>;
+    /** Salario por hora history per employee, oldest first. */
+    payRates: Record<string, PayRate[]>;
+    /** CR date, read on the server (no clock reads during render). */
+    today: string;
     pendingTimeOff: number;
 }) {
     const router = useRouter();
@@ -154,10 +176,16 @@ export function RrhhManager({
                         Recursos Humanos
                     </h2>
                     <p className="text-gray-500 dark:text-zinc-400 text-sm">
-                        Empleados, kioscos de marcaje por QR y permisos.
+                        Empleados, kioscos de marcaje por QR, permisos y planilla.
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                    <Link
+                        href="/admin/rrhh/planilla"
+                        className="bg-white dark:bg-zinc-900 border border-orange-300 dark:border-orange-800 text-orange-700 dark:text-orange-300 px-4 py-2 rounded-lg font-bold hover:bg-orange-50 dark:hover:bg-orange-950/40 shadow-sm flex items-center gap-2"
+                    >
+                        <Wallet size={16} /> Planilla
+                    </Link>
                     <Link
                         href="/admin/rrhh/asistencia"
                         className="bg-white dark:bg-zinc-900 border border-orange-300 dark:border-orange-800 text-orange-700 dark:text-orange-300 px-4 py-2 rounded-lg font-bold hover:bg-orange-50 dark:hover:bg-orange-950/40 shadow-sm flex items-center gap-2"
@@ -247,6 +275,7 @@ export function RrhhManager({
                                 <tr>
                                     <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-zinc-400 text-xs uppercase">Empleado</th>
                                     <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-zinc-400 text-xs uppercase">Puesto</th>
+                                    <th className="text-right px-4 py-3 font-semibold text-gray-600 dark:text-zinc-400 text-xs uppercase">Salario / hora</th>
                                     <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-zinc-400 text-xs uppercase">Estado</th>
                                     <th className="text-right px-4 py-3 font-semibold text-gray-600 dark:text-zinc-400 text-xs uppercase">Acciones</th>
                                 </tr>
@@ -254,6 +283,8 @@ export function RrhhManager({
                             <tbody className="divide-y divide-gray-100 dark:divide-zinc-800">
                                 {employees.map((e) => {
                                     const meta = STATUS_META[statusOf(e)];
+                                    const rate = rateEntryOn(payRates[e.id], today);
+                                    const nextRate = upcomingRate(payRates[e.id], today);
                                     return (
                                         <tr key={e.id} className={e.isActive ? '' : 'opacity-60'}>
                                             <td className="px-4 py-3">
@@ -261,6 +292,24 @@ export function RrhhManager({
                                                 <div className="text-[11px] text-gray-500 dark:text-zinc-500 font-mono">{e.email}</div>
                                             </td>
                                             <td className="px-4 py-3 text-gray-700 dark:text-zinc-300">{e.position || '—'}</td>
+                                            <td className="px-4 py-3 text-right tabular-nums">
+                                                {rate ? (
+                                                    <span className="font-semibold text-gray-900 dark:text-zinc-100">{fmtRate(rate.hourlyRate)}</span>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { setError(null); setEditing(e); }}
+                                                        className="text-xs font-bold text-orange-700 dark:text-orange-400 hover:underline"
+                                                    >
+                                                        Definir
+                                                    </button>
+                                                )}
+                                                {nextRate && (
+                                                    <div className="text-[11px] text-gray-500 dark:text-zinc-500">
+                                                        {fmtRate(nextRate.hourlyRate)} desde {fmtDate(nextRate.effectiveFrom, false)}
+                                                    </div>
+                                                )}
+                                            </td>
                                             <td className="px-4 py-3">
                                                 <span className={`px-2 py-1 rounded-full text-xs font-bold ${meta.cls}`}>{meta.label}</span>
                                             </td>
@@ -379,9 +428,16 @@ export function RrhhManager({
                 <EmployeeModal
                     title="Nuevo empleado"
                     submitLabel="Crear y enviar invitación"
+                    today={today}
                     onClose={() => setCreating(false)}
                     onSubmit={async (values) => {
-                        const res = await createEmployeeAction(values);
+                        const res = await createEmployeeAction({
+                            fullName: values.fullName,
+                            email: values.email,
+                            position: values.position,
+                            phone: values.phone,
+                            hourlyRate: values.hourlyRate
+                        });
                         if (res?.error) return res.error;
                         if (res?.warning) setNotice(res.warning);
                         setCreating(false);
@@ -396,13 +452,25 @@ export function RrhhManager({
                     title="Editar empleado"
                     submitLabel="Guardar cambios"
                     initial={editing}
+                    rates={payRates[editing.id]}
+                    today={today}
                     emailReadOnly
                     onClose={() => setEditing(null)}
                     onSubmit={async (values) => {
+                        const hasRate = !!payRates[editing.id]?.length;
                         const res = await updateEmployeeAction(editing.id, {
                             fullName: values.fullName,
                             position: values.position,
-                            phone: values.phone
+                            phone: values.phone,
+                            pay:
+                                values.rateChanged && values.hourlyRate != null
+                                    ? {
+                                          hourlyRate: values.hourlyRate,
+                                          // A first rate has nothing to
+                                          // replace, so no "rige desde".
+                                          effectiveFrom: hasRate ? values.rateFrom : today
+                                      }
+                                    : null
                         });
                         if (res?.error) return res.error;
                         setEditing(null);
@@ -451,6 +519,8 @@ function EmployeeModal({
     title,
     submitLabel,
     initial,
+    rates,
+    today,
     emailReadOnly = false,
     onClose,
     onSubmit
@@ -458,23 +528,49 @@ function EmployeeModal({
     title: string;
     submitLabel: string;
     initial?: Employee;
+    /** Salario por hora history (edit), oldest first. */
+    rates?: PayRate[];
+    today: string;
     emailReadOnly?: boolean;
     onClose: () => void;
-    onSubmit: (values: CreateEmployeeInput) => Promise<string | null>;
+    onSubmit: (values: EmployeeFormValues) => Promise<string | null>;
 }) {
     const dialogRef = useDialog();
+    const current = rateEntryOn(rates, today);
+    const upcoming = upcomingRate(rates, today);
     const [fullName, setFullName] = useState(initial?.fullName || '');
     const [email, setEmail] = useState(initial?.email || '');
     const [position, setPosition] = useState(initial?.position || '');
     const [phone, setPhone] = useState(initial?.phone || '');
+    const [rate, setRate] = useState(current ? String(current.hourlyRate) : '');
+    const [rateFrom, setRateFrom] = useState(today);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    const hourlyRate = rate.trim() === '' ? null : Number(rate);
+    const rateChanged = hourlyRate !== (current?.hourlyRate ?? null);
+
     const submit = async (ev: React.FormEvent) => {
         ev.preventDefault();
+        if (current && hourlyRate == null) {
+            setError('El salario por hora no puede quedar vacío.');
+            return;
+        }
+        if (hourlyRate != null && !(hourlyRate > 0)) {
+            setError('El salario por hora debe ser un monto mayor a 0.');
+            return;
+        }
         setSaving(true);
         setError(null);
-        const msg = await onSubmit({ fullName, email, position, phone });
+        const msg = await onSubmit({
+            fullName,
+            email,
+            position,
+            phone,
+            hourlyRate,
+            rateChanged,
+            rateFrom
+        });
         setSaving(false);
         if (msg) setError(msg);
     };
@@ -504,6 +600,25 @@ function EmployeeModal({
                             <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="8888-8888" className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-transparent" />
                         </Field>
                     </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <Field label="Salario por hora">
+                            <div className="relative">
+                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500 dark:text-zinc-400 pointer-events-none" aria-hidden="true">₡</span>
+                                <input type="number" inputMode="decimal" min={0} step="0.01" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="ej. 2000" className="w-full p-2.5 pl-6 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-transparent tabular-nums" />
+                            </div>
+                        </Field>
+                        {current && rateChanged && (
+                            <Field label="Rige desde">
+                                <input type="date" value={rateFrom} onChange={(e) => setRateFrom(e.target.value)} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-transparent" required />
+                            </Field>
+                        )}
+                    </div>
+                    <p className="-mt-1 text-[11px] text-gray-500 dark:text-zinc-500">
+                        {current && rateChanged
+                            ? `Las horas antes de esa fecha se siguen pagando a ${fmtRate(current.hourlyRate)}.`
+                            : 'La planilla multiplica las horas marcadas por este monto.'}
+                        {upcoming && ` Ya hay un cambio a ${fmtRate(upcoming.hourlyRate)} desde el ${fmtDate(upcoming.effectiveFrom)}.`}
+                    </p>
                     {error && <div className="bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 p-3 rounded-lg text-sm border border-red-200 dark:border-red-900/50">{error}</div>}
                     <div className="flex justify-end gap-2 pt-2">
                         <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-semibold text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg">Cancelar</button>
