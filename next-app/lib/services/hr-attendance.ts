@@ -25,8 +25,10 @@ export const FLAG_LABELS: Record<DayFlag, string> = {
 export interface DaySummary {
     firstIn: string | null;
     lastOut: string | null;
-    /** Minutes worked = span(firstIn→lastOut) − break − lunch. Null when
-     *  the day is still open (no clock-out). */
+    /** Minutes worked = the entrada→salida sessions − break − lunch. A
+     *  salida followed by a new entrada (errand, split shift, a salida
+     *  punched instead of "almuerzo") leaves the gap out. Null when the
+     *  day has no entrada or no salida. */
     workedMin: number | null;
     breakMin: number;
     lunchMin: number;
@@ -51,7 +53,8 @@ export function crMinutesOfDay(iso: string): number {
     return wall.getUTCHours() * 60 + wall.getUTCMinutes();
 }
 
-function parseHHMM(s: string): number {
+/** Minutes since midnight for an "HH:MM" schedule time. */
+export function parseHHMM(s: string): number {
     const [h, m] = s.split(':').map(Number);
     return (h || 0) * 60 + (m || 0);
 }
@@ -76,6 +79,8 @@ export function computeDaySummary(
 ): DaySummary {
     let firstIn: string | null = null;
     let lastOut: string | null = null;
+    let sessionStart: string | null = null;
+    let sessionMin = 0;
     let breakMin = 0;
     let lunchMin = 0;
     let breakCount = 0;
@@ -88,9 +93,16 @@ export function computeDaySummary(
         switch (p.punchType) {
             case 'in':
                 if (!firstIn) firstIn = p.punchedAt;
+                // A repeated entrada (possible after an admin correction)
+                // doesn't restart the session.
+                if (!sessionStart) sessionStart = p.punchedAt;
                 break;
             case 'out':
                 lastOut = p.punchedAt;
+                if (sessionStart) {
+                    sessionMin += diffMin(sessionStart, p.punchedAt);
+                    sessionStart = null;
+                }
                 break;
             case 'break_start':
                 openBreak = p.punchedAt;
@@ -120,7 +132,7 @@ export function computeDaySummary(
     const open = hasPunches && lastType !== 'out';
     const workedMin =
         firstIn && lastOut
-            ? Math.max(0, diffMin(firstIn, lastOut) - breakMin - lunchMin)
+            ? Math.max(0, sessionMin - breakMin - lunchMin)
             : null;
 
     const flags: DayFlag[] = [];

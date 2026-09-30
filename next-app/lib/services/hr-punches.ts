@@ -261,6 +261,47 @@ export async function fetchPunchesInRange(
     }));
 }
 
+/** Every employee's punches across CR dates [fromDate, toDateExclusive),
+ *  ordered ascending (payroll). Paged until the exact count is reached:
+ *  PostgREST caps each response (1000 rows by default) and a month of
+ *  punches for the whole staff runs past that — a silently truncated
+ *  list would underpay whoever's punches got cut off. */
+export async function fetchAllPunchesInRange(
+    supabase: SupabaseClient,
+    fromDate: string,
+    toDateExclusive: string
+): Promise<PunchWithEmployee[]> {
+    const PAGE = 1000;
+    const out: PunchWithEmployee[] = [];
+    let total = Infinity;
+    while (out.length < total) {
+        const { data, error, count } = await supabase
+            .from('hr_punches')
+            .select('id, employee_id, punch_type, punched_at', { count: 'exact' })
+            .gte('punched_at', crDayRangeForDate(fromDate).start)
+            .lt('punched_at', crDayRangeForDate(toDateExclusive).start)
+            .order('punched_at', { ascending: true })
+            .order('id', { ascending: true })
+            .range(out.length, out.length + PAGE - 1);
+        if (error) {
+            if ((error as { code?: string }).code === '42P01') return [];
+            throw error;
+        }
+        const rows = (data || []) as (RawPunch & { employee_id: string })[];
+        if (rows.length === 0) break;
+        if (count != null) total = count;
+        for (const r of rows) {
+            out.push({
+                id: r.id,
+                employeeId: r.employee_id,
+                punchType: r.punch_type,
+                punchedAt: r.punched_at
+            });
+        }
+    }
+    return out;
+}
+
 /** CR calendar date ("YYYY-MM-DD") a timestamp falls on. */
 export function crDateOf(iso: string): string {
     return crTodayStr(new Date(iso).getTime());

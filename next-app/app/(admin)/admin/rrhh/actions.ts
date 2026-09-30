@@ -22,13 +22,36 @@ import {
 } from '@/lib/services/hr-kiosks';
 import { upsertSchedule, type ScheduleInput } from '@/lib/services/hr-schedules';
 import { reviewTimeOffRequest } from '@/lib/services/hr-time-off';
-import { crDateTimeToIso, crToday, PUNCH_TYPES, type PunchType } from '@/lib/services/hr-punches';
+import {
+    addDaysStr,
+    crDateTimeToIso,
+    crToday,
+    PUNCH_TYPES,
+    type PunchType
+} from '@/lib/services/hr-punches';
 import { correctPunch, type PunchEditAction } from '@/lib/services/hr-punch-edits';
+import { scheduledJornadaMin, upsertPayRate } from '@/lib/services/hr-payroll';
 import { sendEmployeeInviteEmail } from '@/lib/email/notifications';
 
 // The invite link is single-use and expires; long enough that an
 // employee has a couple of days to open it.
 const INVITE_TTL_HOURS = 72;
+
+// Anything above this is a typo (an extra zero), not a wage.
+const MAX_HOURLY_RATE = 1_000_000;
+
+/** Validate a salario por hora from the form: colones, > 0, 2 decimals. */
+function parseHourlyRate(value: number): { rate: number } | { error: string } {
+    if (!Number.isFinite(value) || value <= 0)
+        return { error: 'El salario por hora debe ser un monto mayor a 0.' };
+    if (value > MAX_HOURLY_RATE)
+        return { error: 'Ese salario por hora parece demasiado alto. Revisá el monto.' };
+    return { rate: Math.round(value * 100) / 100 };
+}
+
+/** "YYYY-MM-DD" that is a real calendar date (rejects 2026-02-31). */
+const isRealDate = (s: string) =>
+    /^\d{4}-\d{2}-\d{2}$/.test(s) && addDaysStr(s, 0) === s;
 
 /** URL-safe random token (no padding). Used as the /activar-empleado
  *  slug AND — for the throwaway initial auth password — a value the
@@ -58,6 +81,8 @@ export interface CreateEmployeeInput {
     email: string;
     position?: string;
     phone?: string;
+    /** Salario por hora in colones; null/undefined = not set yet. */
+    hourlyRate?: number | null;
 }
 
 /**
@@ -76,6 +101,12 @@ export async function createEmployeeAction(
     const email = input.email.trim().toLowerCase();
     if (!fullName || !email) {
         return { error: 'Nombre y email son obligatorios.' };
+    }
+    let hourlyRate: number | null = null;
+    if (input.hourlyRate != null) {
+        const parsed = parseHourlyRate(input.hourlyRate);
+        if ('error' in parsed) return { error: parsed.error };
+        hourlyRate = parsed.rate;
     }
 
     const service = createServiceClient();
@@ -114,6 +145,24 @@ export async function createEmployeeAction(
         return { error: msg };
     }
 
+    const warnings: string[] = [];
+    if (hourlyRate != null) {
+        try {
+            // The first rate also covers any hours before today (see
+            // rateEntryOn), so its start date is just a record.
+            await upsertPayRate(service, {
+                employeeId: created.user.id,
+                hourlyRate,
+                effectiveFrom: crToday(),
+                createdBy: adminId
+            });
+        } catch {
+            warnings.push(
+                'El empleado se creó, pero no se pudo guardar el salario por hora. Editalo para intentarlo de nuevo.'
+            );
+        }
+    }
+
     const origin = await originFromHeaders();
     const sent = await sendEmployeeInviteEmail(
         email,
@@ -127,12 +176,11 @@ export async function createEmployeeAction(
         // Surface the provider's reason — a swallowed message here made a
         // misconfigured API key look like a generic failure.
         const detail = sent.error ? ` (${sent.error})` : '';
-        return {
-            warning:
-                `El empleado se creó, pero no se pudo enviar el correo de invitación${detail}. Usá "Reenviar invitación".`
-        };
+        warnings.push(
+            `El empleado se creó, pero no se pudo enviar el correo de invitación${detail}. Usá "Reenviar invitación".`
+        );
     }
-    return {};
+    return warnings.length ? { warning: warnings.join(' ') } : {};
 }
 
 /** Reissue the invite (new token + expiry) and resend the email. Works
@@ -176,25 +224,58 @@ export async function resendEmployeeInviteAction(
     return {};
 }
 
+export interface UpdateEmployeeInput {
+    fullName: string;
+    position?: string;
+    phone?: string;
+    /** Only sent when the salario por hora changed. */
+    pay?: {
+        hourlyRate: number;
+        /** CR date the new rate applies from; earlier hours keep the
+         *  previous rate. */
+        effectiveFrom: string;
+    } | null;
+}
+
 export async function updateEmployeeAction(
     userId: string,
-    input: { fullName: string; position?: string; phone?: string }
+    input: UpdateEmployeeInput
 ): Promise<{ error?: string }> {
-    const { error: adminErr } = await requireAdmin();
+    const { error: adminErr, adminId } = await requireAdmin();
     if (adminErr) return { error: adminErr };
     if (!input.fullName.trim()) return { error: 'El nombre es obligatorio.' };
+    let pay: { hourlyRate: number; effectiveFrom: string } | null = null;
+    if (input.pay) {
+        const parsed = parseHourlyRate(input.pay.hourlyRate);
+        if ('error' in parsed) return { error: parsed.error };
+        if (!isRealDate(input.pay.effectiveFrom))
+            return { error: 'Elegí desde qué fecha rige el salario.' };
+        pay = { hourlyRate: parsed.rate, effectiveFrom: input.pay.effectiveFrom };
+    }
+
     const service = createServiceClient();
+    if (!(await fetchEmployee(service, userId))) return { error: 'Empleado no encontrado.' };
     try {
         await updateEmployeeRow(service, userId, {
             fullName: input.fullName.trim(),
             position: (input.position || '').trim(),
             phone: (input.phone || '').trim()
         });
+        if (pay) {
+            await upsertPayRate(service, {
+                employeeId: userId,
+                hourlyRate: pay.hourlyRate,
+                effectiveFrom: pay.effectiveFrom,
+                createdBy: adminId
+            });
+        }
     } catch (err) {
-        const msg = err instanceof Error ? err.message : 'No se pudo actualizar.';
+        // PostgREST errors are plain objects, not Error instances.
+        const msg = (err as { message?: string } | null)?.message || 'No se pudo actualizar.';
         return { error: msg };
     }
     revalidatePath('/admin/rrhh');
+    revalidatePath('/admin/rrhh/planilla');
     return {};
 }
 
@@ -312,6 +393,19 @@ export async function saveEmployeeScheduleAction(
     if (adminErr) return { error: adminErr };
     if (!input.workdays.length) return { error: 'Elegí al menos un día laboral.' };
     if (!input.startTime || !input.endTime) return { error: 'Definí hora de entrada y salida.' };
+    // The jornada (salida − entrada − almuerzo) is what the planilla pays
+    // as ordinary time, so it has to be positive. Shifts past midnight
+    // aren't supported: punches are grouped by calendar day.
+    if (
+        scheduledJornadaMin({
+            startTime: input.startTime,
+            endTime: input.endTime,
+            lunchMin: Math.max(0, input.lunchMin || 0)
+        }) == null
+    )
+        return {
+            error: 'La salida tiene que ser después de la entrada, con tiempo de trabajo además del almuerzo.'
+        };
     const service = createServiceClient();
     try {
         await upsertSchedule(service, employeeId, {
@@ -328,6 +422,7 @@ export async function saveEmployeeScheduleAction(
     }
     revalidatePath('/admin/rrhh');
     revalidatePath('/admin/rrhh/asistencia');
+    revalidatePath('/admin/rrhh/planilla');
     return {};
 }
 
