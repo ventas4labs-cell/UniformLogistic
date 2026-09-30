@@ -49,8 +49,13 @@ export interface TaskGroup {
 
 const RECENT_DAYS = 90;
 
-/** Pieces ordered per product code inside the recency window. */
-function recentVolumeByCode(orders: Order[], now: Date): Map<string, number> {
+/**
+ * Pieces ordered per product uuid inside the recency window. Keyed by the
+ * line's product link, not its code: a line's code is a snapshot and
+ * product codes change (0049), so it can miss its product or belong to
+ * another one.
+ */
+function recentVolumeByProduct(orders: Order[], now: Date): Map<string, number> {
     const cutoff = now.getTime() - RECENT_DAYS * 24 * 60 * 60 * 1000;
     const out = new Map<string, number>();
     for (const o of orders) {
@@ -58,8 +63,8 @@ function recentVolumeByCode(orders: Order[], now: Date): Map<string, number> {
         const t = new Date(o.dateCreated).getTime();
         if (!Number.isFinite(t) || t < cutoff) continue;
         for (const it of o.items) {
-            if (!it.productId) continue;
-            out.set(it.productId, (out.get(it.productId) || 0) + it.quantity);
+            if (!it.productUuid) continue;
+            out.set(it.productUuid, (out.get(it.productUuid) || 0) + it.quantity);
         }
     }
     return out;
@@ -78,7 +83,7 @@ export function buildAdminTasks({
     orders: Order[];
     now?: Date;
 }): TaskGroup[] {
-    const volume = recentVolumeByCode(orders, now);
+    const volume = recentVolumeByProduct(orders, now);
     const activeProducts = products.filter((p) => p.isActive);
 
     // ── Products with no BOM at all ──────────────────────────────────
@@ -87,7 +92,7 @@ export function buildAdminTasks({
     const noFabric: AdminTask[] = [];
 
     for (const p of activeProducts) {
-        const used = volume.get(p.id) || 0;
+        const used = volume.get(p.uuid) || 0;
         const bom = p.bom || [];
         if (bom.length === 0) {
             noBom.push({
@@ -154,13 +159,20 @@ export function buildAdminTasks({
 
     // ── Order lines detached from their product ──────────────────────
     // The line still prints, but the BOM join is broken so the order
-    // shows no insumos. Extras legitimately have no product row.
+    // shows no insumos: no product link, and no live product carries its
+    // code either (hydrateOrphanItems heals a match). A linked line whose
+    // product's code changed since (0049) is fine. Extras legitimately
+    // have no product row.
     const knownCodes = new Set(products.map((p) => p.id));
     const detached: AdminTask[] = [];
     for (const o of orders) {
         if (o.status === 'cancelled') continue;
         const broken = o.items.filter(
-            (i) => !i.isExtra && i.productId && !knownCodes.has(i.productId)
+            (i) =>
+                !i.isExtra &&
+                !i.productUuid &&
+                i.productId &&
+                !knownCodes.has(i.productId)
         );
         if (broken.length === 0) continue;
         const codes = [...new Set(broken.map((i) => i.productId))];

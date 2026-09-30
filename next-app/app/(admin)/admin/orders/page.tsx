@@ -53,11 +53,13 @@ export default async function AdminOrdersPage() {
     // Only pending fast-order requests need admin action; converted /
     // rejected ones are done.
     const pendingRequests = fastRequests.filter((r) => r.status === 'pending');
-    // Lightweight product-code → 3D model map so the order detail view
-    // can surface a 3D preview when an order includes a modeled product.
-    const models3d = threeDModels
-        .filter((m) => m.productCode && m.modelUrl)
-        .map((m) => ({ productCode: m.productCode, modelUrl: m.modelUrl, name: m.name }));
+    // Lightweight product → 3D model map so the order detail view can
+    // surface a 3D preview when an order includes a modeled product.
+    const models3d = threeDModels.flatMap((m) =>
+        m.productId && m.modelUrl
+            ? [{ productUuid: m.productId, modelUrl: m.modelUrl, name: m.name }]
+            : []
+    );
     const orderIds = orders.map((o) => o.uuid).filter((id): id is string => !!id);
     const [completions, assignments, dispatchTotals, stockTotals, fabricReportsByOrder] =
         await Promise.all([

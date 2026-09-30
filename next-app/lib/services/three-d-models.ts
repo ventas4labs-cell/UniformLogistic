@@ -313,7 +313,11 @@ export interface DesignRequest {
     companyName: string;
     modelId: string | null;
     modelName: string;
-    /** Linked product snapshot (for creating the order). */
+    /**
+     * Linked product (for creating the order). The code is the product's
+     * current one, since codes get renumbered (0049); it falls back to
+     * the code captured on the request when no product is linked.
+     */
     productCode: string;
     productName: string;
     status: DesignStatus;
@@ -361,6 +365,7 @@ interface DesignRow {
     items: DesignItem[] | null;
     created_at: string;
     company?: { name: string } | { name: string }[] | null;
+    product?: { product_code: string } | { product_code: string }[] | null;
     logos?: {
         id: string;
         zone_id: string | null;
@@ -382,7 +387,7 @@ const mapDesign = (r: DesignRow): DesignRequest => ({
     companyName: pickOne(r.company)?.name || '',
     modelId: r.model_id,
     modelName: r.model_name || '',
-    productCode: r.product_code || '',
+    productCode: pickOne(r.product)?.product_code || r.product_code || '',
     productName: r.product_name || '',
     status: (r.status as DesignStatus) || 'sent',
     colorName: r.color_name || '',
@@ -404,6 +409,7 @@ const DESIGN_SELECT = `
     id, request_number, company_id, model_id, model_name, product_code, product_name,
     status, color_name, notes, preview_url, items, created_at,
     company:companies ( name ),
+    product:products ( product_code ),
     logos:custom_design_logos ( id, zone_id, zone_label, logo_id, logo_image_url, logo_name )
 `;
 

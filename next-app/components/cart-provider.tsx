@@ -10,7 +10,11 @@ import {
 } from 'react';
 import type { CartItem, ProductType, SizeSelection } from '@/lib/types';
 
-const STORAGE_KEY = 'ul-cart-v1';
+// v2: product codes were renumbered per client prefix (0049). Checkout
+// resolves products by code, and a v1 cart holds the old codes, some of
+// which now belong to a different product, so v1 carts are dropped.
+const STORAGE_KEY = 'ul-cart-v2';
+const LEGACY_STORAGE_KEY = 'ul-cart-v1';
 
 /** Lightweight product meta captured when adding to the cart so the
  *  slide-over mini-cart can show a thumbnail + format sizes without a
@@ -49,6 +53,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     // Hydrate from localStorage once on mount
     useEffect(() => {
         try {
+            window.localStorage.removeItem(LEGACY_STORAGE_KEY);
             const raw = window.localStorage.getItem(STORAGE_KEY);
             if (raw) {
                 const parsed = JSON.parse(raw);

@@ -322,13 +322,15 @@ export const fetchStockedOrderForUser = async (
  * already loaded.
  */
 export const withdrawablePiecesByOrder = (
-    orders: { uuid?: string; items: { uuid?: string; productId: string; selection: { size?: string } }[] }[],
+    orders: { uuid?: string; items: { uuid?: string; productUuid?: string; selection: { size?: string } }[] }[],
     stockTotals: Map<string, Map<string, number>>,
     stockRows: StockRow[]
 ): Map<string, number> => {
-    // Order items carry the product CODE, stock rows carry both.
+    // Match by product uuid, not code: a line's code is a snapshot and
+    // product codes change (0049), so an old code can miss its product or
+    // land on another one.
     const available = new Map<string, number>();
-    for (const r of stockRows) available.set(stockKey(r.productCode, r.size), r.quantityAvailable);
+    for (const r of stockRows) available.set(stockKey(r.productId, r.size), r.quantityAvailable);
 
     const out = new Map<string, number>();
     for (const o of orders) {
@@ -337,8 +339,8 @@ export const withdrawablePiecesByOrder = (
         const stocked = new Map<string, number>();
         for (const it of o.items) {
             const q = it.uuid ? perItem.get(it.uuid) || 0 : 0;
-            if (q <= 0) continue;
-            const k = stockKey(it.productId, it.selection.size || '');
+            if (q <= 0 || !it.productUuid) continue;
+            const k = stockKey(it.productUuid, it.selection.size || '');
             stocked.set(k, (stocked.get(k) || 0) + q);
         }
         let pieces = 0;

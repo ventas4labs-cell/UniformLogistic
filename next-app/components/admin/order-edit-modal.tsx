@@ -72,12 +72,12 @@ export function OrderEditModal({
             productName: it.productName,
             size: it.selection.size || '',
             quantity: it.quantity,
-            // Carry the real product UUID by matching the line's code
-            // against the catalogue. Sending null here used to detach
-            // the row from its product on save, which emptied the
-            // order's insumos. The server re-resolves this from the
-            // code as well, so a miss here is no longer destructive.
-            productUuid: products.find((p) => p.id === it.productId)?.uuid ?? null
+            // The line's own product link (order_items.product_id). Don't
+            // look it up by code: the line's code is a snapshot and product
+            // codes change (0049), so the catalogue can hand back a
+            // different product. The server keeps the stored link anyway
+            // while the line's code is unchanged.
+            productUuid: it.productUuid ?? null
         }))
     );
 
@@ -187,6 +187,7 @@ export function OrderEditModal({
                     notes: notes.trim(),
                     items: items.map((i) => ({
                         productId: i.productCode,
+                        productUuid: i.productUuid ?? undefined,
                         productName: i.productName,
                         selection: { size: i.size },
                         quantity: i.quantity

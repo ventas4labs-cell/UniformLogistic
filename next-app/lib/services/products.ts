@@ -327,18 +327,22 @@ interface ProductRowWithLinks extends ProductRow {
     links: { company_id: string }[] | null;
 }
 
+// Codes are PREFIX-NNNN with one prefix per client (0049), so sorting by
+// code groups each client and counts up within it. `numeric` compares the
+// digits as numbers, which keeps a code typed without padding in place
+// (ULK9-37 after ULK9-0036).
+const compareProductCodes = new Intl.Collator('es', { numeric: true }).compare;
+
 export const fetchProducts = async (
     supabase: SupabaseClient
 ): Promise<AdminProduct[]> => {
     const { data, error } = await supabase
         .from('products')
-        .select(`${PRODUCT_SELECT}, links:company_products ( company_id )`)
-        .order('product_type', { ascending: true })
-        .order('name', { ascending: true });
+        .select(`${PRODUCT_SELECT}, links:company_products ( company_id )`);
     if (error) throw error;
-    return (data as unknown as ProductRowWithLinks[]).map((row) =>
-        mapProductRow(row, (row.links || []).map((l) => l.company_id))
-    );
+    return (data as unknown as ProductRowWithLinks[])
+        .map((row) => mapProductRow(row, (row.links || []).map((l) => l.company_id)))
+        .sort((a, b) => compareProductCodes(a.id, b.id));
 };
 
 /**

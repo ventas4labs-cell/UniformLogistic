@@ -19,7 +19,7 @@ const ModelViewer3D = dynamic(() => import('@/components/custom-order/model-view
 });
 
 export interface OrderModel3D {
-    productCode: string;
+    productUuid: string;
     modelUrl: string;
     name: string;
 }

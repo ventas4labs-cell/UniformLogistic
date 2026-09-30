@@ -1015,7 +1015,7 @@ export function ProductsManager({
                                         value={form.productCode}
                                         onChange={(e) => setForm({ ...form, productCode: e.target.value })}
                                         className="w-full p-3 border rounded-lg font-mono text-sm focus:ring-2 focus:ring-orange-500 outline-none"
-                                        placeholder="ej. col-azul-h"
+                                        placeholder="ej. ULK9-0037"
                                     />
                                 </Field>
                                 <Field label="Nombre *">

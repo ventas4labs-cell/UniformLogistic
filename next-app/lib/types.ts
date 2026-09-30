@@ -72,6 +72,14 @@ export interface SizeSelection {
 
 export interface CartItem {
     productId: string;
+    /**
+     * order_items.product_id — only populated for items that came back
+     * from the DB, and absent for extras. productId is a snapshot of the
+     * code and product codes change (renumbered in 0049, editable in the
+     * product form), so match a line to its product (stock, catalogue) by
+     * this instead.
+     */
+    productUuid?: string;
     productName: string;
     selection: SizeSelection;
     quantity: number;

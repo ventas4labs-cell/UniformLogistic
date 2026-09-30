@@ -174,6 +174,7 @@ interface ItemProduct {
 
 interface ItemJoin {
     id: string;
+    product_id: string | null;
     product_code: string;
     product_name: string;
     size: string;
@@ -207,6 +208,7 @@ const NESTED_SELECT = `
     company:companies ( id, name, document_number, contact_name, email, phone, address ),
     items:order_items (
         id,
+        product_id,
         product_code,
         product_name,
         size,
@@ -237,6 +239,7 @@ const mapRowToOrder = (row: RawOrderRow): Order => {
             return {
                 uuid: it.id,
                 productId: it.product_code,
+                productUuid: it.product_id || undefined,
                 productName: it.product_name,
                 selection: { size: it.size },
                 quantity: it.quantity,
@@ -269,6 +272,10 @@ const mapRowToOrder = (row: RawOrderRow): Order => {
  *
  * Without this fallback, the operator board shows zero insumos for the
  * order even when the BOM is configured on the matching product.
+ *
+ * Lines that do have a product link are never matched by code: a line's
+ * code is a snapshot and product codes change (0049), so it may now
+ * belong to another product.
  */
 const hydrateOrphanItems = async (
     supabase: SupabaseClient,
@@ -277,7 +284,7 @@ const hydrateOrphanItems = async (
     const orphanCodes = new Set<string>();
     for (const o of orders) {
         for (const i of o.items) {
-            if (!i.bom && !i.productType && !i.fabricType && i.productId) {
+            if (!i.bom && !i.productType && !i.fabricType && !i.productUuid && i.productId) {
                 orphanCodes.add(i.productId);
             }
         }
@@ -306,7 +313,7 @@ const hydrateOrphanItems = async (
 
     for (const o of orders) {
         for (const i of o.items) {
-            if (i.bom || i.productType || i.fabricType) continue;
+            if (i.bom || i.productType || i.fabricType || i.productUuid) continue;
             const hit = byCode.get(i.productId);
             if (!hit) continue;
             i.productType = hit.product_type || undefined;
@@ -538,19 +545,27 @@ export const updateOrderFull = async (
     // Surgical updates avoid churning unchanged rows.
     const { data: existing, error: fetchError } = await supabase
         .from('order_items')
-        .select('id')
+        .select('id, product_code, product_id')
         .eq('order_id', orderUuid);
     if (fetchError) throw fetchError;
+    const existingRows = (existing || []) as {
+        id: string;
+        product_code: string;
+        product_id: string | null;
+    }[];
 
-    // Re-resolve product_id from product_code for every submitted line.
-    // The client is not a trustworthy source for this: the edit modal
-    // cannot map an existing row back to its product UUID and sends
-    // productUuid=null, so trusting it wiped product_id on every line of
-    // any edited order — silently detaching the BOM and emptying
+    // Resolve product_id server-side. The client is not a trustworthy
+    // source for it: trusting a null productUuid wiped product_id on every
+    // line of any edited order — silently detaching the BOM and emptying
     // "Insumos necesarios" (orders 82, 97, 98 were corrupted this way).
-    // Resolving server-side keeps the link intact no matter what the
-    // client sends. Codes with no product (extras, retired codes) stay
-    // null, which is the correct representation for them.
+    // A line that keeps its code keeps the product it is linked to: the
+    // code is a snapshot and product codes change (renumbered in 0049,
+    // editable in the product form), so looking it up again can land on a
+    // different product and swap the garment and its BOM. New or re-coded
+    // lines take the picked product, else the one with that code. Codes
+    // with no product (extras, retired codes) stay null, which is the
+    // correct representation for them.
+    const storedById = new Map(existingRows.map((r) => [r.id, r]));
     const submittedCodes = [...new Set(items.map((i) => i.productCode).filter(Boolean))];
     const codeToUuid = new Map<string, string>();
     if (submittedCodes.length > 0) {
@@ -563,10 +578,15 @@ export const updateOrderFull = async (
             codeToUuid.set(r.product_code, r.id);
         }
     }
-    const resolveProductId = (i: OrderItemInput): string | null =>
-        i.productUuid || codeToUuid.get(i.productCode) || null;
+    const resolveProductId = (i: OrderItemInput): string | null => {
+        const stored = i.id ? storedById.get(i.id) : undefined;
+        if (stored?.product_id && stored.product_code === i.productCode) {
+            return stored.product_id;
+        }
+        return i.productUuid || codeToUuid.get(i.productCode) || null;
+    };
 
-    const existingIds = new Set((existing || []).map((r) => r.id as string));
+    const existingIds = new Set(existingRows.map((r) => r.id));
     const submittedIds = new Set(
         items.filter((i) => i.id).map((i) => i.id as string)
     );

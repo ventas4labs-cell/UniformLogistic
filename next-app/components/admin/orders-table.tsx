@@ -210,13 +210,14 @@ export function OrdersTable({
         completedOrders.map((c) => [c.orderId, c.reason] as const)
     );
     const isCompleted = (o: Order) => !!o.uuid && completedReasonById.has(o.uuid);
-    // Order whose detailed view is open, and the product-code → 3D model
-    // lookup used to surface a 3D preview inside it.
+    // Order whose detailed view is open, and the product → 3D model
+    // lookup used to surface a 3D preview inside it. Keyed by product
+    // uuid: a line's code is a snapshot and product codes change (0049).
     const [detailOrder, setDetailOrder] = useState<Order | null>(null);
-    const modelByCode = new Map(models3d.map((m) => [m.productCode, m] as const));
+    const modelByProduct = new Map(models3d.map((m) => [m.productUuid, m] as const));
     const modelForOrder = (o: Order): OrderModel3D | null => {
         for (const it of o.items) {
-            const m = it.productId && modelByCode.get(it.productId);
+            const m = it.productUuid && modelByProduct.get(it.productUuid);
             if (m) return m;
         }
         return null;
