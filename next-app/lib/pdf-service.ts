@@ -269,8 +269,7 @@ export const generateAdminPDF = (order: Order, opts: AdminPdfOptions = {}) => {
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
-    doc.text('Cédula Jurídica 3-101-795102', 14, 17);
-    doc.text('Tel. 2263-9093  ·  Santo Domingo, Heredia', 14, 20.5);
+    doc.text('Santo Domingo, Heredia', 14, 17);
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
@@ -297,10 +296,9 @@ export const generateAdminPDF = (order: Order, opts: AdminPdfOptions = {}) => {
         labeledField(doc, 14, y, pageWidth - 28, 'DIRECCIÓN', order.address || '');
         y += 11;
 
-        const triW = (pageWidth - 28) / 3 - 2;
-        labeledField(doc, 14, y, triW, 'TELÉFONO', order.phone || '');
-        labeledField(doc, 14 + triW + 3, y, triW, 'EMAIL', order.email || '');
-        labeledField(doc, 14 + (triW + 3) * 2, y, triW, 'ORDEN DE COMPRA', order.purchaseOrder || '');
+        const detailW = (pageWidth - 28) / 2 - 2;
+        labeledField(doc, 14, y, detailW, 'EMAIL', order.email || '');
+        labeledField(doc, 14 + detailW + 4, y, detailW, 'ORDEN DE COMPRA', order.purchaseOrder || '');
         y += 11;
 
         const dateW = (pageWidth - 28) / 2 - 2;

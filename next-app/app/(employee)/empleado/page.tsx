@@ -9,6 +9,7 @@ import {
     STATE_LABELS,
     type PunchState
 } from '@/lib/services/hr-punches';
+import { EmployeeQrScanner } from './employee-qr-scanner';
 
 const fmtTime = (iso: string) =>
     new Date(iso).toLocaleTimeString('es-CR', {
@@ -61,9 +62,10 @@ export default async function EmpleadoHomePage() {
                     Escaneá el código del taller para marcar
                 </p>
                 <p className="text-sm text-gray-500 dark:text-zinc-400 mt-1">
-                    Usá la cámara de tu teléfono sobre la pantalla del kiosco para
-                    registrar tu entrada, salida, break o almuerzo.
+                    Escaneá el QR de la pantalla del kiosco para registrar tu entrada,
+                    salida, break o almuerzo.
                 </p>
+                <EmployeeQrScanner />
             </div>
 
             <div>
