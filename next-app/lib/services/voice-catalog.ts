@@ -1,7 +1,7 @@
 // ─── Voice catalog builder ────────────────────────────────────────────
 // Used by /api/admin/stock/voice-parse and -apply to give the LLM the
 // exact SKUs it is allowed to pick from. Each entry is a (product × size)
-// pair the company has been granted; if a company_stock row already
+// pair available to the company; if a company_stock row already
 // exists for the pair, its id is pre-resolved.
 //
 // Sizes are expanded the SAME way the customer checkout produces size
@@ -40,6 +40,7 @@ interface ProductRow {
         inseam?: number[];
     } | null;
     fabric_type: string | null;
+    is_active?: boolean;
 }
 
 function expandSizes(p: ProductRow): string[] {
@@ -94,14 +95,16 @@ export async function buildVoiceCatalog(
     supabase: SupabaseClient,
     companyId: string
 ): Promise<VoiceCatalogEntry[]> {
-    // 1. Products this company is allowed to order (catalog assignment).
+    // 1. Company assignments plus shared basic products. Customers can
+    // order basic products without a company_products row, so manual stock
+    // entry must offer those too.
     const { data: assigned, error: assignedErr } = await supabase
         .from('company_products')
         .select(
             `
             product:products (
                 id, product_code, name, product_type, gender,
-                sizes_json, fabric_type
+                sizes_json, fabric_type, is_active
             )
         `
         )
@@ -109,9 +112,21 @@ export async function buildVoiceCatalog(
         .eq('is_active', true);
     if (assignedErr) throw assignedErr;
 
-    const products: ProductRow[] = (assigned || [])
+    const { data: basic, error: basicErr } = await supabase
+        .from('products')
+        .select('id, product_code, name, product_type, gender, sizes_json, fabric_type')
+        .eq('is_basic', true)
+        .eq('is_active', true);
+    if (basicErr) throw basicErr;
+
+    const assignedProducts = (assigned || [])
         .map((row: CompanyProductJoin) => pickOne(row.product))
-        .filter((p): p is ProductRow => Boolean(p));
+        .filter((p): p is ProductRow => Boolean(p && p.is_active !== false));
+    const products = Array.from(
+        new Map(
+            [...assignedProducts, ...((basic || []) as ProductRow[])].map((p) => [p.id, p])
+        ).values()
+    );
 
     if (products.length === 0) return [];
 

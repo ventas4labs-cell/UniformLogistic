@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/utils/supabase/server';
 import { isAdminEmail } from '@/lib/admin-acting-company';
+import { buildVoiceCatalog, type VoiceCatalogEntry } from '@/lib/services/voice-catalog';
 import {
     sendWithdrawalApprovedEmail,
     sendWithdrawalRejectedEmail
@@ -75,6 +76,86 @@ export interface StockCorrectionResult {
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export async function getManualStockCatalogAction(
+    companyId: string
+): Promise<{ entries: VoiceCatalogEntry[]; error?: string }> {
+    await assertAdmin();
+    if (!UUID_RE.test(companyId))
+        return { entries: [], error: 'Seleccioná una empresa válida.' };
+
+    const supabase = await createClient();
+    const { data: company, error } = await supabase
+        .from('companies')
+        .select('id')
+        .eq('id', companyId)
+        .maybeSingle();
+    if (error || !company)
+        return { entries: [], error: 'No se encontró la empresa.' };
+
+    try {
+        return { entries: await buildVoiceCatalog(supabase, companyId) };
+    } catch {
+        return { entries: [], error: 'No se pudo cargar el catálogo de productos.' };
+    }
+}
+
+export interface ManualStockEntryInput {
+    companyId: string;
+    productId: string;
+    size: string;
+    quantity: number;
+    reason?: string;
+}
+
+/** Add physical pieces to one company's SKU, creating its stock row if needed. */
+export async function addManualStockEntryAction(
+    input: ManualStockEntryInput
+): Promise<{ error?: string }> {
+    await assertAdmin();
+    if (!UUID_RE.test(input.companyId) || !UUID_RE.test(input.productId))
+        return { error: 'Empresa o producto inválido.' };
+    if (!Number.isSafeInteger(input.quantity) || input.quantity < 1 || input.quantity > 1_000_000)
+        return { error: 'La cantidad debe ser un número entero entre 1 y 1.000.000.' };
+    if (typeof input.size !== 'string' || !input.size)
+        return { error: 'Seleccioná una talla válida.' };
+
+    const supabase = await createClient();
+    const { data: company, error: companyError } = await supabase
+        .from('companies')
+        .select('id')
+        .eq('id', input.companyId)
+        .maybeSingle();
+    if (companyError || !company) return { error: 'No se encontró la empresa.' };
+
+    let catalog: VoiceCatalogEntry[];
+    try {
+        catalog = await buildVoiceCatalog(supabase, input.companyId);
+    } catch {
+        return { error: 'No se pudo validar el producto.' };
+    }
+    if (!catalog.some((entry) => entry.product_id === input.productId && entry.size === input.size))
+        return { error: 'El producto o la talla no están disponibles para esta empresa.' };
+
+    const reason =
+        typeof input.reason === 'string'
+            ? input.reason.trim().slice(0, 200) || 'Entrada manual'
+            : 'Entrada manual';
+    const { error } = await supabase.rpc('upsert_company_stock_movement', {
+        p_company_id: input.companyId,
+        p_product_id: input.productId,
+        p_size: input.size,
+        p_type: 'entry',
+        p_quantity: input.quantity,
+        p_reason: reason,
+        p_source: 'manual'
+    });
+    if (error) return { error: error.message };
+
+    revalidatePath('/admin/stock');
+    revalidatePath('/stock');
+    return {};
+}
 
 // The balance writer raises in English; the admin reads Spanish.
 function correctionErrorMessage(raw: string): string {

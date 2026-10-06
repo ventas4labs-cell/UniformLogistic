@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import type { CompanyStockGroup, StockRow } from '@/lib/services/stock';
 import { VoiceStockDictate } from '@/components/admin/voice-stock-dictate';
+import { ManualStockEntry } from '@/components/admin/manual-stock-entry';
 import { CollapsibleSearch } from '@/components/admin/collapsible-search';
 import { StockCorrectionModal } from '@/components/admin/stock-correction-modal';
 
@@ -111,22 +112,26 @@ export function AdminStockBoard({
 }) {
     const [query, setQuery] = useState('');
     const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
+    const [showZero, setShowZero] = useState(false);
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-    // Apply type filter to rows within each group (recomputed summary).
+    // Keep all typed rows for corrections, but summarize only visible stock.
     const filteredGroups = useMemo(() => {
         const q = query.trim().toLowerCase();
         return groups
             .map((g) => {
-                const filteredRows =
+                const typedRows =
                     typeFilter === 'all'
                         ? g.rows
                         : g.rows.filter((r) => r.productType === typeFilter);
+                const visibleRows = showZero
+                    ? typedRows
+                    : typedRows.filter((r) => r.quantityOnHand > 0);
                 let totalOnHand = 0;
                 let totalAvailable = 0;
                 let estimatedValue = 0;
                 const productSet = new Set<string>();
-                filteredRows.forEach((r) => {
+                visibleRows.forEach((r) => {
                     totalOnHand += r.quantityOnHand;
                     totalAvailable += r.quantityAvailable;
                     if (r.unitPrice) estimatedValue += r.unitPrice * r.quantityOnHand;
@@ -134,10 +139,11 @@ export function AdminStockBoard({
                 });
                 return {
                     ...g,
-                    rows: filteredRows,
+                    rows: typedRows,
+                    visibleRows,
                     summary: {
                         ...g.summary,
-                        skuCount: filteredRows.length,
+                        skuCount: visibleRows.length,
                         totalOnHand,
                         totalAvailable,
                         estimatedValue,
@@ -149,8 +155,8 @@ export function AdminStockBoard({
                 if (!q) return true;
                 return g.company.name.toLowerCase().includes(q);
             })
-            .filter((g) => g.rows.length > 0);
-    }, [groups, query, typeFilter]);
+            .filter((g) => g.visibleRows.length > 0);
+    }, [groups, query, typeFilter, showZero]);
 
     // Org-wide totals
     const totals = useMemo(() => {
@@ -193,6 +199,7 @@ export function AdminStockBoard({
                     </p>
                 </div>
                 <div className="flex items-center gap-2 text-sm flex-wrap">
+                    <ManualStockEntry companies={companies} />
                     <VoiceStockDictate companies={companies} />
                     <button
                         onClick={expandAll}
@@ -268,6 +275,18 @@ export function AdminStockBoard({
                         </button>
                     ))}
                 </div>
+                <button
+                    type="button"
+                    aria-pressed={showZero}
+                    onClick={() => setShowZero((current) => !current)}
+                    className={`px-3 py-2 rounded-lg text-xs font-bold transition-colors ${
+                        showZero
+                            ? 'bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-300'
+                            : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-300 hover:bg-gray-200 dark:hover:bg-zinc-700'
+                    }`}
+                >
+                    Mostrar en 0
+                </button>
             </div>
 
             {/* Company groups */}
@@ -318,6 +337,7 @@ export function AdminStockBoard({
                                     <ProductTable
                                         company={g.company}
                                         rows={g.rows}
+                                        showZero={showZero}
                                     />
                                 )}
                             </div>
@@ -333,16 +353,19 @@ export function AdminStockBoard({
 
 function ProductTable({
     company,
-    rows
+    rows,
+    showZero
 }: {
     company: { id: string; name: string };
     rows: StockRow[];
+    showZero: boolean;
 }) {
-    const products = useMemo(() => groupByProduct(rows), [rows]);
+    const allProducts = useMemo(() => groupByProduct(rows), [rows]);
+    const products = allProducts.filter((p) => showZero || p.totalOnHand > 0);
     const [correcting, setCorrecting] = useState<string | null>(null);
     // Look the product up on every render so the modal sees fresh
     // quantities after router.refresh() (partial-failure case).
-    const correctingProduct = products.find((p) => p.productId === correcting);
+    const correctingProduct = allProducts.find((p) => p.productId === correcting);
     return (
         <div className="border-t border-gray-100 dark:border-zinc-800">
             {correctingProduct && (
@@ -411,7 +434,7 @@ function ProductTable({
                             </td>
                             <td className="p-3 align-top">
                                 <div className="flex flex-wrap gap-1.5">
-                                    {p.rows.map((r) => (
+                                    {p.rows.filter((r) => showZero || r.quantityOnHand > 0).map((r) => (
                                         <SizePill key={r.id} row={r} />
                                     ))}
                                 </div>
