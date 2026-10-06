@@ -191,7 +191,7 @@ export default async function CorregirMarcajesPage({
 
             <PunchEditor
                 // Reset any open form when the day or its punches change.
-                key={`${date}:${punches.map((p) => `${p.id}${p.punchedAt}${p.punchType}`).join('|')}`}
+                key={`${employeeId}:${date}:${punches.map((p) => `${p.id}${p.punchedAt}${p.punchType}`).join('|')}`}
                 employeeId={employeeId}
                 date={date}
                 punches={punches}

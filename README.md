@@ -19,6 +19,24 @@ npm run dev
 
 The dev server runs on http://localhost:3001.
 
+## Codebase graph for Codex
+
+The project includes a Graphify skill in `.codex/skills/graphify/` and
+instructions in `AGENTS.md`. Codex can query the local code graph for focused
+context instead of reading large parts of the repository.
+
+Install the CLI and build the local graph from the repository root:
+
+```bash
+uv tool install graphifyy
+graphify extract . --code-only
+graphify cluster-only . --no-label
+```
+
+The generated `graphify-out/` directory is local and ignored by Git. Query it
+with `graphify query "your question" --budget 1000`. After code changes, run
+`graphify update .`. The code-only build does not index prose docs or media.
+
 ## Tech stack
 
 - **Next.js 16** App Router (Turbopack dev + build)

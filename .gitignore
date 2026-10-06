@@ -32,6 +32,7 @@ token.json
 .venv/
 venv/
 .vercel
+graphify-out/
 
 # Local PSD/video mockup experiments
 *.psd

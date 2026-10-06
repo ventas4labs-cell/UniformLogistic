@@ -1,6 +1,6 @@
 'use server';
 
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { createClient, createServiceClient } from '@/utils/supabase/server';
@@ -430,6 +430,24 @@ export async function saveEmployeeScheduleAction(
 // The only way a recorded time changes. Each correction needs a reason
 // and is logged in hr_punch_edits by the same DB transaction.
 
+function correctionPinError(pin: string): string | null {
+    const expected = process.env.HR_CORRECTION_PIN;
+    if (!expected) return 'El PIN de corrección no está configurado.';
+    if (typeof pin !== 'string' || !pin || pin.length > 128) return 'PIN incorrecto.';
+    const suppliedHash = createHash('sha256').update(pin).digest();
+    const expectedHash = createHash('sha256').update(expected).digest();
+    return timingSafeEqual(suppliedHash, expectedHash) ? null : 'PIN incorrecto.';
+}
+
+export async function verifyPunchCorrectionPinAction(
+    pin: string
+): Promise<{ error?: string }> {
+    const { error: adminErr } = await requireAdmin();
+    if (adminErr) return { error: adminErr };
+    const error = correctionPinError(pin);
+    return error ? { error } : {};
+}
+
 export interface CorrectPunchInput {
     action: PunchEditAction;
     employeeId: string;
@@ -440,6 +458,7 @@ export interface CorrectPunchInput {
     /** CR wall-clock "HH:MM". */
     time?: string;
     reason: string;
+    pin: string;
 }
 
 export async function correctPunchAction(
@@ -447,6 +466,8 @@ export async function correctPunchAction(
 ): Promise<{ error?: string }> {
     const { error: adminErr, adminId } = await requireAdmin();
     if (adminErr || !adminId) return { error: adminErr || 'No autorizado.' };
+    const pinError = correctionPinError(input.pin);
+    if (pinError) return { error: pinError };
 
     const reason = (input.reason || '').trim().slice(0, 300);
     if (!reason) return { error: 'Escribí el motivo de la corrección.' };

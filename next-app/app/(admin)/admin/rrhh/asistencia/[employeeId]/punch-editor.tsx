@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, Loader2, LockKeyhole, Pencil, Plus, Trash2 } from 'lucide-react';
 import {
     crHHMM,
     PUNCH_LABELS,
@@ -10,7 +10,7 @@ import {
     type Punch,
     type PunchType
 } from '@/lib/services/hr-punches';
-import { correctPunchAction } from '../../actions';
+import { correctPunchAction, verifyPunchCorrectionPinAction } from '../../actions';
 
 type Mode =
     | { kind: 'edit'; id: string }
@@ -43,6 +43,24 @@ export function PunchEditor({
     const [time, setTime] = useState('');
     const [reason, setReason] = useState('');
     const [error, setError] = useState<string | null>(null);
+    const [pin, setPin] = useState('');
+    const [unlocked, setUnlocked] = useState(false);
+    const [pinError, setPinError] = useState<string | null>(null);
+
+    const unlock = (ev: React.FormEvent) => {
+        ev.preventDefault();
+        startTransition(async () => {
+            setPinError(null);
+            const res = await verifyPunchCorrectionPinAction(pin);
+            if (res.error) {
+                setPin('');
+                setPinError(res.error);
+                return;
+            }
+            setError(null);
+            setUnlocked(true);
+        });
+    };
 
     const open = (next: Mode, p?: Punch) => {
         setError(null);
@@ -69,13 +87,21 @@ export function PunchEditor({
                 punchId: mode.kind === 'add' ? undefined : mode.id,
                 punchType,
                 time,
-                reason
+                reason,
+                pin
             });
             if (res.error) {
+                if (res.error === 'PIN incorrecto.' || res.error === 'El PIN de corrección no está configurado.') {
+                    setUnlocked(false);
+                    setPin('');
+                    setPinError(res.error);
+                }
                 setError(res.error);
                 return;
             }
             setMode(null);
+            setPin('');
+            setUnlocked(false);
             router.refresh();
         });
     };
@@ -146,21 +172,75 @@ export function PunchEditor({
         </div>
     );
 
+    if (!unlocked) return (
+        <div className="bg-white dark:bg-zinc-900 rounded-xl border border-gray-200 dark:border-zinc-800 p-5">
+            <div className="flex items-center gap-2 text-gray-900 dark:text-zinc-100 font-bold">
+                <LockKeyhole size={18} className="text-orange-600 dark:text-orange-400" />
+                Corrección protegida
+            </div>
+            <p className="mt-1 text-sm text-gray-500 dark:text-zinc-400">
+                Ingresá el PIN de administrador para agregar, corregir o eliminar marcajes.
+            </p>
+            <form onSubmit={unlock} className="mt-4 flex flex-col sm:flex-row gap-2 sm:items-end">
+                <label className="flex-1 text-sm font-semibold text-gray-700 dark:text-zinc-300">
+                    PIN de administrador
+                    <input
+                        type="password"
+                        value={pin}
+                        onChange={(e) => setPin(e.target.value)}
+                        autoComplete="off"
+                        autoCapitalize="none"
+                        spellCheck={false}
+                        maxLength={128}
+                        required
+                        className={`${inputCls} mt-1 w-full`}
+                    />
+                </label>
+                <button
+                    type="submit"
+                    disabled={pending}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-orange-600 text-white text-sm font-bold hover:bg-orange-700 disabled:opacity-50"
+                >
+                    {pending && <Loader2 size={14} className="animate-spin" />}
+                    Desbloquear
+                </button>
+            </form>
+            {pinError && (
+                <p role="alert" className="mt-3 text-sm font-medium text-red-700 dark:text-red-300">
+                    {pinError}
+                </p>
+            )}
+        </div>
+    );
+
     return (
         <div className="bg-white dark:bg-zinc-900 rounded-xl border border-gray-200 dark:border-zinc-800">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-zinc-800">
                 <h3 className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-zinc-400">
                     Marcajes ({punches.length})
                 </h3>
-                {mode?.kind !== 'add' && (
+                <div className="flex items-center gap-2">
                     <button
                         type="button"
-                        onClick={() => open({ kind: 'add' })}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-bold text-orange-700 dark:text-orange-400 border border-orange-300 dark:border-orange-800 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-950/40"
+                        onClick={() => {
+                            setMode(null);
+                            setPin('');
+                            setUnlocked(false);
+                        }}
+                        className="px-2 py-1.5 text-xs font-semibold text-gray-500 dark:text-zinc-400 hover:text-gray-800 dark:hover:text-zinc-200"
                     >
-                        <Plus size={14} /> Agregar marcaje
+                        Bloquear
                     </button>
-                )}
+                    {mode?.kind !== 'add' && (
+                        <button
+                            type="button"
+                            onClick={() => open({ kind: 'add' })}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-bold text-orange-700 dark:text-orange-400 border border-orange-300 dark:border-orange-800 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-950/40"
+                        >
+                            <Plus size={14} /> Agregar marcaje
+                        </button>
+                    )}
+                </div>
             </div>
 
             {mode?.kind === 'add' && (
