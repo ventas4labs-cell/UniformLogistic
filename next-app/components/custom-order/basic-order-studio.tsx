@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import { ArrowLeft, Loader2, Check, Sparkles, Rotate3d } from 'lucide-react';
 import type { ThreeDModel, DesignItem } from '@/lib/services/three-d-models';
 import type { Logo } from '@/lib/services/logos';
@@ -49,6 +50,7 @@ export function BasicOrderStudio({
     model,
     logos,
     sizeItems,
+    adminOrder,
     onBack,
     onClose
 }: {
@@ -56,6 +58,7 @@ export function BasicOrderStudio({
     model: ThreeDModel;
     logos: Logo[];
     sizeItems: { selection: SizeSelection; quantity: number }[];
+    adminOrder: boolean;
     onBack: () => void;
     onClose: () => void;
 }) {
@@ -65,7 +68,7 @@ export function BasicOrderStudio({
     const [notes, setNotes] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [doneRef, setDoneRef] = useState<string | null>(null);
+    const [done, setDone] = useState<{ ref: string; kind: 'order' | 'request' } | null>(null);
     const viewerRef = useRef<HTMLDivElement>(null);
     const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
     // Data-entry studio (color, logos, notas) — no Escape-to-close so a
@@ -160,7 +163,8 @@ export function BasicOrderStudio({
             setSubmitting(false);
             return;
         }
-        setDoneRef(res.requestRef || 'OK');
+        if (res.orderRef) setDone({ ref: res.orderRef, kind: 'order' });
+        else setDone({ ref: res.requestRef || 'OK', kind: 'request' });
     };
 
     return (
@@ -173,24 +177,33 @@ export function BasicOrderStudio({
             className="fixed inset-0 z-50 bg-white dark:bg-zinc-950 overflow-y-auto outline-none"
         >
             <div className="max-w-6xl mx-auto p-4 sm:p-6">
-                {doneRef ? (
+                {done ? (
                     <div className="max-w-lg mx-auto text-center py-20">
                         <div className="w-16 h-16 rounded-2xl bg-green-100 dark:bg-green-950/40 text-green-600 dark:text-green-400 flex items-center justify-center mx-auto mb-5">
                             <Check size={32} strokeWidth={3} />
                         </div>
                         <h1 className="text-2xl font-extrabold text-zinc-900 dark:text-zinc-100">
-                            ¡Solicitud enviada!
+                            {done.kind === 'order' ? '¡Pedido creado!' : '¡Solicitud enviada!'}
                         </h1>
                         <p className="text-zinc-500 dark:text-zinc-400 mt-2">
-                            Tu solicitud <span className="font-mono font-bold text-orange-600">{doneRef}</span> quedó
-                            registrada. La revisaremos y, al aceptarla, se creará tu pedido.
+                            {done.kind === 'order' ? (
+                                <>El pedido <span className="font-mono font-bold text-orange-600">{done.ref}</span> quedó registrado directamente.</>
+                            ) : (
+                                <>Tu solicitud <span className="font-mono font-bold text-orange-600">{done.ref}</span> quedó registrada. La revisaremos y, al aceptarla, se creará tu pedido.</>
+                            )}
                         </p>
-                        <button
-                            onClick={onClose}
-                            className="mt-7 px-6 py-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold"
-                        >
-                            Volver al catálogo
-                        </button>
+                        {done.kind === 'order' ? (
+                            <Link href="/admin/orders" className="inline-block mt-7 px-6 py-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold">
+                                Ver pedidos
+                            </Link>
+                        ) : (
+                            <button
+                                onClick={onClose}
+                                className="mt-7 px-6 py-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold"
+                            >
+                                Volver al catálogo
+                            </button>
+                        )}
                     </div>
                 ) : (
                     <>
@@ -364,7 +377,9 @@ export function BasicOrderStudio({
                                     className="w-full py-3.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-extrabold shadow-md shadow-orange-500/20 disabled:opacity-60 inline-flex items-center justify-center gap-2 transition-colors"
                                 >
                                     {submitting ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
-                                    {submitting ? 'Enviando…' : 'Solicitar pedido'}
+                                    {submitting
+                                        ? (adminOrder ? 'Creando pedido…' : 'Enviando…')
+                                        : (adminOrder ? 'Crear pedido' : 'Solicitar pedido')}
                                 </button>
                             </div>
                         </div>

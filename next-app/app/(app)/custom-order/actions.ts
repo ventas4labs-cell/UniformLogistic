@@ -4,9 +4,15 @@ import { revalidatePath } from 'next/cache';
 import { randomUUID } from 'node:crypto';
 import { createClient } from '@/utils/supabase/server';
 import { fetchUserCompanyId } from '@/lib/services/products';
-import { getActingCompanyId, isAdminEmail } from '@/lib/admin-acting-company';
+import {
+    clearActingCompanyId,
+    getActingCompanyId,
+    isAdminEmail
+} from '@/lib/admin-acting-company';
 import { fetchLogos } from '@/lib/services/logos';
 import { isCustomOrderEnabled } from '@/lib/services/companies';
+import { createOrder, selectionToSizeString } from '@/lib/services/orders';
+import type { CartItem, CustomerForm } from '@/lib/types';
 import {
     fetchModelById,
     createDesignRequest,
@@ -83,7 +89,7 @@ async function uploadPreview(
 
 export async function submitCustomDesignAction(
     input: SubmitInput
-): Promise<{ ok: boolean; requestRef?: string; error?: string }> {
+): Promise<{ ok: boolean; requestRef?: string; orderRef?: string; error?: string }> {
     const supabase = await createClient();
     const {
         data: { user }
@@ -91,10 +97,23 @@ export async function submitCustomDesignAction(
     if (!user) return { ok: false, error: 'No autenticado.' };
 
     // Re-derive the company server-side — never trust the client.
-    const companyId = isAdminEmail(user.email)
+    const adminOrder = isAdminEmail(user.email);
+    const companyId = adminOrder
         ? await getActingCompanyId()
         : await fetchUserCompanyId(supabase, user.id);
     if (!companyId) return { ok: false, error: 'No se pudo determinar tu empresa.' };
+
+    if (
+        !Array.isArray(input.items) || input.items.length === 0 ||
+        input.items.some((item) =>
+            !item || !item.selection ||
+            !Number.isSafeInteger(item.quantity) ||
+            item.quantity < 1 ||
+            !selectionToSizeString(item.selection)
+        )
+    ) {
+        return { ok: false, error: 'Agregá al menos una talla con una cantidad válida.' };
+    }
 
     // Master switch — reject if the feature is disabled for this empresa.
     if (!(await isCustomOrderEnabled(supabase, companyId))) {
@@ -106,6 +125,9 @@ export async function submitCustomDesignAction(
     const model = await fetchModelById(supabase, input.modelId);
     if (!model || !model.isActive) {
         return { ok: false, error: 'Modelo no disponible.' };
+    }
+    if (adminOrder && (!model.productId || !model.productCode)) {
+        return { ok: false, error: 'El modelo no tiene un producto vinculado para crear el pedido.' };
     }
 
     // Only accept logos that belong to this company; snapshot name + url.
@@ -154,6 +176,45 @@ export async function submitCustomDesignAction(
         const previewUrl = input.previewDataUrl
             ? await uploadPreview(supabase, input.previewDataUrl)
             : '';
+
+        if (adminOrder) {
+            const cart: CartItem[] = input.items.map((item) => ({
+                productId: model.productCode,
+                productName: model.productName || model.name,
+                selection: item.selection,
+                quantity: item.quantity
+            }));
+            const logoLines = logos.map((logo) =>
+                `${logo.zoneLabel}: ${logo.logoName || '—'}${logo.logoImageUrl ? ` · ${logo.logoImageUrl}` : ''}`
+            );
+            const form: CustomerForm = {
+                name: '',
+                company: '',
+                email: '',
+                phone: '',
+                notes: [
+                    `Pedido 3D · ${model.name}`,
+                    input.colorName ? `Color: ${input.colorName}` : '',
+                    logoLines.length ? `Logos:\n${logoLines.join('\n')}` : '',
+                    previewUrl ? `Vista 3D: ${previewUrl}` : '',
+                    input.notes?.trim() || ''
+                ].filter(Boolean).join('\n'),
+                date: '',
+                purchaseOrder: ''
+            };
+            const order = await createOrder(supabase, user.id, form, cart, companyId);
+            // The next admin order must start with a fresh company choice.
+            // A cookie failure must not turn a created order into a retryable error.
+            try {
+                await clearActingCompanyId();
+            } catch {
+                // The order already exists; keep its successful result.
+            }
+            revalidatePath('/admin/orders');
+            revalidatePath('/orders');
+            revalidatePath('/catalog');
+            return { ok: true, orderRef: order.orderRef };
+        }
 
         const { requestRef } = await createDesignRequest(
             supabase,

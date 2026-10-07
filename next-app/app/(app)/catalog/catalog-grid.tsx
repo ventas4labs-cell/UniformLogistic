@@ -231,12 +231,13 @@ export function CatalogGrid({ catalog, basics, companyLogos, actingCompany }: Pr
                 />
             )}
 
-            {/* Basic product → sizes → 3D → request */}
+            {/* Basic product → sizes → 3D → direct admin order or customer request */}
             {activeBasic && (
                 <BasicItemFlow
                     product={activeBasic.product}
                     model={activeBasic.model}
                     logos={companyLogos}
+                    adminOrder={Boolean(actingCompany)}
                     onClose={() => setActiveBasic(null)}
                 />
             )}

@@ -199,7 +199,7 @@ export function OrderDetailModal({
                             <h4 className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-zinc-400 mb-1 flex items-center gap-1.5">
                                 <Package size={12} /> Notas
                             </h4>
-                            <p className="text-sm text-gray-600 dark:text-zinc-300 italic">
+                            <p className="text-sm text-gray-600 dark:text-zinc-300 italic whitespace-pre-wrap break-words">
                                 {order.notes}
                             </p>
                         </div>

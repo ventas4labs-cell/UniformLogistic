@@ -8,16 +8,18 @@ import type { ThreeDModel } from '@/lib/services/three-d-models';
 import type { Logo } from '@/lib/services/logos';
 import type { SizeSelection } from '@/lib/types';
 
-// Basic-item order flow: pick sizes → 3D logo placement → order request.
+// Basic-item order flow: pick sizes → 3D logo placement → order or request.
 export function BasicItemFlow({
     product,
     model,
     logos,
+    adminOrder,
     onClose
 }: {
     product: AdminProduct;
     model: ThreeDModel;
     logos: Logo[];
+    adminOrder: boolean;
     onClose: () => void;
 }) {
     const [sizeItems, setSizeItems] = useState<
@@ -40,6 +42,7 @@ export function BasicItemFlow({
             model={model}
             logos={logos}
             sizeItems={sizeItems}
+            adminOrder={adminOrder}
             onBack={() => setSizeItems(null)}
             onClose={onClose}
         />
