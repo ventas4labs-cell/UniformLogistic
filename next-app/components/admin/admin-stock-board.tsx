@@ -24,7 +24,7 @@ const SHIRT_SIZE_ORDER = [
 /**
  * Strip the gender prefix from a size string ("H · M" → "M", "M · 2XL" → "2XL").
  * The customer-facing checkout adds the gender; for the admin stock view we
- * only need the canonical size token to sort and label compactly.
+ * only need the canonical size token to sort.
  */
 function shortSize(s: string): string {
     const parts = s.split('·').map((x) => x.trim());
@@ -484,7 +484,7 @@ function ProductTable({
 }
 
 function SizePill({ row }: { row: StockRow }) {
-    const label = shortSize(row.size);
+    const label = row.size;
     const qty = row.quantityAvailable;
     const out = qty === 0;
     const low = qty > 0 && qty <= 3;

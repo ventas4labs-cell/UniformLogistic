@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:stock": "node --conditions=react-server --test tests/stock-catalog.test.mjs",
     "sync:3d": "node scripts/sync-3d-models.mjs"
   },
   "dependencies": {
