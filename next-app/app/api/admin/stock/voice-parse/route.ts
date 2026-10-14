@@ -207,6 +207,8 @@ Tallas canónicas:
 - "cintura 32" → "C32\\""
 - "cintura 34 largo 30" → "C34\\" / L30\\""
 - "mediana" → M, "grande" → L, "extra grande" → XL, "doble extra grande" → 2XL, "triple extra grande" → 3XL.
+- "extra pequeña" → XS, "talla única" o "unitalla" → UNITALLA.
+- Usá el género dictado aunque difiera del público original del producto; si no se indicó género, preferí la talla sin prefijo.
 
 Reglas adicionales:
 - Si hay ambigüedad de producto ("camisa azul" cuando hay dos azules), elegí el más probable y bajá confidence a 0.6.

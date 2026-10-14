@@ -8,12 +8,20 @@ import {
     getManualStockCatalogAction
 } from '@/app/(admin)/admin/stock/actions';
 import type { VoiceCatalogEntry } from '@/lib/services/voice-catalog';
+import { splitStockSize, type StockGender } from '@/lib/stock-size';
+import { compareSizeLabels } from '@/lib/size-order';
 import { useDialog } from '@/lib/use-dialog';
 
 interface CompanyOption {
     id: string;
     name: string;
 }
+
+const GENDER_OPTIONS: { value: StockGender; label: string }[] = [
+    { value: null, label: 'Sin género' },
+    { value: 'men', label: 'Hombre' },
+    { value: 'women', label: 'Mujer' }
+];
 
 export function ManualStockEntry({ companies }: { companies: CompanyOption[] }) {
     const [open, setOpen] = useState(false);
@@ -45,6 +53,7 @@ function EntryModal({
     const [companyId, setCompanyId] = useState(companies[0]?.id || '');
     const [catalog, setCatalog] = useState<VoiceCatalogEntry[]>([]);
     const [productId, setProductId] = useState('');
+    const [gender, setGender] = useState<StockGender>(null);
     const [size, setSize] = useState('');
     const [quantity, setQuantity] = useState('');
     const [reason, setReason] = useState('');
@@ -77,7 +86,14 @@ function EntryModal({
             a.product_name.localeCompare(b.product_name, 'es')
         );
     }, [catalog]);
-    const sizes = catalog.filter((entry) => entry.product_id === productId);
+    const productEntries = catalog.filter((entry) => entry.product_id === productId);
+    const genderOptions = GENDER_OPTIONS.filter((option) =>
+        productEntries.some((entry) => splitStockSize(entry.size).gender === option.value)
+    );
+    const sizes = productEntries
+        .filter((entry) => splitStockSize(entry.size).gender === gender)
+        .sort((a, b) => compareSizeLabels(a.size, b.size));
+    const selectedSize = sizes.find((entry) => splitStockSize(entry.size).size === size)?.size;
     const selectedCompany = companies.find((company) => company.id === companyId);
     const selectedProduct = products.find((product) => product.product_id === productId);
     const amount = Number(quantity);
@@ -86,7 +102,7 @@ function EntryModal({
 
     const submit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        if (loadingCatalog || !companyId || !productId || !size || !validAmount) return;
+        if (loadingCatalog || !companyId || !productId || !selectedSize || !validAmount) return;
         setError(null);
         setSuccess(null);
         startTransition(async () => {
@@ -94,7 +110,7 @@ function EntryModal({
                 const result = await addManualStockEntryAction({
                     companyId,
                     productId,
-                    size,
+                    size: selectedSize,
                     quantity: amount,
                     reason
                 });
@@ -102,7 +118,7 @@ function EntryModal({
                     setError(result.error);
                     return;
                 }
-                setSuccess(`${amount} pieza${amount === 1 ? '' : 's'} agregada${amount === 1 ? '' : 's'} a ${selectedCompany?.name}: ${selectedProduct?.product_name} · ${size}.`);
+                setSuccess(`${amount} pieza${amount === 1 ? '' : 's'} agregada${amount === 1 ? '' : 's'} a ${selectedCompany?.name}: ${selectedProduct?.product_name} · ${selectedSize}.`);
                 setQuantity('');
                 setReason('');
                 router.refresh();
@@ -150,6 +166,7 @@ function EntryModal({
                                 setCompanyId(event.target.value);
                                 setCatalog([]);
                                 setProductId('');
+                                setGender(null);
                                 setSize('');
                                 setLoadingCatalog(true);
                                 setError(null);
@@ -171,6 +188,7 @@ function EntryModal({
                             value={productId}
                             onChange={(event) => {
                                 setProductId(event.target.value);
+                                setGender(null);
                                 setSize('');
                                 setError(null);
                                 setSuccess(null);
@@ -188,10 +206,38 @@ function EntryModal({
                         </select>
                         {!loadingCatalog && products.length === 0 && !error && (
                             <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
-                                Esta empresa no tiene productos con tallas disponibles.
+                                Esta empresa no tiene productos disponibles.
                             </p>
                         )}
                     </div>
+
+                    <fieldset disabled={!productId || pending}>
+                        <legend className="block text-sm font-semibold mb-1">Género (opcional)</legend>
+                        <div className="flex flex-wrap gap-2">
+                            {(productId ? genderOptions : GENDER_OPTIONS).map((option) => (
+                                <button
+                                    key={option.value ?? 'none'}
+                                    type="button"
+                                    aria-pressed={gender === option.value}
+                                    onClick={() => {
+                                        setGender(option.value);
+                                        if (!productEntries.some((entry) => {
+                                            const parsed = splitStockSize(entry.size);
+                                            return parsed.gender === option.value && parsed.size === size;
+                                        })) setSize('');
+                                        setError(null);
+                                        setSuccess(null);
+                                    }}
+                                    className={`px-3 py-2 rounded-lg border text-sm font-semibold disabled:opacity-60 ${gender === option.value
+                                        ? 'bg-orange-50 border-orange-500 text-orange-700 dark:bg-orange-950/30 dark:text-orange-300'
+                                        : 'border-gray-200 dark:border-zinc-700 hover:bg-gray-50 dark:hover:bg-zinc-800'
+                                    }`}
+                                >
+                                    {option.label}
+                                </button>
+                            ))}
+                        </div>
+                    </fieldset>
 
                     <div className="grid grid-cols-2 gap-3">
                         <div>
@@ -210,7 +256,9 @@ function EntryModal({
                             >
                                 <option value="">Seleccioná talla</option>
                                 {sizes.map((entry) => (
-                                    <option key={entry.size} value={entry.size}>{entry.size}</option>
+                                    <option key={entry.size} value={splitStockSize(entry.size).size}>
+                                        {splitStockSize(entry.size).size}
+                                    </option>
                                 ))}
                             </select>
                         </div>
@@ -260,7 +308,7 @@ function EntryModal({
                         </button>
                         <button
                             type="submit"
-                            disabled={pending || loadingCatalog || !productId || !size || !validAmount}
+                            disabled={pending || loadingCatalog || !productId || !selectedSize || !validAmount}
                             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {pending ? <Loader2 size={16} className="animate-spin" /> : <PackagePlus size={16} />}

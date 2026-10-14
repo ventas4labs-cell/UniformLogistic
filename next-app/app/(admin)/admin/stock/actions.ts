@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/utils/supabase/server';
 import { isAdminEmail } from '@/lib/admin-acting-company';
-import { buildVoiceCatalog, type VoiceCatalogEntry } from '@/lib/services/voice-catalog';
+import { buildManualStockCatalog, type VoiceCatalogEntry } from '@/lib/services/voice-catalog';
 import {
     sendWithdrawalApprovedEmail,
     sendWithdrawalRejectedEmail
@@ -94,7 +94,7 @@ export async function getManualStockCatalogAction(
         return { entries: [], error: 'No se encontró la empresa.' };
 
     try {
-        return { entries: await buildVoiceCatalog(supabase, companyId) };
+        return { entries: await buildManualStockCatalog(supabase, companyId) };
     } catch {
         return { entries: [], error: 'No se pudo cargar el catálogo de productos.' };
     }
@@ -130,7 +130,7 @@ export async function addManualStockEntryAction(
 
     let catalog: VoiceCatalogEntry[];
     try {
-        catalog = await buildVoiceCatalog(supabase, input.companyId);
+        catalog = await buildManualStockCatalog(supabase, input.companyId);
     } catch {
         return { error: 'No se pudo validar el producto.' };
     }

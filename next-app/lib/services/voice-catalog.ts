@@ -4,15 +4,12 @@
 // pair available to the company; if a company_stock row already
 // exists for the pair, its id is pre-resolved.
 //
-// Sizes are expanded the SAME way the customer checkout produces size
-// strings (see selectionToSizeString in lib/services/orders.ts):
-//   shirts  →  "H · M" / "M · 2XL" (gender prefix)
-//   pants   →  "C32\"" / "C32\" / L30\"" (waist + optional inseam)
-// So a SKU dictated by voice writes the same string the customer would
-// have ordered.
+// Keep checkout's canonical size labels and also allow XS and either
+// gender for every stock product, regardless of its catalog audience.
 
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { manualStockSizes, splitStockSize, stockProductSizes } from '@/lib/stock-size';
 
 export interface VoiceCatalogEntry {
     product_id: string;
@@ -43,41 +40,6 @@ interface ProductRow {
     is_active?: boolean;
 }
 
-function expandSizes(p: ProductRow): string[] {
-    const sj = p.sizes_json || {};
-    const out: string[] = [];
-
-    if (p.product_type === 'shirt') {
-        // Shirts: gender-prefixed strings. Unisex products get both
-        // Hombre · and Mujer · variants so warehouse can split inventory.
-        if (p.gender === 'men') {
-            (sj.men || []).forEach((s) => out.push(`Hombre · ${s}`));
-        } else if (p.gender === 'women') {
-            (sj.women || []).forEach((s) => out.push(`Mujer · ${s}`));
-        } else {
-            (sj.men || []).forEach((s) => out.push(`Hombre · ${s}`));
-            (sj.women || []).forEach((s) => out.push(`Mujer · ${s}`));
-            if (out.length === 0) {
-                // No gendered size lists configured — fall back to bare labels.
-                (sj.men || sj.women || []).forEach((s) => out.push(s));
-            }
-        }
-        return out;
-    }
-
-    // Pants: `C<waist>"` with optional `/ L<inseam>"`.
-    const waists = sj.waist || [];
-    const inseams = sj.inseam || [];
-    if (inseams.length > 0) {
-        for (const w of waists) {
-            for (const i of inseams) out.push(`C${w}" / L${i}"`);
-        }
-    } else {
-        for (const w of waists) out.push(`C${w}"`);
-    }
-    return out;
-}
-
 interface CompanyProductJoin {
     product: ProductRow | ProductRow[] | null;
 }
@@ -94,6 +56,22 @@ const pickOne = <T>(v: T | T[] | null | undefined): T | null =>
 export async function buildVoiceCatalog(
     supabase: SupabaseClient,
     companyId: string
+): Promise<VoiceCatalogEntry[]> {
+    return buildStockCatalog(supabase, companyId, false);
+}
+
+/** Manual stock also supports unspecified sizes and optional gender. */
+export async function buildManualStockCatalog(
+    supabase: SupabaseClient,
+    companyId: string
+): Promise<VoiceCatalogEntry[]> {
+    return buildStockCatalog(supabase, companyId, true);
+}
+
+async function buildStockCatalog(
+    supabase: SupabaseClient,
+    companyId: string,
+    manual: boolean
 ): Promise<VoiceCatalogEntry[]> {
     // 1. Company assignments plus shared basic products. Customers can
     // order basic products without a company_products row, so manual stock
@@ -145,13 +123,15 @@ export async function buildVoiceCatalog(
     // 3. Cartesian expand into the catalog.
     const catalog: VoiceCatalogEntry[] = [];
     for (const p of products) {
-        for (const size of expandSizes(p)) {
+        const configuredSizes = stockProductSizes(p);
+        const sizes = manual ? manualStockSizes(configuredSizes) : configuredSizes;
+        for (const size of sizes) {
             catalog.push({
                 product_id: p.id,
                 product_code: p.product_code,
                 product_name: p.name,
                 product_type: p.product_type,
-                gender: p.gender,
+                gender: splitStockSize(size).gender ?? p.gender,
                 fabric_type: p.fabric_type,
                 size,
                 company_stock_id: existingMap.get(`${p.id}|${size}`) ?? null
