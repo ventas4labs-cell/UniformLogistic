@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { ChevronLeft, ChevronRight, Lock } from 'lucide-react';
 import { createClient } from '@/utils/supabase/server';
-import { fetchSchedule } from '@/lib/services/hr-schedules';
+import { DEFAULT_SCHEDULE, fetchSchedule } from '@/lib/services/hr-schedules';
+import { computeEmployeePayroll } from '@/lib/services/hr-payroll';
 import {
     addDaysStr,
     crDateOf,
@@ -92,6 +93,13 @@ export default async function HorasPage({
         arr.push(p);
         byDate.set(d, arr);
     }
+    const payroll = computeEmployeePayroll({
+        punches, schedule, leave, rates: [], today,
+        period: { kind: 'semana', start: monday, end: sunday }
+    });
+    const payDays = new Map(payroll.days.map((d) => [d.date, d]));
+    const effectiveSchedule = schedule && !payroll.invalidSchedule
+        ? schedule : { employeeId: user.id, ...DEFAULT_SCHEDULE };
 
     const days = Array.from({ length: 7 }, (_, i) => {
         const date = addDaysStr(monday, i);
@@ -102,9 +110,10 @@ export default async function HorasPage({
             date,
             punches: dayPunches,
             future: date > today,
-            scheduled: !!schedule && schedule.workdays.includes(weekday),
+            scheduled: effectiveSchedule.workdays.includes(weekday),
+            payDay: payDays.get(date),
             onLeave,
-            summary: computeDaySummary(dayPunches, schedule, {
+            summary: computeDaySummary(dayPunches, effectiveSchedule, {
                 weekday,
                 isPast: date < today,
                 onLeave: !!onLeave
@@ -160,9 +169,14 @@ export default async function HorasPage({
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-200 dark:border-zinc-800 p-4">
-                    <p className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-zinc-400">Trabajado</p>
+                    <p className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-zinc-400">Horas pagadas</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-zinc-100 mt-1 tabular-nums">{fmtHm(payroll.regularMin + payroll.overtimeMin)}</p>
+                    <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">Incluyen almuerzo y breaks. Horas extra a 1,5×.</p>
+                </div>
+                <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-200 dark:border-zinc-800 p-4">
+                    <p className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-zinc-400">Trabajo efectivo</p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-zinc-100 mt-1 tabular-nums">{fmtHm(totalMin)}</p>
                 </div>
                 <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-200 dark:border-zinc-800 p-4">
@@ -172,7 +186,7 @@ export default async function HorasPage({
             </div>
 
             <ul className="space-y-2">
-                {days.map(({ date, punches: dayPunches, future, scheduled, onLeave, summary }) => {
+                {days.map(({ date, punches: dayPunches, future, scheduled, onLeave, summary, payDay }) => {
                     const hasPunches = dayPunches.length > 0;
                     const muted = future || (!hasPunches && !scheduled && !onLeave);
                     return (
@@ -197,7 +211,9 @@ export default async function HorasPage({
                                     ) : summary.open ? (
                                         <span className="text-green-600 dark:text-green-400 text-sm">En curso</span>
                                     ) : hasPunches ? (
-                                        fmtHm(summary.workedMin)
+                                        payDay?.status === 'paid'
+                                            ? `${fmtHm(payDay.regularMin + payDay.overtimeMin)} pagadas`
+                                            : 'Marcas incompletas'
                                     ) : future ? (
                                         ''
                                     ) : scheduled ? (
@@ -216,6 +232,11 @@ export default async function HorasPage({
                                         <span>Break <span className="text-gray-800 dark:text-zinc-200">{fmtPeriod(summary.breakMin, summary.breakCount, summary.breakOpen)}</span></span>
                                         <span>Almuerzo <span className="text-gray-800 dark:text-zinc-200">{fmtPeriod(summary.lunchMin, summary.lunchCount, summary.lunchOpen)}</span></span>
                                     </div>
+                                    {payDay && payDay.overtimeMin > 0 && (
+                                        <p className="mt-1.5 text-xs text-gray-500 dark:text-zinc-400">
+                                            {fmtHm(payDay.overtimeMin)} extra a 1,5×{payDay.dayOff ? ' por día libre del horario.' : ' por exceder la duración del turno.'}
+                                        </p>
+                                    )}
                                     <details className="mt-2">
                                         <summary className="text-xs font-semibold text-orange-700 dark:text-orange-400 cursor-pointer select-none">
                                             Ver marcajes ({dayPunches.length})

@@ -1,19 +1,17 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { computeDaySummary, parseHHMM } from './hr-attendance';
 import { addDaysStr, crDateOf, crWeekday, type Punch } from './hr-punches';
-import { DEFAULT_SCHEDULE, type Schedule } from './hr-schedules';
+import { DEFAULT_SCHEDULE, scheduleInputError, type Schedule } from './hr-schedules';
 import { timeOffOn, type TimeOffKind, type TimeOffRequest } from './hr-time-off';
 
 // ─── Payroll (planilla): punched hours × hourly rate ────────────────
 // Salario bruto per CR calendar day, summed over the pay period:
 //
-//   pagado     = asistencia's "Trabajado" (entrada→salida sessions minus
-//                break and almuerzo) + break up to the schedule's
-//                allowance. Breaks inside the jornada are tiempo efectivo
-//                de trabajo; only the minutes past the allowance go unpaid.
-//   ordinarias = pagado up to the day's jornada (salida − entrada −
-//                almuerzo) on a scheduled workday; 0 on a day off
-//   extra      = the rest, at 1.5× (Código de Trabajo, art. 139)
+//   turno      = closed entrada→salida sessions, including all breaks
+//                and lunch; gaps between separate sessions are excluded.
+//   ordinarias = turno up to the scheduled daily duration (salida −
+//                entrada) on a workday; 0 on a scheduled day off.
+//   extra      = the rest, paid at 1.5× the hourly rate.
 //
 // Gross only — no CCSS / renta deductions, feriados, or vacation pay.
 // A day that is still open (no salida) pays nothing until it's closed
@@ -21,9 +19,8 @@ import { timeOffOn, type TimeOffKind, type TimeOffRequest } from './hr-time-off'
 
 export const OVERTIME_MULTIPLIER = 1.5;
 
-/** Legal daily ordinary jornada (diurna) — used when a saved schedule
- *  has no working time left after almuerzo. */
-const LEGAL_JORNADA_MIN = 8 * 60;
+const DEFAULT_SHIFT_MIN =
+    parseHHMM(DEFAULT_SCHEDULE.endTime) - parseHHMM(DEFAULT_SCHEDULE.startTime);
 
 // ─── Rates ──────────────────────────────────────────────────────────
 
@@ -175,10 +172,13 @@ export interface PayDay {
     lastOut: string | null;
     /** Asistencia's "Trabajado" (0 unless the day is paid). */
     workedMin: number;
+    shiftMin: number;
     paidBreakMin: number;
+    paidLunchMin: number;
     regularMin: number;
+    /** Recorded shift minutes beyond the scheduled duration or on a day off. */
     overtimeMin: number;
-    /** Not one of the schedule's workdays, so every hour is extra. */
+    /** Not one of the schedule's workdays. */
     dayOff: boolean;
     hourlyRate: number | null;
     /** Céntimos, rounded per day so every total adds up exactly. */
@@ -204,18 +204,18 @@ export interface EmployeePayroll {
     grossPay: number | null;
     /** No schedule saved — the default 8:00–17:00, L–V jornada applies. */
     usesDefaultSchedule: boolean;
-    /** The saved schedule leaves no time after almuerzo (salida before
-     *  entrada?) — the 8 h legal jornada applies instead. */
+    /** An invalid saved schedule uses the default 9 h shift instead. */
     invalidSchedule: boolean;
 }
 
-/** Ordinary minutes in one scheduled workday, or null when the schedule
- *  leaves none (salida ≤ entrada + almuerzo). */
+/** Paid duration of a full shift. Breaks and lunch are included. */
 export function scheduledJornadaMin(
-    schedule: Pick<Schedule, 'startTime' | 'endTime' | 'lunchMin'>
+    schedule: Pick<Schedule, 'startTime' | 'endTime'>
 ): number | null {
+    const time = /^([01]\d|2[0-3]):[0-5]\d$/;
+    if (!time.test(schedule.startTime) || !time.test(schedule.endTime)) return null;
     const min =
-        parseHHMM(schedule.endTime) - parseHHMM(schedule.startTime) - schedule.lunchMin;
+        parseHHMM(schedule.endTime) - parseHHMM(schedule.startTime);
     return min > 0 ? min : null;
 }
 
@@ -225,7 +225,9 @@ const emptyDay = (date: string, status: PayDayStatus): PayDay => ({
     firstIn: null,
     lastOut: null,
     workedMin: 0,
+    shiftMin: 0,
     paidBreakMin: 0,
+    paidLunchMin: 0,
     regularMin: 0,
     overtimeMin: 0,
     dayOff: false,
@@ -247,9 +249,10 @@ export function computeEmployeePayroll(input: {
     today: string;
 }): EmployeePayroll {
     const { punches, schedule, rates, leave, period, today } = input;
-    const effective: Schedule = schedule ?? { employeeId: '', ...DEFAULT_SCHEDULE };
-    const jornada = scheduledJornadaMin(effective);
-    const workdayCap = jornada ?? LEGAL_JORNADA_MIN;
+    const invalidSchedule = !!schedule && scheduleInputError(schedule) != null;
+    const effective: Schedule = schedule && !invalidSchedule
+        ? schedule : { employeeId: '', ...DEFAULT_SCHEDULE };
+    const workdayCap = scheduledJornadaMin(effective) ?? DEFAULT_SHIFT_MIN;
     const hasRate = !!rates?.length;
 
     const byDate = new Map<string, Punch[]>();
@@ -288,10 +291,9 @@ export function computeEmployeePayroll(input: {
         }
 
         const dayOff = !effective.workdays.includes(weekday);
-        const paidBreakMin = Math.min(summary.breakMin, effective.breakMin);
-        const paidMin = summary.workedMin + paidBreakMin;
-        const regularMin = Math.min(paidMin, dayOff ? 0 : workdayCap);
-        const overtimeMin = paidMin - regularMin;
+        const shiftMin = summary.shiftMin ?? 0;
+        const regularMin = Math.min(shiftMin, dayOff ? 0 : workdayCap);
+        const overtimeMin = shiftMin - regularMin;
         const hourlyRate = rateEntryOn(rates, date)?.hourlyRate ?? null;
         const centsPerHour = hourlyRate == null ? 0 : Math.round(hourlyRate * 100);
 
@@ -301,7 +303,9 @@ export function computeEmployeePayroll(input: {
             firstIn: summary.firstIn,
             lastOut: summary.lastOut,
             workedMin: summary.workedMin,
-            paidBreakMin,
+            shiftMin,
+            paidBreakMin: summary.breakMin,
+            paidLunchMin: summary.lunchMin,
             regularMin,
             overtimeMin,
             dayOff,
@@ -326,7 +330,7 @@ export function computeEmployeePayroll(input: {
         days,
         regularMin: sum((d) => d.regularMin),
         overtimeMin: sum((d) => d.overtimeMin),
-        daysPaid: paid.length,
+        daysPaid: paid.filter((d) => d.regularMin + d.overtimeMin > 0).length,
         incompleteDates: days.filter((d) => d.status === 'incomplete').map((d) => d.date),
         openToday: days.some((d) => d.status === 'open'),
         leaveDays: days.filter((d) => d.status === 'leave').length,
@@ -335,7 +339,7 @@ export function computeEmployeePayroll(input: {
         overtimePay: hasRate ? overtimePay : null,
         grossPay: hasRate ? regularPay + overtimePay : null,
         usesDefaultSchedule: !schedule,
-        invalidSchedule: jornada == null
+        invalidSchedule
     };
 }
 

@@ -20,7 +20,7 @@ import {
     setKioskAccessToken,
     setKioskActive
 } from '@/lib/services/hr-kiosks';
-import { upsertSchedule, type ScheduleInput } from '@/lib/services/hr-schedules';
+import { DEFAULT_SCHEDULE, scheduleInputError, upsertSchedule, type ScheduleInput } from '@/lib/services/hr-schedules';
 import { reviewTimeOffRequest } from '@/lib/services/hr-time-off';
 import {
     addDaysStr,
@@ -30,7 +30,7 @@ import {
     type PunchType
 } from '@/lib/services/hr-punches';
 import { correctPunch, type PunchEditAction } from '@/lib/services/hr-punch-edits';
-import { scheduledJornadaMin, upsertPayRate } from '@/lib/services/hr-payroll';
+import { upsertPayRate } from '@/lib/services/hr-payroll';
 import { sendEmployeeInviteEmail } from '@/lib/email/notifications';
 
 // The invite link is single-use and expires; long enough that an
@@ -83,6 +83,7 @@ export interface CreateEmployeeInput {
     phone?: string;
     /** Salario por hora in colones; null/undefined = not set yet. */
     hourlyRate?: number | null;
+    schedule?: ScheduleInput;
 }
 
 /**
@@ -102,6 +103,9 @@ export async function createEmployeeAction(
     if (!fullName || !email) {
         return { error: 'Nombre y email son obligatorios.' };
     }
+    const schedule = input.schedule ?? DEFAULT_SCHEDULE;
+    const scheduleError = scheduleInputError(schedule);
+    if (scheduleError) return { error: scheduleError };
     let hourlyRate: number | null = null;
     if (input.hourlyRate != null) {
         const parsed = parseHourlyRate(input.hourlyRate);
@@ -138,10 +142,11 @@ export async function createEmployeeAction(
             activationExpiresAt: expiresAt,
             createdBy: adminId
         });
+        await upsertSchedule(service, created.user.id, schedule);
     } catch (err) {
         // Roll back the orphan auth user so the email is free to retry.
         await service.auth.admin.deleteUser(created.user.id);
-        const msg = err instanceof Error ? err.message : 'No se pudo registrar el empleado.';
+        const msg = (err as { message?: string } | null)?.message || 'No se pudo registrar el empleado y su horario.';
         return { error: msg };
     }
 
@@ -228,6 +233,7 @@ export interface UpdateEmployeeInput {
     fullName: string;
     position?: string;
     phone?: string;
+    schedule?: ScheduleInput;
     /** Only sent when the salario por hora changed. */
     pay?: {
         hourlyRate: number;
@@ -244,6 +250,10 @@ export async function updateEmployeeAction(
     const { error: adminErr, adminId } = await requireAdmin();
     if (adminErr) return { error: adminErr };
     if (!input.fullName.trim()) return { error: 'El nombre es obligatorio.' };
+    if (input.schedule) {
+        const error = scheduleInputError(input.schedule);
+        if (error) return { error };
+    }
     let pay: { hourlyRate: number; effectiveFrom: string } | null = null;
     if (input.pay) {
         const parsed = parseHourlyRate(input.pay.hourlyRate);
@@ -256,6 +266,7 @@ export async function updateEmployeeAction(
     const service = createServiceClient();
     if (!(await fetchEmployee(service, userId))) return { error: 'Empleado no encontrado.' };
     try {
+        if (input.schedule) await upsertSchedule(service, userId, input.schedule);
         await updateEmployeeRow(service, userId, {
             fullName: input.fullName.trim(),
             position: (input.position || '').trim(),
@@ -276,6 +287,8 @@ export async function updateEmployeeAction(
     }
     revalidatePath('/admin/rrhh');
     revalidatePath('/admin/rrhh/planilla');
+    revalidatePath('/admin/rrhh/asistencia', 'layout');
+    revalidatePath('/empleado/horas');
     return {};
 }
 
@@ -391,38 +404,20 @@ export async function saveEmployeeScheduleAction(
 ): Promise<{ error?: string }> {
     const { error: adminErr } = await requireAdmin();
     if (adminErr) return { error: adminErr };
-    if (!input.workdays.length) return { error: 'Elegí al menos un día laboral.' };
-    if (!input.startTime || !input.endTime) return { error: 'Definí hora de entrada y salida.' };
-    // The jornada (salida − entrada − almuerzo) is what the planilla pays
-    // as ordinary time, so it has to be positive. Shifts past midnight
-    // aren't supported: punches are grouped by calendar day.
-    if (
-        scheduledJornadaMin({
-            startTime: input.startTime,
-            endTime: input.endTime,
-            lunchMin: Math.max(0, input.lunchMin || 0)
-        }) == null
-    )
-        return {
-            error: 'La salida tiene que ser después de la entrada, con tiempo de trabajo además del almuerzo.'
-        };
+    const error = scheduleInputError(input);
+    if (error) return { error };
     const service = createServiceClient();
+    if (!(await fetchEmployee(service, employeeId))) return { error: 'Empleado no encontrado.' };
     try {
-        await upsertSchedule(service, employeeId, {
-            workdays: input.workdays,
-            startTime: input.startTime,
-            endTime: input.endTime,
-            lunchMin: Math.max(0, input.lunchMin || 0),
-            breakMin: Math.max(0, input.breakMin || 0),
-            graceMin: Math.max(0, input.graceMin || 0)
-        });
+        await upsertSchedule(service, employeeId, input);
     } catch (err) {
         const msg = err instanceof Error ? err.message : 'No se pudo guardar el horario.';
         return { error: msg };
     }
     revalidatePath('/admin/rrhh');
-    revalidatePath('/admin/rrhh/asistencia');
+    revalidatePath('/admin/rrhh/asistencia', 'layout');
     revalidatePath('/admin/rrhh/planilla');
+    revalidatePath('/empleado/horas');
     return {};
 }
 

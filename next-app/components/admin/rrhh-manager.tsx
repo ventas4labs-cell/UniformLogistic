@@ -27,6 +27,7 @@ import type { Employee } from '@/lib/services/employees';
 import type { Kiosk } from '@/lib/services/hr-kiosks';
 import {
     DEFAULT_SCHEDULE,
+    scheduleInputError,
     WEEKDAY_LABELS,
     type Schedule,
     type ScheduleInput
@@ -35,6 +36,7 @@ import {
     fmtDate,
     fmtRate,
     rateEntryOn,
+    scheduledJornadaMin,
     upcomingRate,
     type PayRate
 } from '@/lib/services/hr-payroll';
@@ -52,11 +54,13 @@ import {
     type CreateEmployeeInput
 } from '@/app/(admin)/admin/rrhh/actions';
 import { useDialog } from '@/lib/use-dialog';
+import { fmtHm } from '@/lib/services/hr-attendance';
 
 type Status = 'active' | 'pending' | 'inactive';
 type Tab = 'empleados' | 'kioscos';
 
 interface EmployeeFormValues extends CreateEmployeeInput {
+    schedule: ScheduleInput;
     hourlyRate: number | null;
     /** The salario por hora differs from the one in force today. */
     rateChanged: boolean;
@@ -436,7 +440,8 @@ export function RrhhManager({
                             email: values.email,
                             position: values.position,
                             phone: values.phone,
-                            hourlyRate: values.hourlyRate
+                            hourlyRate: values.hourlyRate,
+                            schedule: values.schedule
                         });
                         if (res?.error) return res.error;
                         if (res?.warning) setNotice(res.warning);
@@ -452,6 +457,7 @@ export function RrhhManager({
                     title="Editar empleado"
                     submitLabel="Guardar cambios"
                     initial={editing}
+                    schedule={schedules[editing.id] || null}
                     rates={payRates[editing.id]}
                     today={today}
                     emailReadOnly
@@ -462,6 +468,7 @@ export function RrhhManager({
                             fullName: values.fullName,
                             position: values.position,
                             phone: values.phone,
+                            schedule: values.schedule,
                             pay:
                                 values.rateChanged && values.hourlyRate != null
                                     ? {
@@ -519,6 +526,7 @@ function EmployeeModal({
     title,
     submitLabel,
     initial,
+    schedule,
     rates,
     today,
     emailReadOnly = false,
@@ -528,6 +536,7 @@ function EmployeeModal({
     title: string;
     submitLabel: string;
     initial?: Employee;
+    schedule?: Schedule | null;
     /** Salario por hora history (edit), oldest first. */
     rates?: PayRate[];
     today: string;
@@ -542,6 +551,7 @@ function EmployeeModal({
     const [email, setEmail] = useState(initial?.email || '');
     const [position, setPosition] = useState(initial?.position || '');
     const [phone, setPhone] = useState(initial?.phone || '');
+    const [scheduleValues, setScheduleValues] = useState<ScheduleInput>(schedule || DEFAULT_SCHEDULE);
     const [rate, setRate] = useState(current ? String(current.hourlyRate) : '');
     const [rateFrom, setRateFrom] = useState(today);
     const [saving, setSaving] = useState(false);
@@ -552,6 +562,11 @@ function EmployeeModal({
 
     const submit = async (ev: React.FormEvent) => {
         ev.preventDefault();
+        const scheduleError = scheduleInputError(scheduleValues);
+        if (scheduleError) {
+            setError(scheduleError);
+            return;
+        }
         if (current && hourlyRate == null) {
             setError('El salario por hora no puede quedar vacío.');
             return;
@@ -569,7 +584,8 @@ function EmployeeModal({
             phone,
             hourlyRate,
             rateChanged,
-            rateFrom
+            rateFrom,
+            schedule: scheduleValues
         });
         setSaving(false);
         if (msg) setError(msg);
@@ -577,7 +593,7 @@ function EmployeeModal({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-2xl shadow-2xl p-6 outline-none">
+            <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} className="bg-white dark:bg-zinc-900 w-full max-w-xl max-h-[90dvh] overflow-y-auto rounded-2xl shadow-2xl p-6 outline-none">
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">{title}</h3>
                     <button type="button" onClick={onClose} className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200">
@@ -616,9 +632,13 @@ function EmployeeModal({
                     <p className="-mt-1 text-[11px] text-gray-500 dark:text-zinc-500">
                         {current && rateChanged
                             ? `Las horas antes de esa fecha se siguen pagando a ${fmtRate(current.hourlyRate)}.`
-                            : 'La planilla multiplica las horas marcadas por este monto.'}
+                            : 'La planilla multiplica las horas pagadas del turno por este monto.'}
                         {upcoming && ` Ya hay un cambio a ${fmtRate(upcoming.hourlyRate)} desde el ${fmtDate(upcoming.effectiveFrom)}.`}
                     </p>
+                    <fieldset disabled={saving} className="border-t border-gray-200 dark:border-zinc-800 pt-4 space-y-3">
+                        <legend className="text-sm font-bold text-gray-900 dark:text-zinc-100 px-1">Horario de trabajo</legend>
+                        <ScheduleFields value={scheduleValues} onChange={setScheduleValues} />
+                    </fieldset>
                     {error && <div className="bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 p-3 rounded-lg text-sm border border-red-200 dark:border-red-900/50">{error}</div>}
                     <div className="flex justify-end gap-2 pt-2">
                         <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-semibold text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg">Cancelar</button>
@@ -737,31 +757,20 @@ function ScheduleModal({
     onSubmit: (input: ScheduleInput) => Promise<string | null>;
 }) {
     const dialogRef = useDialog();
-    const base = schedule || DEFAULT_SCHEDULE;
-    const [workdays, setWorkdays] = useState<number[]>(base.workdays);
-    const [startTime, setStartTime] = useState(base.startTime);
-    const [endTime, setEndTime] = useState(base.endTime);
-    const [lunchMin, setLunchMin] = useState(String(base.lunchMin));
-    const [breakMin, setBreakMin] = useState(String(base.breakMin));
-    const [graceMin, setGraceMin] = useState(String(base.graceMin));
+    const [values, setValues] = useState<ScheduleInput>(schedule || DEFAULT_SCHEDULE);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const toggleDay = (d: number) =>
-        setWorkdays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
-
     const submit = async (ev: React.FormEvent) => {
         ev.preventDefault();
+        const validationError = scheduleInputError(values);
+        if (validationError) {
+            setError(validationError);
+            return;
+        }
         setSaving(true);
         setError(null);
-        const msg = await onSubmit({
-            workdays: [...workdays].sort((a, b) => a - b),
-            startTime,
-            endTime,
-            lunchMin: Number(lunchMin) || 0,
-            breakMin: Number(breakMin) || 0,
-            graceMin: Number(graceMin) || 0
-        });
+        const msg = await onSubmit(values);
         setSaving(false);
         if (msg) setError(msg);
     };
@@ -780,55 +789,7 @@ function ScheduleModal({
                 </div>
 
                 <form onSubmit={submit} className="space-y-4">
-                    <div>
-                        <span className="block text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-zinc-400 mb-2">Días laborales</span>
-                        <div className="flex flex-wrap gap-1.5">
-                            {WEEKDAY_ORDER.map((d) => {
-                                const on = workdays.includes(d);
-                                return (
-                                    <button
-                                        key={d}
-                                        type="button"
-                                        onClick={() => toggleDay(d)}
-                                        aria-pressed={on}
-                                        className={`px-3 py-1.5 rounded-lg text-sm font-bold border ${
-                                            on
-                                                ? 'bg-orange-600 text-white border-orange-600'
-                                                : 'bg-transparent text-gray-600 dark:text-zinc-300 border-gray-200 dark:border-zinc-700 hover:border-orange-400'
-                                        }`}
-                                    >
-                                        {WEEKDAY_LABELS[d]}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                        <Field label="Entrada">
-                            <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-transparent" required />
-                        </Field>
-                        <Field label="Salida">
-                            <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-transparent" required />
-                        </Field>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-3">
-                        <Field label="Almuerzo (min)">
-                            <input type="number" min={0} value={lunchMin} onChange={(e) => setLunchMin(e.target.value)} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-transparent" />
-                        </Field>
-                        <Field label="Break (min)">
-                            <input type="number" min={0} value={breakMin} onChange={(e) => setBreakMin(e.target.value)} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-transparent" />
-                        </Field>
-                        <Field label="Tolerancia (min)">
-                            <input type="number" min={0} value={graceMin} onChange={(e) => setGraceMin(e.target.value)} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-transparent" />
-                        </Field>
-                    </div>
-
-                    <p className="text-[11px] text-gray-500 dark:text-zinc-500">
-                        La tolerancia son los minutos de gracia antes de marcar
-                        “llegada tarde”. Almuerzo y break son el máximo permitido.
-                    </p>
+                    <ScheduleFields value={values} onChange={setValues} />
 
                     {error && <div className="bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 p-3 rounded-lg text-sm border border-red-200 dark:border-red-900/50">{error}</div>}
 
@@ -842,6 +803,64 @@ function ScheduleModal({
                 </form>
             </div>
         </div>
+    );
+}
+
+function ScheduleFields({ value, onChange }: {
+    value: ScheduleInput;
+    onChange: (value: ScheduleInput) => void;
+}) {
+    const shiftMin = scheduledJornadaMin(value);
+    const toggleDay = (day: number) => onChange({
+        ...value,
+        workdays: (value.workdays.includes(day)
+            ? value.workdays.filter((d) => d !== day)
+            : [...value.workdays, day]).sort((a, b) => a - b)
+    });
+    const inputClass = 'w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-transparent';
+    return (
+        <>
+            <div>
+                <span className="block text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-zinc-400 mb-2">Días laborales</span>
+                <div role="group" aria-label="Días laborales" className="flex flex-wrap gap-1.5">
+                    {WEEKDAY_ORDER.map((day) => (
+                        <button key={day} type="button" onClick={() => toggleDay(day)} aria-pressed={value.workdays.includes(day)}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-bold border ${value.workdays.includes(day)
+                                ? 'bg-orange-600 text-white border-orange-600'
+                                : 'bg-transparent text-gray-600 dark:text-zinc-300 border-gray-200 dark:border-zinc-700 hover:border-orange-400'}`}>
+                            {WEEKDAY_LABELS[day]}
+                        </button>
+                    ))}
+                </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+                <Field label="Entrada">
+                    <input type="time" value={value.startTime} onChange={(e) => onChange({ ...value, startTime: e.target.value })} className={inputClass} required />
+                </Field>
+                <Field label="Salida">
+                    <input type="time" value={value.endTime} onChange={(e) => onChange({ ...value, endTime: e.target.value })} className={inputClass} required />
+                </Field>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {([
+                    ['lunchMin', 'Almuerzo (min)'],
+                    ['breakMin', 'Break (min)'],
+                    ['graceMin', 'Tolerancia (min)']
+                ] as const).map(([key, label]) => (
+                    <Field key={key} label={label}>
+                        <input type="number" min={0} max={1440} step={1} value={value[key]} onChange={(e) => onChange({ ...value, [key]: e.target.value === '' ? 0 : e.target.valueAsNumber })} className={inputClass} required />
+                    </Field>
+                ))}
+            </div>
+            <div className="rounded-lg bg-orange-50 dark:bg-orange-950/30 p-3 text-xs text-orange-800 dark:text-orange-300">
+                <p className="font-bold">Turno completo: {fmtHm(shiftMin)} ordinarias por día</p>
+                <p className="mt-1">Incluye almuerzo y breaks pagados. Las horas extra se pagan a 1,5×.</p>
+            </div>
+            <p className="text-[11px] text-gray-500 dark:text-zinc-500">
+                Horas de Costa Rica. La tolerancia define cuándo se marca llegada tarde.
+                Almuerzo y break se usan para alertas de duración, sin descontarse de la planilla.
+            </p>
+        </>
     );
 }
 

@@ -70,7 +70,7 @@ export function PlanillaTable({
                         <th className={`${TH} text-right`}>Salario / hora</th>
                         <th className={`${TH} text-right`}>Días</th>
                         <th className={`${TH} text-right`}>Ordinarias</th>
-                        <th className={`${TH} text-right`}>Extra</th>
+                        <th className={`${TH} text-right`}>Extra (1,5×)</th>
                         <th className={`${TH} text-right`}>Salario bruto</th>
                         <th className="px-2 py-3 w-10"><span className="sr-only">Detalle</span></th>
                     </tr>
@@ -105,12 +105,12 @@ export function PlanillaTable({
                                                 </span>
                                             )}
                                             {p.invalidSchedule ? (
-                                                <span className={TAG_AMBER} title="La salida del horario no es posterior a la entrada más el almuerzo; se usa una jornada de 8 h.">
+                                                <span className={TAG_AMBER} title="El horario guardado no es válido; se usa el horario de 08:00 a 17:00, lunes a viernes, con 9 h pagadas por turno.">
                                                     Revisar horario
                                                 </span>
                                             ) : (
                                                 p.usesDefaultSchedule && (
-                                                    <span className={TAG_GRAY} title="Sin horario guardado: jornada de 8:00 a 17:00, lunes a viernes.">
+                                                    <span className={TAG_GRAY} title="Sin horario guardado: jornada de 8:00 a 17:00, lunes a viernes, con 9 h pagadas por turno.">
                                                         Horario por defecto
                                                     </span>
                                                 )
@@ -216,9 +216,9 @@ function DayBreakdown({ employeeId, days }: { employeeId: string; days: PayDay[]
                 <tr>
                     <th className={`${SUB_TH} text-left`}>Día</th>
                     <th className={`${SUB_TH} text-left`}>Marcas</th>
-                    <th className={`${SUB_TH} text-right`}>Pagado</th>
+                    <th className={`${SUB_TH} text-right`}>Turno</th>
                     <th className={`${SUB_TH} text-right`}>Ordinarias</th>
-                    <th className={`${SUB_TH} text-right`}>Extra</th>
+                    <th className={`${SUB_TH} text-right`}>Extra (1,5×)</th>
                     <th className={`${SUB_TH} text-right`}>Tarifa</th>
                     <th className={`${SUB_TH} text-right`}>Monto</th>
                     <th className={`${SUB_TH} text-left`}>Nota</th>
@@ -241,11 +241,11 @@ function DayBreakdown({ employeeId, days }: { employeeId: string; days: PayDay[]
                                 {paid && (
                                     <>
                                         <div className="font-semibold text-gray-900 dark:text-zinc-100">
-                                            {fmtHm(d.workedMin + d.paidBreakMin)}
+                                            {fmtHm(d.shiftMin)}
                                         </div>
-                                        {d.paidBreakMin > 0 && (
+                                        {(d.paidBreakMin > 0 || d.paidLunchMin > 0) && (
                                             <div className="text-[10px] text-gray-500 dark:text-zinc-500">
-                                                incl. {d.paidBreakMin} min de break
+                                                incl. almuerzo y break
                                             </div>
                                         )}
                                     </>

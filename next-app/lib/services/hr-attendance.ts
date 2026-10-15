@@ -25,6 +25,9 @@ export const FLAG_LABELS: Record<DayFlag, string> = {
 export interface DaySummary {
     firstIn: string | null;
     lastOut: string | null;
+    /** Closed entrada→salida sessions, including paid breaks and lunch.
+     *  Gaps between a salida and the next entrada are excluded. */
+    shiftMin: number | null;
     /** Minutes worked = the entrada→salida sessions − break − lunch. A
      *  salida followed by a new entrada (errand, split shift, a salida
      *  punched instead of "almuerzo") leaves the gap out. Null when the
@@ -153,6 +156,7 @@ export function computeDaySummary(
     return {
         firstIn,
         lastOut,
+        shiftMin: firstIn && lastOut ? Math.max(0, sessionMin) : null,
         workedMin,
         breakMin,
         lunchMin,

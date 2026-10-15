@@ -132,7 +132,7 @@ export default async function PlanillaPage({
                         Planilla
                     </h2>
                     <p className="text-sm text-gray-500 dark:text-zinc-400">
-                        Horas marcadas × salario por hora de cada empleado.
+                        Horas pagadas del turno × salario por hora de cada empleado.
                     </p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -262,13 +262,15 @@ export default async function PlanillaPage({
             <div className="mt-4 text-xs text-gray-500 dark:text-zinc-400 space-y-1 max-w-3xl">
                 <p className="font-bold text-gray-600 dark:text-zinc-300">Cómo se calcula</p>
                 <p>
-                    Horas pagadas: de la entrada a la salida, menos el almuerzo. El break
-                    se paga hasta el máximo del horario; lo que se pase, no.
+                    Horas ordinarias: de la entrada a la salida, con almuerzo y breaks
+                    incluidos, hasta la duración del turno del horario. Un turno de
+                    08:00 a 17:00 paga 9 horas ordinarias completas. Las salidas y nuevas entradas
+                    se cuentan como sesiones separadas, sin pagar el tiempo entre ellas.
                 </p>
                 <p>
-                    Horas extra: lo que pase de la jornada del horario (salida − entrada −
-                    almuerzo) y todo lo trabajado en un día libre, pagado a 1,5× el
-                    salario por hora.
+                    Horas extra: el tiempo que exceda la duración del turno y todo lo
+                    registrado en días libres se paga a 1,5× el salario por hora.
+                    La tolerancia de llegada solo afecta las alertas de asistencia.
                 </p>
                 <p>
                     Un día sin marcar la salida no se paga hasta corregirlo. Es el salario

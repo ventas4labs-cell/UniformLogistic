@@ -37,6 +37,24 @@ export const DEFAULT_SCHEDULE: Omit<Schedule, 'employeeId'> = {
 
 export const WEEKDAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
+/** Shared by profile creation, profile editing and the schedule shortcut. */
+export function scheduleInputError(input: ScheduleInput): string | null {
+    if (
+        !Array.isArray(input.workdays) || !input.workdays.length ||
+        input.workdays.some((d) => !Number.isInteger(d) || d < 0 || d > 6)
+    ) return 'Elegí al menos un día laboral válido.';
+    const time = /^([01]\d|2[0-3]):[0-5]\d$/;
+    if (!time.test(input.startTime) || !time.test(input.endTime))
+        return 'Definí una hora de entrada y salida válidas.';
+    // Punches are grouped by calendar day, so overnight shifts aren't supported.
+    if (input.endTime <= input.startTime)
+        return 'La salida tiene que ser después de la entrada, dentro del mismo día.';
+    if ([input.lunchMin, input.breakMin, input.graceMin].some(
+        (min) => !Number.isInteger(min) || min < 0 || min > 1440
+    )) return 'Almuerzo, break y tolerancia deben ser minutos enteros entre 0 y 1440.';
+    return null;
+}
+
 interface RawRow {
     employee_id: string;
     workdays: number[] | null;
