@@ -29,11 +29,10 @@ import {
     type StageKey
 } from '@/lib/services/stage-completions';
 import {
-    createProductAction,
-    updateProductAction,
     deleteProductAction,
     uploadProductImageAction
 } from '@/app/(admin)/admin/products/actions';
+import { saveProduct } from '@/lib/save-product';
 import { validateCABYS } from '@/lib/facturacion/validation/cabys-validator';
 import { VoiceProductDictate } from '@/components/admin/voice-product-dictate';
 import { DecimalInput } from '@/components/admin/decimal-input';
@@ -449,9 +448,7 @@ export function ProductsManager({
                     .map((c) => ({ name: c.name.trim(), hex: c.hex }))
                     .filter((c) => c.name.length > 0)
             };
-            const result = editing
-                ? await updateProductAction(editing.uuid, payload)
-                : await createProductAction(payload);
+            const result = await saveProduct(payload, editing?.uuid);
             if (!result.ok) {
                 setError(result.error);
                 setSaving(false);

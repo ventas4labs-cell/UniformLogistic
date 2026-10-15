@@ -7,7 +7,7 @@ import {
     updateProduct,
     deleteProduct,
     uploadProductImage,
-    ProductInput
+    type ProductInput
 } from '@/lib/services/products';
 import { isAdminEmail } from '@/lib/admin-acting-company';
 
